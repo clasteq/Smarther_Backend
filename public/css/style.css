@@ -1,0 +1,2509 @@
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@300&family=Open+Sans:wght@300;400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;1,100;1,200;1,300;1,400&family=Raleway&family=Roboto&family=Rubik&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@300&family=Open+Sans:wght@300;400&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;1,100;1,200;1,300;1,400&family=Raleway&family=Roboto&family=Rubik&display=swap');
+
+
+.navigation{
+    font-family: poppins;
+    font-weight: 500;
+    
+}
+.navigation .navbar-expand-lg{
+   padding-top: 0;
+   padding-bottom: 0;
+}
+.navigation .container-fluid{
+    background-color: white;
+}
+.profilebutton {
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+}
+.profilebutton:hover{
+    background-color: white;
+    color:  rgb(68, 68, 194);
+    border: 1px solid  rgb(68, 68, 194);
+}
+.dashboard{
+    margin-top: 120px;
+}
+.dashboard h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.dashboard .managesports .sports{
+    background-color: rgb(225, 237, 241);
+    padding:10px;
+    width: 100%;
+    
+}
+
+.dashboard .managesports .sports .images{
+    width: 90px;
+    background-color: rgb(68, 68, 194);
+    border-radius: 50%;
+    padding: 20px;
+}
+.sports .images img{
+    width: 50px;
+}
+.managesports a{
+    text-decoration: none;
+}
+.dashboard .managesports h4{
+    font-family: Poppins;
+    font-size: x-large;
+    font-weight: 500;
+    margin-top: 10px;
+    color: black;
+}
+@media only screen and (max-width: 1200px) {
+    .dashboard .managesports h4{
+       font-size: 13px;
+}
+}
+@media only screen and (min-width: 300px) {
+    .dashboard .managesports h4{
+       font-size: large;
+}
+}
+/* footer */
+.footer{
+    background-color: #000000;
+    font-family: poppins;
+    
+}
+.footer .logo p{
+    color: white
+}
+.footer h4{
+    color: white;
+}
+.footer li {
+    list-style-type: none;
+    text-decoration: none;
+    
+}
+.footer li a{
+    text-decoration: none;
+    color:white;
+    line-height: 2.7;
+}
+ .footer .resources li i{
+   
+    font-size: 20px;
+} 
+
+.footer .jobnotification p{
+    color: white;
+}
+.footer .submit{
+    background-color: rgb(68, 68, 194);
+    border: none;
+    color: white;
+}
+.footer .line{
+    color:white;
+}
+.footer .footersection{
+    color:  white;
+    text-align: center;
+}
+.footer .socialicon a {
+    background-color:rgb(80, 79, 79) ;
+ border-radius: 50%;
+     opacity: 0.5;
+    margin-left: 15px;
+    padding: 10px;
+}
+.footer .socialicon a i{
+    color: white;
+    padding: 5px;
+ 
+}
+
+/* managecourts */
+.managecourts{
+    margin-top: 120px;
+}
+.managecourts .courts h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.managecourts .courts img{
+    width: 50px;
+}
+
+.managecourts .tennis img{
+    width: 20px;
+}
+.managecourts .card-body .tennis h5{
+    font-family: poppins;
+    font-weight: 600;
+}
+.managecourts .card-body .card-text{
+    font-family: poppins;
+    font-size: 15px;
+    font-weight: 500;
+}
+.managecourts .card-body p{
+    font-family: poppins;
+    font-size: 15px;
+    font-weight: 400;
+}
+.managecourts .card-body .inactive i{
+    color:  #fab905;
+    
+    border-radius: 50%;
+    padding:5px;
+    font-size: 9px;
+}
+.managecourts .card-body .inactive i{
+    background-color:  #d4ccb9;
+}
+.managecourts .card-body .inactive{
+    color: #a17806;
+    
+}
+.managecourts .card-body{
+    background-color: rgb(225, 237, 241);
+    padding: 20px;
+    border-radius: 20px;
+    
+}
+.managecourts .card{
+    
+    border: none;
+}
+/* football turf */
+.managecourts .card-body .active i{
+    color:  #18740e;
+    
+    border-radius: 50%;
+    padding:5px;
+    font-size: 9px;
+}
+.managecourts .card-body .active i{
+    background-color:  #d4ccb9;
+}
+.managecourts .card-body .active{
+    color: #18740e;
+    
+}
+
+/* managecourts2 */
+
+.gymtimings{
+    margin-top: 120px;
+}
+.gymtimings h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.gymtimings .gymslot h4{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+.gymtimings label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.gymtimings .form-select{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+
+.gymtimings .form-control{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+
+
+.timepick .sportstime{
+    background-color:  rgb(225, 237, 241);
+    padding: 10px;
+    width: 80%;
+    border-radius: 10px;
+    margin-left: 13px;
+}
+@media only screen and (min-width: 380px) {
+    .timepick .sportstime{
+        width: 77%;
+}
+}
+@media only screen and (min-width: 330px) {
+    .timepick .sportstime{
+        width: 100%;
+        margin-left: 3px;
+}
+}
+
+.gymtime .sportspick{
+    background-color: rgb(255, 255, 255);
+    padding: 5px;
+    width:100%;
+}
+
+.gymprice .priceamount{
+    background-color:  rgb(225, 237, 241);
+    padding: 10px;
+    width:60%;
+    border-radius: 10px;
+    margin-left: 4px;
+}
+@media only screen and (min-width: 430px) {
+    .gymprice .priceamount{
+        width: 73%;
+        margin-left: -30px;
+}
+}
+@media only screen and (min-width: 380px) {
+    .gymprice .priceamount{
+        width: 73%;
+        margin-left: -40px;
+}
+}
+@media only screen and (min-width: 380px) {
+    .gymprice .priceamount{
+        width: 95%;
+        margin-left: -8px;
+}
+}
+
+.gymprice .priceamount img{
+    height: 17px;
+}
+ .gymprice input{
+   
+    width: 70%;
+    border: none;
+    border-radius: 5px;
+    
+}
+.gymprice p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+
+.timepickk .sportstimee{
+    background-color:  rgb(225, 237, 241);
+    padding: 10px;
+    width: 84%;
+    border-radius: 10px;
+    margin-left: 42px;
+}
+@media only screen and (min-width: 430px) {
+    .timepickk .sportstimee{
+        width: 72%;
+        margin-left: 6px;
+}
+}
+@media only screen and (min-width: 380px) {
+    .timepickk .sportstimee{
+        width: 81%;
+        margin-left: -9px;
+}
+}
+@media only screen and (min-width: 330px) {
+    .timepickk .sportstimee{
+        width: 100%;
+        margin-left: 3px;
+}
+}
+.gympricee .priceamountt{
+    background-color:  rgb(225, 237, 241);
+    padding: 10px;
+    width: 70%;
+    border-radius: 10px;
+    margin-left:55px;
+}
+@media only screen and (min-width: 430px) {
+    .gympricee .priceamountt{
+        width: 100%;
+        margin-left: -38px;
+}
+}
+@media only screen and (min-width: 380px) {
+    .gympricee .priceamountt{
+        width: 76%;
+        margin-left: -44px;
+}
+}
+@media only screen and (min-width: 330px) {
+    .gympricee .priceamountt{
+        width: 97%;
+        margin-left: -8px;
+}
+}
+
+.gympricee input{
+    width: 70%;
+    border: none;
+    border-radius: 5px;
+}
+
+.gym .workingdays h4{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+ .workingdays .days p{
+    background-color:  rgb(225, 237, 241);
+    color: black;
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+   padding: 10px;
+    width: 130px;
+    text-align: center;
+   margin-left: 20px;
+   border: 1px solid blue;
+}
+.workingdays .days .sunday{
+    border: none;
+}
+.workingdays .days{
+    display: flex;
+    flex-wrap: wrap;
+
+}
+.gymtimings .submitbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 260px;
+    text-align: center;
+    align-items: center;
+ 
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .gymtimings .submitbutton{
+    text-align: center;
+ }
+
+ /* manageofflinebookings */
+ .datepicker{
+    width: 90%;
+    
+ }
+
+.timeslot h4{
+    font-family: poppins;
+    font-size: large;
+    font-weight:500;
+}
+.timeslot .btn{
+    background-color: rgb(225, 237, 241);
+    margin-top: 30px;
+    padding: 15px;
+   width: 100%;
+    font-family: poppins;
+}
+@media only screen and (max-width: 350px) {
+    .timeslot .btn{
+        font-size: 13px;
+}
+}
+@media only screen and (max-width: 990px) {
+    .timeslot .btn{
+        font-size: 13px;
+}
+}
+/* gymmembership*/
+.gymmembership{
+    margin-top: 140px;
+}
+.gymmembership h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.gymmembership .form-select{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.gymmembership label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.sports p{
+    font-family: poppins;
+    font-size: large;
+    padding-right: 106px;
+    margin-right: 65px;
+}
+@media only screen and (max-width: 768px) {
+    .sports p{
+       font-size: 13px;
+       margin-right: -19px;
+}
+}
+@media only screen and (max-width: 430px) {
+    .sports p{
+       font-size: 13px;
+       margin-left: 12px;
+}
+}
+@media only screen and (max-width: 380px) {
+    .sports p{
+       font-size: 13px;
+       margin-left: -2px;
+}
+}
+@media only screen and (max-width: 330px) {
+    .sports p{
+       font-size: 11px;
+       margin-left: -12px;
+}
+}
+/* sport */
+.sport p{
+    font-family: poppins;
+    font-size: large;
+    padding-right: 60px;
+    margin-right: 4px;
+}
+@media only screen and (max-width: 768px) {
+    .sport p{
+       font-size: 11px;
+       margin-left: 9px;
+}
+}
+@media only screen and (max-width: 430px) {
+    .sport p{
+       font-size: 13px;
+       margin-left: 29px;
+}
+}
+@media only screen and (max-width: 330px) {
+    .sport p{
+       font-size: 11px;
+       margin-left: 9px;
+}
+}
+
+
+.picker .picktime{
+    background-color:  rgb(225, 237, 241);
+    width: 100%;
+    padding: 5px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 10px;
+}
+
+.price .priceamount{
+    background-color:  rgb(225, 237, 241);
+    padding: 10px;
+    width: 60%;
+    border-radius: 10px;
+}
+@media only screen and (max-width: 430px) {
+    .price .priceamount{
+        width: 80%;
+}
+}
+.priceamount img{
+    height: 17px;
+}
+ .price input{
+   
+    width: 70%;
+    border: none;
+    border-radius: 5px;
+    
+}
+.price p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+
+.membershipname .member {
+  background-color:rgb(225, 237, 241);
+  padding: 7px; 
+  padding-left: 30px;
+  border-radius: 10px;
+   
+    
+}
+.membershipname p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+@media only screen and (max-width: 430px) {
+    .membershipname p{
+    font-size: 14px;
+}
+}
+.member input{
+    width: 90%;
+    border-radius: 5px;
+    border: none;
+  
+}
+.memberprice .priceamount{
+    background-color:  rgb(225, 237, 241);
+    padding: 8px;
+    width: 50%;
+    border-radius: 10px;
+}
+.memberprice .priceamount img{
+    height: 17px;
+}
+ .memberprice input{
+    font-family: poppins;
+    font-size: large;
+   
+    width: 70%;
+    border: none;
+    border-radius: 5px;
+    height: 23px;
+    
+}
+.memberprice p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+@media only screen and (max-width: 430px) {
+    .memberprice p{
+    font-size: 14px;
+}
+}
+.gymmembership .submitbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 260px;
+    text-align: center;
+    align-items: center;
+ 
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .gymmembership .submitbutton{
+    text-align: center;
+ }
+/* createevent */
+.createevent{
+    margin-top: 120px;
+}
+.createevent h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.createevent .form-select{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.createevent label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.createevent .form-control{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.createevent .eventimage img{
+    border: 1px dashed black;
+   
+  width: 120px;
+  padding: 20px;
+}
+
+
+
+#date {
+    width: 250px;
+    outline: none;
+    border: 1px solid #aaa;
+    padding: 6px 28px;
+    color: #aaa;
+  }
+  
+  .date-container {
+    position: relative;
+    float: left;
+  }
+  .date-container .date-text {
+    position: absolute;
+    top: 6px;
+    left: 12px;
+    color: #aaa;
+  }
+  .date-container .date-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    /* pointer-events: none; */
+    cursor: pointer;
+    color: #aaa;
+  }
+
+.typesofticket .types {
+    background-color:rgb(225, 237, 241);
+    padding: 7px;
+    border-radius: 10px;
+     width: 90%;
+     margin-left: 40px;
+  }
+  @media only screen and (max-width: 500px) {
+    .typesofticket .types{
+        margin-left: 20px;
+     }
+ }
+ @media only screen and (max-width: 350px) {
+    .typesofticket .types{
+        margin-left: 10px;
+     }
+ }
+  .typesofticket p{
+      font-family: poppins;
+      font-size: large;
+      font-weight: 500;
+  }
+  .types input{
+        width: 100%;
+        border-radius: 5px;
+        border: none;
+}
+.noofticket .ticket {
+    background-color:rgb(225, 237, 241);
+    padding: 7px;
+    border-radius: 10px;
+    width: 90%;
+    margin-left: 60px;
+}
+@media only screen and (max-width: 500px) {
+    .noofticket .ticket{
+        margin-left: 35px;
+     }
+ }
+ @media only screen and (max-width: 350px) {
+    .noofticket .ticket{
+        margin-left: 25px;
+     }
+ }
+  .ticketsheading p{
+      font-family: poppins;
+      font-size: 18px;
+      font-weight: 500;
+      justify-content: start;
+  }
+  .ticket input{
+        width: 100%;
+        border-radius: 5px;
+        border: none;
+  }
+  .eventprice .priceamount{
+    background-color:  rgb(225, 237, 241);
+    padding: 8px;
+    width: 75%;
+    border-radius: 10px;
+    margin-left: 50px;
+}
+ @media only screen and (max-width: 500px) {
+    .eventprice .priceamount{
+        margin-left: 30px;
+     }
+ }
+.eventprice .priceamount img{
+    height: 17px;
+}
+ .eventprice input{
+    font-family: poppins;
+    font-size: large;
+    width: 80%;
+    border: none;
+    border-radius: 5px;
+    height: 23px;
+}
+.eventprice p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.createevent .submitbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 260px;
+    text-align: center;
+    align-items: center;
+ 
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .createevent .submitbutton{
+    text-align: center;
+ }
+ /* events */
+ .events{
+    margin-top: 120px;
+ }
+ .events .sportevents h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.events .sportevents img{
+    width: 50px;
+}
+.events .card{
+    background-color: rgb(241, 241, 241);;
+    padding: 10px;
+    width: 100%;
+    border: none;
+    border-radius: 15px;
+}
+.events .card img{
+    border-radius: 10px;
+}
+.events .card-body p{
+    font-family: poppins;
+    font-size: 15px;
+    font-weight:500;
+    text-align: start;
+    line-height: 1.1;
+   
+}
+/* offer */
+.offer{
+    margin-top: 120px;
+}
+.offer h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.offer .form-select{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.offer p{
+    font-family: poppins;
+    font-size: 15px;
+    background-color:  rgb(225, 237, 241);
+    padding: 10px;
+    border-radius: 20px ;
+}
+.offer label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.offer .form-control{
+   
+        font-family: poppins;
+        font-size: medium;
+        font-weight: 400;
+        width: 90%;
+        padding: 25px;
+        border: none;
+        border-radius: 10px;
+        background-color:  rgb(225, 237, 241);
+    
+}
+.offer .tableborder {
+    border: 1px solid rgb(196, 195, 195);
+    background-color:  rgb(225, 237, 241);
+   border-radius: 20px ;
+   font-family: poppins;
+   font-size: large;
+}
+.table thead{
+    border-bottom:none;
+}
+.offer .submitbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 30%;
+    text-align: center;
+    align-items: center;
+ 
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ @media only screen and (max-width: 325px) {
+    .offer .submitbutton button{
+        font-size: 20px;
+}
+}
+ .offer .submitbutton{
+    text-align: center;
+ }
+/* managebookings */
+.managebookings{
+    margin-top: 120px;
+}
+.managebookings h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.todaybookings a{
+    text-decoration: none;
+}
+.todaybookings a:hover{
+    border-bottom: 1px solid rgb(68, 68, 194);
+    
+}
+.todaybookings p{
+    font-family: poppins;
+    font-size: medium;
+    color: black;
+}
+.games .card-body a{
+    text-decoration: none;
+}
+.games .card-title{
+    font-family: poppins;
+    font-size: large;
+    color: black;
+}
+.games .card-body{
+    background-color:  rgb(225, 237, 241);
+    font-family: poppins;
+    line-height: 0.9;
+    width: 100%;
+}
+@media only screen and (max-width: 990px) {
+    .games .card-body{
+        font-size: 12px;
+}
+}
+
+.games .card-body span{
+    color: black;
+    font-weight: bold;
+}
+.games .card-body p{
+    color: rgb(70, 70, 70);
+}
+
+/* offerrequest */
+.offerrequest{
+    margin-top: 120px;
+}
+.offerrequest h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.gymoffer{
+    border: none;
+}
+.gymoffer .card-title{
+    font-family: poppins;
+    font-size: large;
+}
+.gymoffer .card-body{
+    background-color:  rgb(225, 237, 241);
+    font-family: poppins;
+    line-height: 0.9;
+    width: 100%;
+    border-radius: 10px;
+
+}
+.gymoffer p{
+    font-size: 15px;
+}
+@media only screen and (max-width: 990px) {
+    .gymoffer .card-body p{
+        font-size: 12px;
+}
+}
+.gymoffer .card{
+    border:none;
+    
+}
+/* requestdetails */
+.requestdetails{
+    margin-top: 120px;
+}
+.requestdetails h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.gymofferrequest .card{
+    border: none;
+}
+.gymofferrequest .card-title{
+    font-family: poppins;
+    font-size: large;
+}
+.gymofferrequest .card-body{
+    background-color:  rgb(225, 237, 241);
+    font-family: poppins;
+    line-height: 0.9;
+    width: 100%;
+    border-radius: 10px;
+
+}
+.gymofferrequest .card-text{
+    color: rgb(78, 78, 78);
+}
+.gymofferrequest p{
+    font-size: 15px;
+    color: rgb(90, 90, 90);
+    line-height: 1.2;
+}
+.requestdetails label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.requestdetails .form-control{
+   
+        font-family: poppins;
+        font-size: medium;
+        font-weight: 400;
+        width: 90%;
+        padding: 25px;
+        border: none;
+        border-radius: 10px;
+        background-color:  rgb(225, 237, 241);
+    
+}
+.requestdetails .sendbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 260px;
+    text-align: center;
+    align-items: center;
+ 
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .requestdetails .sendbutton{
+    text-align: center;
+ }
+ /* userview */
+ .userview{
+    margin-top: 120px;
+    font-family: poppins;
+    
+ }
+ .userview h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+ }
+ .userview .starimages{
+    width: 20px;
+    height: 20px;
+ }
+ .userimage img{
+    width: 80px;
+    height: 80px;
+   
+ }
+
+ .userview p{
+    font-size: 15px;
+    color: rgb(105, 105, 105);
+    
+
+ }
+ .userview .card{
+    padding: 10px;
+    width: 100%;
+    background-color:  rgb(225, 237, 241);
+    border: none;
+    border-radius: 15px;
+ }
+/* viewdetails */
+.viewdetails{
+    margin-top: 120px;
+}
+.viewdetails .card-body i{
+    color: rgb(68, 68, 194);
+}
+.viewdetails .card{
+    font-family: poppins;
+    background-color:  rgb(225, 237, 241);
+    border: none;
+    border-radius: 10px;
+}
+.viewdetails .card p{
+    margin-left: 10px;
+}
+.viewdetails h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.viewdetails .card address{
+    margin-left: 13px;
+}
+.creates{
+    background-color:rgb(225, 237, 241) ;
+    font-family: poppins;
+    padding: 10px;
+    border-radius: 10px;
+}
+.creates .title{
+    color: rgb(128, 128, 128);
+}
+ .creater img{
+    width: 70px;
+    height: 70px;
+    
+}
+.creater p{
+    font-size: large;
+    font-weight: bold;
+
+}
+.players{
+    background-color:rgb(225, 237, 241) ;
+    border-radius: 10px;
+    margin-left: 2px;
+}
+/* attendance */
+.attendance{
+    margin-top: 120px;
+
+}
+.attendance label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.attendance .form-select{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.attendance .date{
+font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.attendancebutton{
+    margin-top: 40px;
+}
+ .attendancebutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 260px;
+    text-align: center;
+    align-items: center;
+ 
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+  table {
+    
+    font-family: poppins;
+    font-size: large;
+    text-align: center;
+    
+
+ }
+
+ .table  thead tr{
+    background-color: rgb(225, 237, 241);
+    border-bottom: 7px solid white;
+   
+ }
+ .table thead th{
+    padding: 20px;
+    
+ }
+ .table tbody tr td{
+    background-color:rgb(225, 237, 241);
+    border-bottom: 7px solid white;
+    padding: 20px;
+ }
+ /* Earnings*/
+ .earnings{
+    margin-top: 120px;
+ }
+ .earnings h3{
+    font-family: poppins;
+    font-size:x-large;
+    font-weight: 600px;
+}
+.payments a{
+    text-decoration: none;
+}
+.payments a:hover{
+    border-bottom: 1px solid rgb(68, 68, 194);
+    
+}
+.payments p{
+    font-family: poppins;
+    font-size: medium;
+    color: black;
+}
+
+.totalearned{
+   padding: 15px;
+    background-color:  rgb(225, 237, 241);
+}
+.totalearned p{
+    font-family: poppins;
+    font-size: x-large;
+    color: rgb(117, 117, 117);
+}
+.totalearned h3{
+    font-size: 40px;
+    font-family: poppins;
+}
+.totalorders .paymentrecieved{
+    color: black;
+    font-weight: 500;
+}
+.totalorders .pending{
+    font-size: 20px;
+}
+.sprsports .card{
+    background-color: rgb(225, 237, 241);
+    border: none;
+    border-radius: 10px;
+    font-family: poppins;
+    
+}
+
+.sprsports .card-body h5{
+  
+    font-size:20px;
+    font-weight: 500;
+}
+.sprsports .card-text{
+    color: rgb(117, 117, 117);;
+}
+.sprsports b{
+    font-size: x-large;
+}
+
+/* Payouts */
+.payouts{
+    margin-top: 120px;
+}
+.pay{
+    background-color: rgb(225, 237, 241);
+    padding: 10px;
+    font-family: poppins;
+    font-size: small;
+    border-radius: 20px;
+    width: 30%;
+   margin-left: 20px;
+    
+  
+}
+@media only screen and (max-width: 375px) {
+    .pay{
+     font-size: 12px;
+     
+    }
+         
+ }
+ @media only screen and (max-width: 780px) {
+    .pay{
+     width: 100%;
+     }
+         
+ }
+.payoutline {
+    margin: 0px;
+  }
+.banktransfer .amount{
+    border-right: 1px solid rgb(37, 37, 37);
+padding-right: 15px;
+}
+
+
+
+.status .statuspaid{
+    border-right: 1px solid rgb(37, 37, 37);
+    padding-right: 38px;
+}
+.status span{
+    color: #16c004;
+}
+.bookingid p{
+    display: inline;
+}
+
+/* overview myprofile*/
+.profile{
+    margin-top: 120px;
+
+}
+.profileimage{
+    position: relative;
+}
+.profileimage .profile1{
+   height: 80px;
+  
+    
+}
+
+
+.edit{
+    position: absolute;
+    bottom: 50px;
+    right: 15px;
+}
+.profileimage .edit{
+    height: 25px;
+    right: 5px;
+    top: 50px;
+}
+.myprofile {
+    background-color: rgb(68, 68, 194);
+}
+.profilefollowers p{
+    font-family: poppins;
+    
+    color: white;
+}
+.profilefollowers .friends{
+    margin-top: 20px;
+    font-size: 25px;
+}
+@media only screen and (max-width: 500px) {
+    .profilefollowers .friends{
+     font-size: 20px
+     }
+         
+ }
+ .overview a{
+    text-decoration: none;
+ }
+ .overview p{
+    font-family: poppins;
+    font-size: large;
+    color: black;
+ }
+ @media only screen and (max-width: 400px) {
+    .overview p{
+     font-size: 15px
+     }
+         
+ }
+ .overviewstar img{
+    height: 20px;
+ } 
+ .overviewstar p{
+    color: #7a7a7a;
+    font-family: poppins;
+ }
+ .viewclock p{
+    font-family: poppins;
+    font-size: 15px;
+ }
+ .viewclock i{
+    color:  rgb(68, 68, 194);
+ }
+ .viewclock p span{
+margin-left: 10px;
+ }
+ .viewclockimage{
+    
+    background-color: #e4e3e3;
+    border-radius: 50%;
+    padding: 2px;
+    height: 30px;
+  
+    
+ }
+ .viewclockimage img{
+    width: 13px;
+}
+.viewaddress i{
+    color:  rgb(68, 68, 194);
+}
+.viewaddress span{
+    margin-left: 10px;
+}
+.viewaddress address{
+    font-family: poppins;
+    font-size: 15px;
+}
+.viewmap img{
+    background-color:  #e4e3e3;
+    padding: 10px;
+    border: 1px solid rgb(68, 68, 194);
+    height: 60px;
+}
+.aboutvenue p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+ .venueimage{
+    background-color:  #e4e3e3;
+
+   border-radius: 50%;
+   padding-right: 5px;
+   padding-left: 5px;
+   padding: 4px;
+    
+}
+.venueimage img {
+height: 15px;
+width: 15px;
+}
+.venuenotes p{
+    font-family: poppins;
+    font-size: 15px;
+}
+.sportsavailable p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+.sportsavailable p span{
+    color: rgb(122, 122, 122);
+    font-weight: normal;
+}
+.sportschart img{
+   background-color: rgb(224, 222, 222);
+   margin-left: 20px;
+   padding: 10px;
+   border-radius: 10px;
+   height: 90%;
+}
+.sportschart img:hover{
+    border: 1px solid rgb(50, 50, 211);
+    
+}
+.amenities p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+/* .parking img{
+    background-color: rgb(230, 226, 226);
+    padding: 10px;
+    
+} */
+ .amenitiesimage{
+    background-color:rgb(230, 226, 226);
+    border-radius: 50%;
+    padding: 10px;
+}
+.amenitiesimage img{
+   width: 30px;
+}
+.parking p{
+    font-family: poppins;
+    font-size:20px;
+    font-weight: 500;
+}
+
+/* My profile2*/
+.uploadphotos{
+    background-color:rgb(248, 246, 246);
+    padding: 20px;
+}
+.uploadphotos .upload img{
+height: 70px;
+}
+@media only screen and (max-width: 400px) {
+    .uploadphotos .upload img{
+        height: 45px;
+     }
+         
+ }
+.photos{
+    background-color: white;
+    width: 50%;
+   border-radius: 50px;
+
+    
+}
+@media only screen and (max-width: 400px) {
+    .photos{
+   width: 400%;
+     }
+         
+ }
+.photos p{
+    font-family: poppins;
+    font-size: large;
+    
+}
+@media only screen and (max-width: 500px) {
+    .photos p{
+   font-size: 13px;
+     }
+         
+ }
+.photos img{
+    width: 30px;
+    height: 40px;
+}
+@media only screen and (max-width: 500px) {
+    .photos img{
+        width: 20px;
+        height: 20px;
+     }
+         
+ }
+ 
+.uploadbutton img{
+    width: 80%;
+}
+@media only screen and (max-width: 400px) {
+    .uploadbutton img{
+        width: 200%;
+     }
+         
+ }
+ 
+.sportsupload img{
+   width: 100%;
+   margin-top: 30px;
+}
+/* toz22 */
+
+
+  .group{
+    background-color:rgb(225, 237, 241) ;
+}
+.group{
+    margin-top: 20px;
+    margin-left: 20px;
+    padding: 10px;
+}
+.groupimage img{
+    width: 90px;
+    height: 90px;
+    background-color: rgb(255, 255, 255) ;
+    border-radius: 50%;
+    padding: 0px;
+}
+.groupname a{
+    text-decoration: none;
+}
+.groupname span{
+    text-align: center  ;
+}
+.groupname .ymt{
+    font-size: x-large;
+    color: #000000;
+    font-weight: bold;
+    font-family: poppins;
+    text-align: center;
+}
+@media only screen and (max-width:1210px){
+    .groupname .ymt{
+        font-size: large;
+        
+    }
+}
+
+.groupname .members{
+    color: rgb(50, 50, 211);
+    font-size: large;
+    font-family: poppins;
+    margin-top: 8px;
+}
+@media only screen and (max-width:1210px){
+    .groupname .members{
+        
+        font-size: 15px;
+        margin-top: 5px;
+    }
+}
+@media only screen and (max-width:990px){
+    .groupname .members{
+        
+        font-size: 14px;
+        
+    }
+}
+ @media only screen and (max-width:760px){
+    
+    .groupimage img{
+        width: 60px;
+        height: 60px;
+        
+    }
+    .group{
+        margin-right: 10px;
+        margin-left: 10px;
+    }
+ } 
+ 
+ @media only screen and (max-width:1200px){
+    .groupimage img{
+        width: 50px;
+        height: 50px;
+        
+    }
+ }
+.groupmembers p{
+    font-family: poppins;
+    font-size: medium;
+    color: rgb(50, 50, 211);
+    
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* addgroup */
+.addgroup{
+    margin-top: 120px;
+}
+.addgroup label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.addnewgroup .form-control{
+    font-family: poppins;
+        font-size: medium;
+        font-weight: 400;
+        width: 90%;
+        padding: 25px;
+        border: none;
+        border-radius: 10px;
+        background-color:  rgb(225, 237, 241);
+}
+.addfriends{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241); 
+}
+.addfriends span{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 500;
+    color:rgb(110, 110, 110);
+    padding-left: 10px;
+}
+.addfriends i{
+    color:rgb(110, 110, 110);
+}
+.addgroup .submitbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 50%;
+    text-align: center;
+    align-items: center;
+ border-radius: 10px;
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .addgroup .submitbutton{
+    text-align: center;
+ }
+ /* friends */
+ .friends{
+    margin-top: 120px;
+ }
+ .friendlist img{
+    width: 70px;
+    height: 70px;
+    background-color: white ;
+    border-radius: 50%;
+    padding: 2px;
+    
+}
+.friendlist p{
+    font-size: large;
+    font-weight: 500;
+    font-family: poppins;
+    color: rgb(36, 36, 36);
+
+}
+.friendlist a{
+    text-decoration: none;
+}
+.friendlist{
+    background-color:rgb(225, 237, 241) ;
+    border-radius: 10px;
+    padding: 5px;
+    padding-left: 10px;
+    margin-top: 25px;
+}
+/* following */
+.following{
+    margin-top: 120px;
+}
+.followinglist img{
+    width: 70px;
+    height: 70px;
+    background-color: white ;
+    border-radius: 50%;
+    padding: 2px;
+    
+}
+.followinglist p{
+    font-size: large;
+    font-weight: 500;
+    font-family: poppins;
+    color: rgb(36, 36, 36);
+
+}
+.followinglist a{
+    text-decoration: none;
+}
+.followinglist{
+    background-color:rgb(225, 237, 241) ;
+    border-radius: 10px;
+    padding: 5px;
+    padding-left: 10px;
+    margin-top: 25px;
+    width: 100%;
+}
+ @media only screen and (max-width: 900px) {
+    .followinglist{
+        width: 100%
+        
+     }
+         
+ } 
+ .follow p{
+    background-color: #918f8f;
+    padding: 5px;
+    color: white;
+    border-radius: 5px;
+    font-family: poppins;
+    font-size: medium;
+ }
+ /* myprofile4*/
+ .imageupload img{
+    height: 40px;
+ }
+ .imageupload p{
+    font-family: poppins;
+    font-size: 150%;
+ }
+ @media only screen and (max-width: 900px) {
+    .imageupload p{
+        font-size: 120%
+        
+     }
+         
+ } 
+ .activity img{
+    height: 50px;
+ }
+ .activity p{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 600;
+ }
+ .activitycontent p{
+    font-family: poppins;
+    font-size: medium;
+    color: #000000;
+ }
+ .likeicon img{
+  height: 30px;
+ }
+ .post{
+    background-color:rgb(225, 237, 241) ;
+    padding: 20px;
+    border-radius: 30px;
+    margin-top: 50px;
+    
+    
+ }
+ .activityimage img{
+    width: 90%;
+ }
+ /* loginpage*/
+ .loginnav{
+    background-color: white;
+    color: rgb(68, 68, 194);
+    border: none;
+}
+.loginnav:hover{
+    background-color: white;
+    color: rgb(68, 68, 194);
+    border: none;
+}
+ .loginpage{
+    margin-top: 120px;
+ }
+ .loginpage .loginimage img{
+    width: 90%;
+    height: 100%;
+}
+.login h3{
+    font-family: poppins;
+    font-size: xx-large;
+    font-weight: bold;
+}
+.login p{
+    font-family: poppins;
+    font-size: large;
+    color: rgb(39, 39, 39);
+}
+.loginnumber label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+.loginnumber .form-control{
+    width: 100%;
+}
+
+.loginpagebutton button{
+    background-color: rgb(98, 98, 212) ;
+    color: white;
+    border: none;
+    padding: 5px;
+    width: 100%;
+    font-family: poppins;
+    font-weight: 500;
+}
+/* verification */
+.otppage{
+    margin-top: 120px;
+ }
+ .otpimage img{
+    width: 90%;
+    height: 100%;
+}
+.otp h3{
+    font-family: poppins;
+    font-size: xx-large;
+    font-weight: bold;
+}
+.otpnumber .number p{
+    background-color: rgb(238, 238, 238);
+    margin-left: 8%;
+    padding: 5%;
+    font-size: xx-large;
+    border-radius: 10px;
+}
+ .otpcode{
+    text-align: center;
+    font-family: poppins;
+    font-size: small;
+    color:rgb(109, 108, 108); 
+}
+ .otpcode span{
+   color: rgb(98, 98, 212);
+}
+
+.otpbutton button{
+    background-color: rgb(98, 98, 212) ;
+    color: white;
+    border: none;
+    padding: 5px;
+    width: 80%;
+    font-family: poppins;
+    font-weight: 500;
+}
+/* updateprofile */
+.update{
+    margin-top: 120px;
+}
+.updateimage img{
+    width: 90%;
+    height: 100%;
+}
+.updateprofile h3{
+    font-family: poppins;
+    font-size: xx-large;
+    font-weight: bold;
+}
+.updateprofile label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: bold;
+}
+.updatebutton button{
+    background-color: rgb(98, 98, 212) ;
+    color: white;
+    border: none;
+    padding: 5px;
+    width: 100%;
+    font-family: poppins;
+    font-weight: 500;
+}
+/* Approval*/
+.approval{
+    margin-top: 120px;
+    text-align: center;
+   
+}
+.adminapproval img{
+    width: 80px;
+}
+.adminapproval p{
+    font-family: poppins;
+    font-size: 15px;
+   font-weight: bold;
+   margin-top: 16px;
+}
+.refreshbutton button{
+    background-color: white ;
+    color: rgb(98, 98, 212);
+    border: 1px solid rgb(98, 98, 212);
+    padding: 8px;
+    
+
+    font-family: poppins;
+    font-weight: 500;
+}
+
+.adminapproval .admin{
+    box-shadow: 0px 0px 25px -10px rgba(0,0,0,0.75);
+    width: 300px;
+    margin:  auto;
+    align-self: center;
+    margin-top: 10%;
+    padding: 20px;
+    border-radius: 30px;
+}
+/*invitefriends */
+.invitefriends{
+    margin-top: 120px;
+ }
+ .invite img{
+    width: 70px;
+    height: 70px;
+    background-color: white ;
+    border-radius: 50%;
+    padding: 2px;
+    
+}
+.invite p{
+    font-size: large;
+    font-weight: 500;
+    font-family: poppins;
+    color: rgb(36, 36, 36);
+
+}
+.invite a{
+    text-decoration: none;
+}
+.invite{
+    background-color:rgb(225, 237, 241) ;
+    border-radius: 10px;
+    padding: 5px;
+    padding-left: 10px;
+    margin-top: 25px;
+    
+}
+.invitefriends label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+
+.inviteaddfriends{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 50%;
+    padding: 20px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241); 
+}
+.inviteaddfriends span{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 500;
+    color:rgb(110, 110, 110);
+    padding-left: 10px;
+}
+.inviteaddfriends i{
+    color:rgb(110, 110, 110);
+}
+.highlight img{
+    width: 70px;
+    height: 70px;
+    background-color: white ;
+    border-radius: 50%;
+    padding: 2px;
+    
+}
+.highlight p{
+    font-size: large;
+    font-weight: 500;
+    font-family: poppins;
+    color: rgb(36, 36, 36);
+
+}
+.highlight a{
+    text-decoration: none;
+}
+.highlight{
+    background-color:rgb(225, 237, 241) ;
+    border-radius: 10px;
+    padding: 5px;
+    padding-left: 10px;
+    margin-top: 25px;
+    border: 1px solid rgb(98, 98, 212);
+}
+.submitbutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 40%;
+    text-align: center;
+    align-items: center;
+ border-radius: 10px;
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .submitbutton {
+    text-align: center;
+ }
+/* profileupdate */
+
+ 
+ .profiledit img{
+    width: 130px;
+    
+ }
+ .avatar-upload {
+    position: relative;
+    max-width: 205px;
+    margin: 50px auto;
+  }
+  .avatar-upload .avatar-edit {
+    position: absolute;
+    right: 12px;
+    z-index: 1;
+    
+  }
+  .avatar-upload .avatar-edit input {
+    display: none;
+  }
+  
+  .avatar-upload .avatar-edit input + label:after {
+    content: "\f040";
+    font-family: 'FontAwesome';
+    color: #757575;
+    position: absolute;
+    top: 80px;
+    /* left: 0; */
+    right: 68px;
+    text-align: center;
+    margin: auto;
+    background-color: rgb(68, 68, 194);;
+    border-radius: 50%;
+    color: white;
+    padding: 6px;
+    font-size: small;
+  }
+  /* .avatar-upload .avatar-preview {
+    width: 192px;
+    height: 192px;
+    position: relative;
+    border-radius: 100%;
+    border: 6px solid #F8F8F8;
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
+  } */
+  /* .avatar-upload .avatar-preview > div {
+    width: 100%;
+    height: 100%;
+    border-radius: 100%;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+  } */
+  .editicon{
+position: relative;
+    right: 50px;
+
+    bottom: -50px;
+  }
+ 
+.myprofileupdate label{
+    font-family: poppins;
+    font-size: large;
+    font-weight: 500;
+}
+.myprofileupdate .form-select{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+
+.myprofileupdate .form-control{
+    font-family: poppins;
+    font-size: medium;
+    font-weight: 400;
+    width: 90%;
+    padding: 25px;
+    border: none;
+    border-radius: 10px;
+    background-color:  rgb(225, 237, 241);
+}
+.updateprofilebutton button{
+    background-color: rgb(68, 68, 194);
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 40%;
+    text-align: center;
+    align-items: center;
+ border-radius: 10px;
+    font-family: Epilogue;
+    font-size: x-large;
+    font-weight: bold;
+ 
+ }
+ .updateprofilebutton {
+    text-align: center;
+ }
+ /* Booking calender */
+ .calender{
+    margin-top: 120px;
+ }
+ /* * {
+	margin: 0;
+	padding: 0;
+	font-family: 'Poppins', sans-serif;
+}
+
+body {
+	display: flex;
+	background: #ef62da;
+	min-height: 100vh;
+	padding: 0 10px;
+	align-items: center;
+	justify-content: center;
+} */
+
+.calendar-container {
+    margin: auto;
+	background: #fff;
+	width: 450px;
+	border-radius: 10px;
+	box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+}
+
+.calendar-container header {
+	display: flex;
+	align-items: center;
+	padding: 25px 30px 10px;
+	justify-content: space-between;
+}
+
+header .calendar-navigation {
+	display: flex;
+}
+
+header .calendar-navigation span {
+	height: 38px;
+	width: 38px;
+	margin: 0 1px;
+	cursor: pointer;
+	text-align: center;
+	line-height: 38px;
+	border-radius: 50%;
+	user-select: none;
+	color: #aeabab;
+	font-size: 1.9rem;
+}
+
+.calendar-navigation span:last-child {
+	margin-right: -10px;
+}
+
+header .calendar-navigation span:hover {
+	background: #f2f2f2;
+}
+
+header .calendar-current-date {
+	font-weight: 500;
+	font-size: 1.45rem;
+}
+
+.calendar-body {
+	padding: 20px;
+}
+
+.calendar-body ul {
+	list-style: none;
+	flex-wrap: wrap;
+	display: flex;
+	text-align: center;
+}
+
+.calendar-body .calendar-dates {
+	margin-bottom: 20px;
+}
+
+.calendar-body li {
+	width: calc(100% / 7);
+	font-size: 1.07rem;
+	color: #414141;
+}
+
+.calendar-body .calendar-weekdays li {
+	cursor: default;
+	font-weight: 500;
+}
+
+.calendar-body .calendar-dates li {
+	margin-top: 30px;
+	position: relative;
+	z-index: 1;
+	cursor: pointer;
+}
+
+.calendar-dates li.inactive {
+	color: #aaa;
+}
+
+.calendar-dates li.active {
+	color: #fff;
+}
+
+.calendar-dates li::before {
+	position: absolute;
+	content: "";
+	z-index: -1;
+	top: 50%;
+	left: 50%;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.calendar-dates li.active::before {
+	background: #6332c5;
+}
+
+.calendar-dates li:not(.active):hover::before {
+	background: #e4e1e1;
+}
+
+ .sportsratio{
+    padding: 20px;
+    background-color: rgb(225, 237, 241);
+ }
+ .sportsratio .card{
+    border-radius: 15px;
+    
+ }
+ .sportsratio .card-title{
+    text-align: center;
+    color: rgb(55, 55, 206);
+    font-size: x-large;
+    font-family: poppins;
+ }
+ .sportsratio .card-body p{
+    font-family: poppins;
+    text-align: center;
+    font-size: large;
+    color: #414040;
+    line-height: 0.9;
+ }
+ .calendergames{
+    margin-top: 40px;
+
+}
+.calendergames .card{
+    border: none;
+}
+ .calendergames .card-body a{
+    text-decoration: none;
+}
+.calendergames .card-title{
+    font-family: poppins;
+    font-size: large;
+    color: black;
+}
+.calendergames .card-body{
+    background-color:  rgb(225, 237, 241);
+    font-family: poppins;
+    line-height: 1.3;
+    width: 100%;
+    border-radius: 20px;
+}
+@media only screen and (max-width: 990px) {
+    .calendergames .card-body{
+        font-size: 12px;
+}
+}
+
+.calendergames .card-body span{
+    color: black;
+    font-weight: bold;
+}
+.calendergames .card-body p{
+    color: rgb(70, 70, 70);
+    font-size: 12px;
+}
+.completed{
+    border-left: 1px solid rgb(97, 97, 97);
+  height: 90px;
+    
+}
+@media only screen and (max-width: 765px) {
+    .completed{
+        border-top: 1px solid rgb(97, 97, 97);
+        
+        border-left: none;
+}
+}
+.calendergames .completed span{
+    color: green;
+    
+}
+@media only screen and (max-width: 990px) {
+    .calendergames .completed span{
+       font-size: 10px;
+}
+}
+.calendergames .upcoming span{
+    color: rgb(224, 143, 20);
+}
+@media only screen and (max-width: 990px) {
+    .calendergames .upcoming span{
+       font-size: 10px;
+}
+}
+.upcoming{
+    border-left: 1px solid rgb(97, 97, 97);
+  height: 90px;
+    
+}
+@media only screen and (max-width: 765px) {
+    .upcoming{
+        border-top: 1px solid rgb(97, 97, 97);
+        
+        border-left: none;
+}
+}
+/* toz34 */
+.olympiasports{
+    margin-top: 120px;
+}
+.olympia{
+    
+    font-family: poppins;
+    border-radius: 20px;
+    padding-left: 0;
+ background-image: url(images/Rectangle\ 12369.png); 
+ margin-top: 20px;
+ width: 35%;
+ 
+}
+ .olympiacricket{
+    font-size: x-large;
+
+}
+.olympiacricket p{
+    background-color: #20e70a;
+    border-bottom-right-radius: 30px;
+    border-top-left-radius: 20px;
+    padding: 10px;
+    width: 130px;
+    font-weight: 500;
+    text-align: center;
+}
+.olympiacontent {
+    background-color: none;
+    margin-top: 70px;
+    padding: 10px;
+    color: white;
+}
+.olympiacontent span{
+    font-size: x-large;
+    font-weight: 500;
+}
+.olympiacontent .notes{
+    text-align: justify;
+}
+.olympiacricket img{
+    width: 20px;
+    height: 30px;
+    background-color: white;
+    padding: 5px;
+    border-radius: 50%;
+}
+.offerolympia {
+    background-image: url(images/Group\ \(47\).png);
+    background-size:cover;
+    background-repeat: no-repeat;
+    height: 100px;
+    margin-top: 20px;
+    
+width: 100px;
+
+}
+.cricket {
+     background-color: white;
+    border-radius: 50%;
+    
+    
+}
+.cricket img{
+    padding: 3px;
+    height: 25px;
+}
+.offerolympia p{
+    text-align: center;
+    color: white;
+    font-size: x-large;
+}
+.rushgym{
+    
+    font-family: poppins;
+    border-radius: 20px;
+    padding-left: 0;
+ background-image: url(images/Rectangle\ 8144.png); 
+ margin-top: 20px;
+ width: 35%;
+ 
+ 
+}
+.rushmadras{
+    font-size: x-large;
+    margin-left: 10px;
+
+}
+.rushmadras p{
+    background-color: #20e70a;
+    border-bottom-right-radius: 30px;
+    border-top-left-radius: 20px;
+    padding: 20px;
+    width: 130px;
+    font-weight: 500;
+    text-align: center;
+}
+.rushcontent {
+    background-color: none;
+    margin-top: 70px;
+    padding: 10px;
+    color: white;
+}
+.rushcontent span{
+    font-size: x-large;
+    font-weight: 500;
+}
+.rushcontent .notes{
+    text-align: justify;
+}
+.rushmadras img{
+    width: 20px;
+    height: 30px;
+    background-color: white;
+    padding: 5px;
+    border-radius: 50%;
+}
+.offerrushgym {
+    background-image: url(images/Group\ \(47\).png);
+    background-size:cover;
+    background-repeat: no-repeat;
+    height: 100px;
+    margin-top: 20px;
+    
+width: 100px;
+
+}

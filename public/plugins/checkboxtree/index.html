@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <title>jQuery checkboxTree plugin demo</title>
+    <!--	<script type="text/javascript">
+
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-10814140-5']);
+        _gaq.push(['_trackPageview']);
+
+        (function() {
+            var ga = document.createElement('script');
+            ga.type = 'text/javascript';
+            ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(ga, s);
+        })();
+
+    </script>-->
+    <!-- styles for demo purpose -->
+    <style type="text/css">
+        body {
+            font-family: verdana, arial;
+            font-size: 0.8em;
+        }
+
+        code {
+            white-space: pre;
+        }
+    </style>
+
+    <!-- start checkboxTree configuration -->
+    <script type="text/javascript" src="library/jquery-1.4.4.js"></script>
+    <script type="text/javascript" src="library/jquery-ui-1.8.12.custom/js/jquery-ui-1.8.12.custom.min.js"></script>
+    <link rel="stylesheet" type="text/css"
+          href="library/jquery-ui-1.8.12.custom/css/smoothness/jquery-ui-1.8.12.custom.css"/>
+
+    <script type="text/javascript" src="jquery.checkboxtree.js"></script>
+    <link rel="stylesheet" type="text/css" href="jquery.checkboxtree.css"/>
+    <!-- end checkboxTree configuration -->
+
+    <script type="text/javascript" src="library/jquery.cookie.js"></script>
+    <script type="text/javascript">
+        //<!--
+        $(document).ready(function() {
+            $('#tabs').tabs({
+                cookie: { expires: 30 }
+            });
+            $('.jquery').each(function() {
+                eval($(this).html());
+            });
+            $('.button').button();
+        });
+        //-->
+    </script>
+</head>
+<body>
+<h1>jQuery checkboxTree plugin demo</h1>
+<a href="http://checkboxtree.daredevel.it/" class="button">Project Home</a>
+
+
+    <p>This example show default script behaviour.</p>
+    <code class="jquery" lang="text/javascript">
+        $('#tree1').checkboxTree();
+    </code>
+    <ul id="tree1">
+        <li><input type="checkbox"><label>Node 1</label>
+            <ul>
+                <li><input type="checkbox"><label>Node 1.1</label>
+                    <ul>
+                        <li><input type="checkbox"><label>Node 1.1.1</label>
+                    </ul>
+            </ul>
+            <ul>
+                <li><input type="checkbox"><label>Node 1.2</label>
+                    <ul>
+                        <li><input type="checkbox"><label>Node 1.2.1</label>
+                        <li><input type="checkbox"><label>Node 1.2.2</label>
+                        <li><input type="checkbox"><label>Node 1.2.3</label>
+                            <ul>
+                                <li><input type="checkbox"><label>Node 1.2.3.1</label>
+                                <li><input type="checkbox"><label>Node 1.2.3.2</label>
+                            </ul>
+                        <li><input type="checkbox"><label>Node 1.2.4</label>
+                        <li><input type="checkbox"><label>Node 1.2.5</label>
+                        <li><input type="checkbox"><label>Node 1.2.6</label>
+                    </ul>
+            </ul>
+        <li><input type="checkbox"><label>Node 2</label>
+            <ul>
+                <li><input type="checkbox"><label>Node 2.1</label>
+                    <ul>
+                        <li><input type="checkbox"><label>Node 2.1.1</label>
+                    </ul>
+                <li><input type="checkbox"><label>Node 2.2</label>
+                    <ul>
+                        <li><input type="checkbox"><label>Node 2.2.1</label>
+                        <li><input type="checkbox"><label>Node 2.2.2</label>
+                        <li><input type="checkbox"><label>Node 2.2.3</label>
+                            <ul>
+                                <li><input type="checkbox"><label>Node 2.2.3.1</label>
+                                <li><input type="checkbox"><label>Node 2.2.3.2</label>
+                            </ul>
+                        <li><input type="checkbox"><label>Node 2.2.4</label>
+                        <li><input type="checkbox"><label>Node 2.2.5</label>
+                        <li><input type="checkbox"><label>Node 2.2.6</label>
+                    </ul>
+            </ul>
+    </ul>
+
+</body>
+</html>
