@@ -84,7 +84,7 @@ class FeeStructureItem extends Model
 
         $post  = DB::table('fee_structure_lists')->where('id', $this->fee_structure_id)->first();
 
-        $is_receivers = '';
+        $is_receivers = [];
         if(!empty($post)) {
             $post_type = $post->fee_post_type;
             $receiver_end = $post->class_list;

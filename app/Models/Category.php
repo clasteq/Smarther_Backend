@@ -21,5 +21,11 @@ class Category extends Model
      */
     protected $table = 'categories';
     
-   
+    protected $appends = [ 'is_background_theme' ];
+
+    public function getIsBackgroundThemeAttribute(){
+
+        $is_background_theme = BackgroundTheme::where('id', $this->background_theme_id)->first();
+        return $is_background_theme;
+    }
 }

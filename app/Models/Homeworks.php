@@ -21,7 +21,26 @@ class Homeworks extends Model
      */
     protected $table = 'homeworks';
     public $test_name;
-    protected $appends = ['is_hw_attachment','is_dt_attachment', 'is_class_name','is_section_name','is_subject_name','is_hw_date','is_hw_submission_date','is_test_name','is_test_id','is_new_test_name','is_test_list'];
+    protected $appends = ['is_hw_attachment','is_dt_attachment', 'is_class_name','is_section_name','is_subject_name','is_hw_date','is_hw_submission_date','is_test_name','is_test_id','is_new_test_name','is_test_list','is_file_attachments'];
+
+    public function getIsFileAttachmentsAttribute()
+    {   
+        $is_file_attachments = [];
+        if(!empty($this->file_attachments)) {
+            $file_attachments = $this->file_attachments;
+
+            if(!empty($file_attachments)) {
+                $file_attachments = explode(',', $file_attachments);
+                foreach($file_attachments as $img) {
+                    $is_file_attachments[] = ['img' => config("constants.APP_IMAGE_URL").'image/homework/'.$img];
+                }
+            } 
+        }   else {
+            $is_file_attachments = [];
+        }
+        
+        return $is_file_attachments;
+    }
 
     public function getIsHwAttachmentAttribute()    {
         if(!empty($this->hw_attachment)) {

@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+use App\Http\Controllers\CommonController;
 
 use Illuminate\Database\Eloquent\Model;
 use DB;
@@ -22,9 +23,17 @@ class Teacher extends Model
     public $classes_handling;
     public $subjects_handling;
 
-    protected $appends = ['is_class_name','is_subject_name','is_classes_handling', 'is_subjects_handling', 'is_class_id','is_subject_id','is_class_tutor','is_section_name'];
-
+    protected $appends = ['is_class_name','is_subject_name','is_classes_handling', 'is_subjects_handling', 'is_class_id','is_subject_id','is_class_tutor','is_section_name',  'is_anniversary']; 
     
+
+    public function getIsAnniversaryAttribute()    {
+        $is_anniversary = '';
+        if(!empty($this->date_of_joining) && strtotime($this->date_of_joining) > 0) {
+            $is_anniversary = CommonController::gettime_ago(strtotime($this->date_of_joining),1);
+        }
+        return $is_anniversary;
+        
+    } 
 
     public function getIsClassNameAttribute()    {
         $val = [];

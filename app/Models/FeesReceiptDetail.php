@@ -25,7 +25,24 @@ class FeesReceiptDetail extends Model
     protected $table = 'fees_receipt_details';
 
     protected $appends = [ 'is_created_name','is_account_name','is_receipthead_name', 'is_school', 'is_student', 
-      'is_payment_mode', 'is_amount_words', 'is_pdf','is_canceled_name'];
+      'is_payment_mode', 'is_amount_words', 'is_pdf','is_canceled_name', 'is_fee_items'];
+
+      public function getIsFeeItemsAttribute()    {
+        $is_fee_items_arr = []; $is_fee_items = '';
+        $fee_items = DB::table('fees_payment_details')
+          ->leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+          ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+          ->where('fees_payment_details.receipt_id', $this->id)->where('fees_payment_details.batch', $this->batch)
+          ->select('fee_items.item_name')->get();
+        if($fee_items->isNotEmpty()) {
+          foreach($fee_items as $item) {
+            $is_fee_items_arr[] = $item->item_name;
+          }
+        }
+        $is_fee_items = implode(', ', $is_fee_items_arr);
+        return $is_fee_items;
+
+      }
 
       public function getIsCanceledNameAttribute()    {
 

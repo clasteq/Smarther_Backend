@@ -7,7 +7,7 @@ use App\Http\Controllers\CommonController;
 use DB;
 use App\Models\BackgroundTheme;
 
-class CommunicationPost extends Model
+class CommunicationPostStaff extends Model
 {
 
     /**
@@ -21,14 +21,14 @@ class CommunicationPost extends Model
      *
      * @var array
      */
-    protected $table = 'communication_posts';
+    protected $table = 'communication_posts_staff';
 
     protected $appends = [ 'posted_user', 'is_created_ago', 'is_liked', 'like_count', 'post_category', 'post_theme', 
          'is_attachment', 'is_image_attachment', 'is_video_attachment', 'is_files_attachment', 'is_notify_datetime', 
-         'is_youtube_link', 'is_category_text_color', 'is_read_count', 'is_post_receivers', 'is_post_cc_receivers' ];
+         'is_youtube_link', 'is_read_count', 'is_post_receivers'];
 
      public function getIsReadCountAttribute() {
-        $is_read_count = DB::table('notifications')->where('post_id', $this->id)->where('type_no', 4)
+        $is_read_count = DB::table('staff_notifications')->where('post_id', $this->id)->where('type_no', 4)
             ->where('read_status', 1)->select('id')->count();
         return $is_read_count;
      }
@@ -79,37 +79,12 @@ class CommunicationPost extends Model
         return $is_youtube_link;
      }
 
-    public function getIsPostCcReceiversAttribute() {
+     public function getIsPostReceiversAttribute() {
 
         $post_id = $this->id;
-        $post  = DB::table('communication_posts')->where('id', $post_id)->first();
+        $post  = DB::table('communication_posts_staff')->where('id', $post_id)->first();
 
-        $is_post_cc_receivers = [];
-        if(!empty($post)) {
-            $cc_ids = $post->cc_ids; 
-            if(!empty($cc_ids)) {
-                $cc_ids = explode(',', $cc_ids);
-                $cc_ids = array_unique($cc_ids);
-                $cc_ids = array_filter($cc_ids);
-                if(count($cc_ids) > 0) {
-                    $is_post_cc_receivers = DB::table('users')->where('status','ACTIVE')->whereIn('id',$cc_ids)
-                        ->select('name', 'mobile as name1')->orderby('name', 'asc')->get(); 
-                }
-            }
-             
-        }
-        if(!empty($is_receivers) && $is_receivers->isNotEmpty()) {
-            $is_post_cc_receivers = $is_receivers->toArray();
-        }
-        return  $is_post_cc_receivers;
-    } 
-
-    public function getIsPostReceiversAttribute() {
-
-        $post_id = $this->id;
-        $post  = DB::table('communication_posts')->where('id', $post_id)->first();
-
-        $is_receivers = [];
+        $is_receivers = '';
         if(!empty($post)) {
             $post_type = $post->post_type;
             $receiver_end = $post->receiver_end;
@@ -126,15 +101,30 @@ class CommunicationPost extends Model
                             ->select('section_name as name1', 'classes.class_name as name')->orderby('name', 'asc')->get(); 
                     }
                 }
-            }   else if($post_type == 2) { // user ids
+            }   else if($post_type == 2) { // role ids 
+                $role_ids = $post->receiver_end;
+                if(!empty($role_ids)) {
+                     
+                    $role_ids = explode(',', $role_ids);
+                    $role_ids = array_unique($role_ids);
+                    $role_ids = array_filter($role_ids);
+                    if(count($role_ids) > 0) { 
+                        $is_receivers = DB::table('userroles')//->where('status','ACTIVE')
+                            ->whereIn('id',$role_ids)
+                            ->select('user_role as name', DB::RAW('"" as name1'))->orderby('name', 'asc')->get();  
+                    } 
+                }
+            }   else if($post_type == 6) { // user ids
                 $user_ids = $post->receiver_end;
                 if(!empty($user_ids)) {
                     $user_ids = explode(',', $user_ids);
                     $user_ids = array_unique($user_ids);
                     $user_ids = array_filter($user_ids);
                     if(count($user_ids) > 0) {
-                        $is_receivers = DB::table('users')->where('status','ACTIVE')->whereIn('id',$user_ids)
-                            ->select('name', 'admission_no as name1')->orderby('name', 'asc')->get(); 
+                        $is_receivers = DB::table('users')->leftjoin('userroles', 'userroles.ref_code', 'users.user_type')
+                            ->where('users.school_college_id',$post->posted_by)->where('userroles.school_id',$post->posted_by)
+                            ->whereIn('users.id',$user_ids)
+                            ->select('name', 'userroles.user_role as name1')->orderby('name', 'asc')->get(); 
                     }
                 }
             }   else if($post_type == 3) { // all user ids 
@@ -142,7 +132,7 @@ class CommunicationPost extends Model
             }   else if($post_type == 4) { // group ids 
                 $group_ids = $post->receiver_end;
                 if(!empty($group_ids)) {
-                    $user_ids = [];
+                     
                     $group_ids = explode(',', $group_ids);
                     $group_ids = array_unique($group_ids);
                     $group_ids = array_filter($group_ids);
@@ -151,20 +141,29 @@ class CommunicationPost extends Model
                             ->select('group_name as name', DB::RAW('"" as name1'))->orderby('name', 'asc')->get();  
                     } 
                 }
+            }   else if($post_type == 5) { // department ids 
+                $department_ids = $post->receiver_end;
+                if(!empty($department_ids)) {
+                     
+                    $department_ids = explode(',', $department_ids);
+                    $department_ids = array_unique($department_ids);
+                    $department_ids = array_filter($department_ids);
+                    if(count($department_ids) > 0) { 
+                        $is_receivers = DB::table('departments')->where('status','ACTIVE')->whereIn('id',$department_ids)
+                            ->select('department_name as name', DB::RAW('"" as name1'))->orderby('name', 'asc')->get();  
+                    } 
+                }
             }  
         }
         if(!empty($is_receivers) && $is_receivers->isNotEmpty()) {
             $is_receivers = $is_receivers->toArray();
-        }   else {
-            $is_receivers = [];
         }
         return  $is_receivers;
     }
-    
 
     public static function getIsReceiversAttribute($post_id) {
 
-        $post  = DB::table('communication_posts')->where('id', $post_id)->first();
+        $post  = DB::table('communication_posts_staff')->where('id', $post_id)->first();
 
         $is_receivers = '';
         if(!empty($post)) {
@@ -180,7 +179,7 @@ class CommunicationPost extends Model
                         $is_receivers = DB::table('sections')
                             ->leftjoin('classes', 'classes.id', 'sections.class_id')
                             ->where('sections.status','ACTIVE')->whereIn('sections.id',$section_ids)
-                            ->select('section_name as name', 'classes.class_name as name1')->orderby('name', 'asc')->get(); 
+                            ->select('section_name as name', 'classes.class_name as name1')->get(); 
                     }
                 }
             }   else if($post_type == 2) { // user ids
@@ -191,7 +190,7 @@ class CommunicationPost extends Model
                     $user_ids = array_filter($user_ids);
                     if(count($user_ids) > 0) {
                         $is_receivers = DB::table('users')->where('status','ACTIVE')->whereIn('id',$user_ids)
-                            ->select('name', 'admission_no as name1')->orderby('name', 'asc')->orderby('name', 'asc')->get(); 
+                            ->select('name', 'admission_no as name1')->get(); 
                     }
                 }
             }   else if($post_type == 3) { // all user ids 
@@ -205,7 +204,7 @@ class CommunicationPost extends Model
                     $group_ids = array_filter($group_ids);
                     if(count($group_ids) > 0) { 
                         $is_receivers = DB::table('communication_groups')->where('status','ACTIVE')->whereIn('id',$group_ids)
-                            ->select('group_name as name', DB::RAW('"" as name1'))->orderby('name', 'asc')->get();  
+                            ->select('group_name as name', DB::RAW('"" as name1'))->get();  
                     } 
                 }
             }  
@@ -275,14 +274,8 @@ class CommunicationPost extends Model
     }
 
     public function getPostedUserAttribute() { 
-         
-        if($this->created_by > 0) {
-            $posted = $this->created_by;
-        } else {
-            $posted = $this->posted_by;
-        }
-        if($posted > 0) { } else { $posted = $this->posted_by; }
-        $posted_user = User::where('id', $posted)
+
+        $posted_user = User::where('id', $this->posted_by)
             ->select('users.id', 'users.name', 'users.profile_image', 'name_code')->first();  
 
         return $posted_user;
@@ -323,17 +316,10 @@ class CommunicationPost extends Model
         return $post_category;
     }
 
-    public function getIsCategoryTextColorAttribute() { 
-
-        $is_category_text_color = DB::table('categories')->where('id', $this->category_id)->value('text_color');  
-
-        return $is_category_text_color;
-    }
-
     public function getPostThemeAttribute() { 
 
         $post_theme = BackgroundTheme::where('id', $this->background_id)
-            ->select('id', 'image', 'name')->first();  
+            ->select('id', 'image')->first();  
 
         return $post_theme;
     }

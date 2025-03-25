@@ -29,6 +29,45 @@ class BulkStaffs implements ToModel,WithHeadingRow
                 $error = [];   $date = date('Y-m-d H:i:s');
 
                 $data1 = [];
+                $user_role  = $row['user_role'];  
+                $user_role = trim($user_role);
+                if(empty($user_role)) {
+                    $user_role = 'TEACHER';
+                }
+
+                if(!empty(trim($user_role))) {
+                    $role_id = DB::table('userroles')->where('school_id', Auth::User()->id)
+                        ->where('user_role', trim($user_role))->value('id');
+                    if($role_id > 0) { } else { 
+
+                        // Last Order id
+                        $lastorderid = DB::table('userroles')
+                            ->orderby('id', 'desc')->select('id')->limit(1)->get();
+
+                        if($lastorderid->isNotEmpty()) {
+                            $lastorderid = $lastorderid[0]->id;
+                            $lastorderid = $lastorderid + 1;
+                        }   else {
+                            $lastorderid = 1;
+                        }
+
+                        $append = str_pad($lastorderid,3,"0",STR_PAD_LEFT);
+
+                        $ref_code = CommonController::$code_prefix.'UR'.$append;
+
+                        $role_id = DB::table('userroles')->insertGetId(['school_id'=>Auth::User()->id, 
+                            'user_role'=>trim($user_role), 'ref_code' => $ref_code, 
+                            'status'=>'ACTIVE',  'created_at'=>date('Y-m-d H:i:s')]); 
+                    }
+
+                    if($role_id > 0) {  
+                        $user_type = DB::table('userroles')->where('school_id', Auth::User()->id)
+                        ->where('id', $role_id)->value('ref_code');  
+                    } else {
+                        $user_type = 'TEACHER';
+                    }
+                } 
+
                 $data1['name'] = $row['name'];  
                 $data1['mobile'] = $row['phone_number']; 
                 $data1['phone_number_verify_status'] = $row['phone_number_verify_status']; 
@@ -108,7 +147,7 @@ class BulkStaffs implements ToModel,WithHeadingRow
                     $data1['joined_date'] = $date;
                     $data1['created_by'] = Auth::User()->id;
 
-                    $data1['user_type'] = "TEACHER";
+                    $data1['user_type'] = $user_type; //"TEACHER";
 
                     $lastjobid = DB::table('users')
                         ->where('created_at', 'like', date('Y-m-d') . '%')

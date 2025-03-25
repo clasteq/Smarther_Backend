@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+use DB;
 
 class CommunicationGroup extends Model
 {
@@ -21,7 +21,7 @@ class CommunicationGroup extends Model
      */
     protected $table = 'communication_groups';
 
-    protected $appends = ['is_members'];
+    protected $appends = ['is_members', 'is_staff_members'];
 
     public function getIsMembersAttribute() {
         $is_members = null;
@@ -41,5 +41,23 @@ class CommunicationGroup extends Model
         return $is_members;
     }
     
-   
+    public function getIsStaffMembersAttribute() {
+        $is_staff_members = null;
+        $staff_members = $this->staff_members;
+        if(!empty($staff_members)) {
+            $staff_members = explode(',', $staff_members);
+            $staff_members = array_unique($staff_members);
+            $staff_members = array_filter($staff_members);
+            if(count($staff_members)>0) {
+                $is_staff_members = DB::table('teachers')->leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','TEACHER')
+                    ->whereIn('users.id',$staff_members)
+                    ->select('users.id', 'users.name')
+                    ->get(); 
+            }
+        }
+        return $is_staff_members;
+    }
+    
 }

@@ -46,16 +46,16 @@ class FeeStructureList extends Model
         if(isset(self::$fee_structure_item_id) && (self::$fee_structure_item_id) > 0) {
           return $this->hasMany('App\Models\FeeStructureItem','fee_structure_id','id')->where('id', self::$fee_structure_item_id)
             ->whereIn('gender', $ge)->where('cancel_status', 0)
-            ->select('id','fee_term_id','fee_structure_id','fee_item_id','gender','amount','due_date');
+            ->select('id','fee_term_id','fee_structure_id','fee_item_id','gender','amount','due_date')->orderby('due_date', 'asc');
         } else { 
           if(isset(self::$paiditems) && (is_array(self::$paiditems)) && count(self::$paiditems)  > 0) {
             return $this->hasMany('App\Models\FeeStructureItem','fee_structure_id','id')->whereIn('id', self::$paiditems)
               ->whereIn('gender', $ge)->where('cancel_status', 0)
-              ->select('id','fee_term_id','fee_structure_id','fee_item_id','gender','amount','due_date');
+              ->select('id','fee_term_id','fee_structure_id','fee_item_id','gender','amount','due_date')->orderby('due_date', 'asc');
           } else {  
             return $this->hasMany('App\Models\FeeStructureItem','fee_structure_id','id')->whereIn('gender', $ge)
               ->where('cancel_status', 0)
-              ->select('id','fee_term_id','fee_structure_id','fee_item_id','gender','amount','due_date');
+              ->select('id','fee_term_id','fee_structure_id','fee_item_id','gender','amount','due_date')->orderby('due_date', 'asc');
           }
         }
           

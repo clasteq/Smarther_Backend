@@ -40,13 +40,20 @@ class User extends Authenticatable
     ];
 	
 	
-    protected $appends = [ 'is_profile_image', 'enc_id', 'is_country_name','is_state_name','is_district_name' ,'is_country_detail'];
+    protected $appends = [ 'is_profile_image', 'enc_id', 'is_country_name','is_state_name','is_district_name' ,
+        'is_country_detail', 'is_shortname'
+    ];
 
     public static $monthyear;
     public static $class_id;
     public static $section_id;
     public static $exam_id;
     public static $subject_id;  
+
+    public function getIsShortnameAttribute() {
+        $is_shortname = CommonController::getShortcode($this->name);
+        return $is_shortname;
+    }
     
     public function attendance(){
         //if(self::$class_id > 0 && self::$section_id > 0) {
@@ -130,6 +137,15 @@ class User extends Authenticatable
         $encode = base64_encode(json_encode(array('id'=>$encodeid)));
                         
         return $encode;
+    }
+
+    public static function getDecodedIdAttribute($code) {
+        $user_id = 0;
+        $obj = json_decode(base64_decode($code));
+        if(!empty($obj)) {  
+            $user_id = $obj->id; 
+        } 
+        return $user_id;
     }
 
     public function getJoinedDateAttribute($value) {

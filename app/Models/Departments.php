@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 
-class DltTemplate extends Model
+class Departments extends Model
 {
 
     /**
@@ -19,7 +19,7 @@ class DltTemplate extends Model
      *
      * @var array
      */
-    protected $table = 'dlt_templates';
+    protected $table = 'departments'; 
     
-   
+
 }

@@ -163,6 +163,16 @@ class BulkScholars implements ToModel,WithHeadingRow
                     }
                 }
 
+                $blood_group = 0;
+                if(!empty(trim($row['blood_group']))) {
+                    $blood_group = DB::table('blood_groups')
+                        ->whereRAW('UPPER(name) = "' . trim(strtoupper($row['blood_group'])) . '"')->value('id');
+                    if($blood_group > 0) {} else {
+                        $blood_group = DB::table('blood_groups')->insertGetId(['name'=>trim(strtoupper($row['blood_group'])),
+                            'status'=>'YES','created_at'=>date('Y-m-d H:i:s')]); 
+                    }
+                } 
+
                 $data = [];
                 $data['user_id'] = $id; 
                 $data['school_id'] = Auth::User()->id; 
@@ -183,7 +193,7 @@ class BulkScholars implements ToModel,WithHeadingRow
                 $data['aadhar_number'] = trim($row['aadhar_number']);
                 $data['address'] = trim($row['address']);
                 $data['pincode'] = trim($row['pin_code']);
-                $data['bloodgroup'] = trim($row['blood_group']);
+                $data['bloodgroup'] = $blood_group;
                 $data['religion'] = trim($row['religion']);
                 $data['medium_of_instruction'] = trim($row['medium_of_instruction']);
 
@@ -207,6 +217,12 @@ class BulkScholars implements ToModel,WithHeadingRow
                 $data['medium_10'] = trim($row['medium_10']);
                 $data['medium_11'] = trim($row['medium_11']);
                 $data['medium_12'] =  trim($row['medium_12']); 
+
+                $data['identification_mark_1'] =  trim($row['personal_identification_mark_1']); 
+                $data['identification_mark_2'] =  trim($row['personal_identification_mark_2']); 
+                $data['stay_type'] =  trim($row['type']); 
+                $data['transport'] =  trim($row['transport']); 
+                $data['caste'] =  trim($row['caste']); 
 
                 if($user_id > 0) {
                     $student = Student::where('user_id', $user_id)->first();

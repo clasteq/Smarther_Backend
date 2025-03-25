@@ -21,12 +21,22 @@ class Sections extends Model
      */
     protected $table = 'sections'; 
 
-    protected $appends = ['is_subject_name','is_mapped_subjects','is_subject_id','boys','girls','total', 'academic_year','is_class_name'];
+    protected $appends = ['is_subject_name','is_mapped_subjects','is_subject_id','boys','girls','total', 'academic_year','is_class_name', 'is_class_teacher'];
 
     protected $boys;
     protected $girls;
 
     public static $acadamic_year;
+
+    public function getIsClassTeacherAttribute()    {
+        
+        $is_class_teacher = DB::table('class_teachers')->leftjoin('users', 'class_teachers.teacher_id', 'users.id')
+                        ->leftjoin('teachers', 'class_teachers.teacher_id', 'teachers.user_id')
+                        ->where('class_teachers.class_id', $this->class_id)->where('class_teachers.section_id', $this->id)
+                        ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                        ->select('users.id', 'users.name', 'users.mobile', 'teachers.emp_no')->first();
+        return $is_class_teacher;      
+    } 
 
     public function getIsSubjectNameAttribute()    {
         
