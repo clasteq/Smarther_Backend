@@ -31,7 +31,10 @@
         background-color: #fff !important;
       }
         .dataTables_filter {
-            display: none;
+           /*display: none;*/
+        }
+        .dataTables_length {
+            float: left !important;
         }
         tfoot {
             display: table-header-group;
@@ -124,6 +127,12 @@
 
         .br-10 {
             border-radius: 5% !important;
+        }
+
+        .table thead th {
+            text-align: center !important;
+            vertical-align: middle !important;
+            border-bottom: 2px solid #dee2e6 !important;
         }
     </style>
 

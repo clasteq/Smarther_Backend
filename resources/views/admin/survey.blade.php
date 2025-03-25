@@ -22,7 +22,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 <div class="card-header">
                   <h4 style="font-size:20px;" class="card-title">Survey
                     @if((isset($session_module['Survey']) && ($session_module['Survey']['add'] == 1)) || ($user_type == 'SCHOOL'))
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                    <a href="{{url('/admin/addsurvey')}}" ><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
                     @endif
                   </h4>
                   <div class="row">

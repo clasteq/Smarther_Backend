@@ -71,9 +71,9 @@
         <label for="an_chk" class="ml-5">After Noon </label><input class="ml-3" type="radio" {{$an_checked}} name="att_chk" id="an_chk" value="3" onclick="movefn(3)"> 
     </div></div>
     <div class="row"><div class="col-md-12">
-    <div class="col-md-5 float-left">
+    <div class="col-md-8 float-left">
         <h3>Present :</h3>
-        <div class="users-list clearfix" id="presentlist">
+        <div class="row users-list border rounded clearfix" id="presentlist">
                 <?php
 
                     $i = 1;
@@ -107,9 +107,9 @@
                                     } 
                                     ?> 
 
-                                    <div class="col-md-2 float-left m-3" id="lisection_{{$student['id']}}">
+                                    <div class="col-md-2 border rounded text-center float-left m-3" id="lisection_{{$student['id']}}">
                                         <img src="{{$student['is_profile_image']}}" alt="User Image" style="width: 50px;height: 50px;">
-                                        <a class="users-list-name" href="#" tooltip="" title="{{$student['mobile']}}">{{$student['name']}} {{$student['admission_no']}} </a>
+                                        <a class="users-list-name" href="#" tooltip="" title="{{$student['mobile']}}">{{$student['name']}} <br/> {{$student['admission_no']}} </a>
 
                                         <input type="hidden" name="attendance_type[{{$student['id']}}]" value="p" id="attendance_type">
 
@@ -141,9 +141,9 @@
         </div>
     </div>
     <div class="col-md-2 float-left"></div>
-    <div class="col-md-5 float-left">
+    <div class="col-md-3 float-left">
         <h3>Absent :</h3>
-        <div class="users-list clearfix" id="absentlist">
+        <div class="row users-list border rounded clearfix" id="absentlist">
               
         </div>
     </div>
@@ -165,7 +165,7 @@
     if(!in_array($day,$v)){    ?>
     <div class="modal-footer">
         @if($appstatus == 1) @php($appst = "Approved") @php($appclass = "btn-success") 
-        @else @php($appst = "Approve")  @php($appclass = "btn-info") @endif
+        @else @php($appst = "Approve")  @php($appclass = "btn-info") @endif 
         <button type="sumbit" class="btn {{$appclass}} waves-effect"
             id="edit_style" onclick="saveTimetable();"> {{$appst}}  </button> 
     </div>

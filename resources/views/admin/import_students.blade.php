@@ -130,7 +130,13 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                                 <th>Medium_9</th> 
                                                 <th>Medium_10</th>
                                                 <th>Medium_11</th> 
-                                                <th>Medium_12</th> 
+                                                <th>Medium_12</th>
+                                                <th>Personal Identification Mark 1</th>
+                                                <th>Personal Identification Mark 2</th>
+                                                <th>Type</th>
+                                                <th>Transport</th>
+                                                <th>Caste</th>             
+
                                             </tr>
                                         </thead>                                                                               
  
@@ -146,7 +152,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                                 <th>Tamil</th><th class="red">6046</th><th>SC-Others</th>
                                                 <th>Not Applicable</th><th></th>
                                                 <th>Tamil</th><th></th><th></th><th></th><th></th><th></th><th></th>
-                                                <th></th><th></th><th></th><th></th><th></th><th></th> 
+                                                <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+                                                <th></th><th></th> 
                                                  
                                             </tr>
                                         </tbody>
@@ -154,7 +161,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 </div>
                             </div>
 
-                            <a href="{{config('constants.APP_IMAGE_URL')}}uploads/Sample_StudentsList.xlsx" ><button class=" btn btn-info" id="export_qb_btn">Export Sample Scholars List .xlsx file</button></a>
+                            <a href="{{config('constants.APP_IMAGE_URL')}}uploads/Sample_StudentsLists.xlsx" ><button class=" btn btn-info" id="export_qb_btn">Export Sample Scholars List .xlsx file</button></a>
 
                             <form method="post" name="qb_import" id="qb_import" action="{{URL::to('/admin/import/scholarslist')}}">
                             {{csrf_field()}}   

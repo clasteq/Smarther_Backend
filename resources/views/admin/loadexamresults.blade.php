@@ -9,7 +9,7 @@ if(!empty($subjects)) {
   @if(!empty($students) && count($students)>0)
     <thead style="background: #a3d10c;color: #fff;text-align: center;">
       <tr>
-        <th scope="col">Name</th>
+        <th scope="col" style="text-align: left !important;">Name</th>
         <th scope="col">Admission No</th>
         @foreach( $c as $key=>$value)
         <th scope="col">{{$value}}</th>
@@ -26,8 +26,8 @@ if(!empty($subjects)) {
   
       @foreach($students as $student)  
       <tr id="{{ $student['id'] }}" class="{{ $student['id'] }}"> 
-          <th scope="row">{{$student['name']}}</th> 
-          <th scope="row">{{$student['admission_no']}}</th>
+          <th scope="row" style="text-align: left !important;">{{$student['name']}}</th> 
+          <th scope="row" style="text-align: left !important;">{{$student['admission_no']}}</th>
           <?php   foreach( $c as $key=>$value){
           $total_marks = 0; // $totalmarks; 
           $marks = $remarks = $grade = $checked = ''; $is_absent = $rank = 0;
@@ -73,6 +73,15 @@ if(!empty($subjects)) {
  
     @endforeach  
   </tbody>
+  <tfoot>
+    <td >
+      <div class="col-md-2"> 
+          <button type="button" class="btn signupBtn"
+              style="background:#A3D10C;border-radius: 6px;padding: 8px 13px;margin-top:22px"
+              onclick="loadExamResultsPdf();">PDF </button>
+      </div>
+    </td>
+  </tfoot>
   @else 
   <tbody style="text-align: center;"><tr><td>No Details</td></tr>
   @endif  

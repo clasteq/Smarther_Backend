@@ -19,17 +19,36 @@
             @php($id = $post['id'])
             <div class="col-md-12 post mt-4 ms-md-5 ms-sm-2 elevation-5 br-10"  style="    background: #fff;">
                 <div class="d-flex m-3 activity activityimage">
-                    <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle">
-                    <p class="mt-2 ml-3"><b>{{$post['post_category']}} </b><br> {{$post['posted_user']['name_code']}} <br> 
+                    <?php $shortcode = $post['posted_user']['is_shortname']; ?>
+                    @if(empty($post['posted_user']['profile_image']))
+                    <svg class="col-md-2" height="100" width="100">
+                      <defs>
+                        <linearGradient id="grad1">
+                          <stop offset="0%" stop-color="#FF6F61" />
+                          <stop offset="100%" stop-color="#FF6F61" />
+                        </linearGradient>
+                      </defs>
+                      <ellipse cx="60" cy="40" rx="40" ry="40" fill="url(#grad1)" />
+                      <text fill="#ffffff" font-size="35" font-family="Verdana" x="35" y="55">{{$shortcode}}</text>
+                      Sorry, your browser does not support inline SVG.
+                    </svg>
+                    @else 
+                    <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle col-md-2">
+                    @endif 
+                    <p class="mt-2 ml-3"><b>{{$post['post_category']}} </b><br> 
+                    @if(!empty($post['posted_user']['name_code'])) {{$post['posted_user']['name_code']}} @else {{$shortcode}} @endif <br> 
                     Notify At: {{date('d M, Y h:i A', strtotime($post['notify_datetime']))}}</p> 
-                    <?php if(strtotime($post['notify_datetime']) > strtotime(date('Y-m-d H:i:s'))) {  ?>
-                    @if((isset($session_module['SMS']) && ($session_module['SMS']['edit'] == 1)) || ($user_type == 'SCHOOL'))    
-                    <a href="{{URL('/')}}/admin/editpostsms?id={{$post['id']}}" title="Edit post" style="padding-left:60%;display: none;"><img class="editact w-15" src="{{asset('/public/images/edit 1.png')}}"></a> 
-                    @endif
-                    @if((isset($session_module['SMS']) && ($session_module['SMS']['delete'] == 1)) || ($user_type == 'SCHOOL'))
-                    <a href="#" onclick="deletepostsms({{$id}})"  title="Delete post" style="padding-left:1%;"><img class="deleteact w-15" src="{{asset('/public/images/delete.png')}}"></a>
-                    @endif
-                    <?php } ?>
+
+                    <div class=" float-left col-md-6 receiverslist" id="likeact_{{$id}}" >  
+                    @if(!empty($post['is_post_receivers']))
+                        @foreach($post['is_post_receivers'] as $receivers)
+                     <p class=" btn-info" style="display: inline-block; padding: 2px;">{{$receivers->name}}  {{$receivers->name1}}</p> 
+                        @endforeach
+                    @else 
+                     <p class=" btn-info" style="display: inline-block; padding: 2px;">All</p> 
+                    @endif  
+
+                    </div>   
                 </div>  
                 <div class="activitycontent offerolympia" >
                     <p>{!! $post['content'] !!}</p>
@@ -42,18 +61,22 @@
                                 </p> 
                             </a>
                         </div> 
-                        @if((isset($session_module['SMS']) && ($session_module['SMS']['status_update'] == 1)) || ($user_type == 'SCHOOL'))
-                        @if($post['status'] == 'PENDING')
-                        <p class=" float-right"> 
-                        <select class="form-control ml-3" name="post_status" onchange="updatesmsstatus(this, {{$id}});">
-                            <option value="">Select Status</option>
-                            <option value="ACTIVE">Approved</option>
-                            <option value="INACTIVE">Rejected</option>
-                        </select>
-                        </p>
-                        @endif
-                        @endif
                         <p class=" float-right">{{$post['is_created_ago']}}</p> 
+
+                        @if((isset($session_module['Posts']) && ($session_module['Posts']['edit'] == 1)) || ($user_type == 'SCHOOL'))
+                        <a class="col-md-1 float-right" href="{{URL('/')}}/admin/editpostsms?id={{$post['id']}}" title="Edit sms" ><img class="editact w-15" src="{{asset('/public/images/edit 1.png')}}"></a> 
+                        @endif 
+
+                        @if((isset($session_module['Posts']) && ($session_module['Posts']['status_update'] == 1)) || ($user_type == 'SCHOOL'))
+                        
+                        @if($post['status'] == 'PENDING')
+                        <a class="mr-1 float-right" href="#" onclick="confirmactivity({{$id}}, 'ACTIVE')"  title="Confirm sms" style="padding-left:1%;text-align: right;"><img class="deleteact w-15 pointer" src="{{asset('/public/images/confirm.png')}}"></a>
+                        <a class="mr-1 float-right" href="#" onclick="confirmactivity({{$id}}, 'INACTIVE')"  title="Reject sms" style="padding-left:1%;text-align: right;"><img class="deleteact w-15 pointer" src="{{asset('/public/images/rejected.png')}}"></a> 
+                        @endif
+
+                        <a class="col-md-1 float-right" href="#" onclick="deletepostsms({{$id}})"  title="Delete sms" style="padding-left:1%;text-align: right;"><img class="deleteact w-15 pointer" src="{{asset('/public/images/delete.png')}}"></a> 
+                        @endif
+    
                     </div> 
                 </div>
             </div>

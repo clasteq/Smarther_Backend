@@ -6,9 +6,11 @@
 <?php 
 use App\Http\Controllers\AdminRoleController;
 
+$user_type = Auth::User()->user_type;
 $rights = AdminRoleController::getRights();
 
 ?>
+@if($user_type == "SUPER_ADMIN")
 <meta name="csrf-token" content="{{ csrf_token() }}">
 @if($rights['rights']['view'] == 1)
 <section class="content">
@@ -17,11 +19,23 @@ $rights = AdminRoleController::getRights();
 		<div class="col-12">
 			<div class="card">
 				<div class="card-header">
-					<h4 class="card-title">
-						Modules
-						@if($rights['rights']['add'] == 1)
-						<a href="#" data-toggle="modal" data-target="#smallModal" id="addbtn"><button class="btn btn-primary" style="float: right;">Add</button></a>
-						@endif
+					<h4 class="card-title"> 	<!-- Modules -->
+						<div class="row col-md-12">
+	                        <div class="form-inline col-md-3 " >
+	                            <label class="form-label mr-1">Status</label>
+	                            <select class="form-control" name="status_id" id="status_id">
+	                                <option value="" >All</option>
+	                                <option value="1">ACTIVE</option>
+	                                <option value="2">INACTIVE</option>
+	                            </select>
+	                        </div>
+	                        <div class="form-inline col-md-8 float-right " ></div>
+	                        <div class="form-inline col-md-1 float-right " >
+	                        @if($user_type == 'SUPER_ADMIN' && $rights['rights']['add'] == 1)
+	                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+	                        @endif
+	                        </div>
+	                    </div>  
 					</h4>
 
 				</div>
@@ -41,7 +55,7 @@ $rights = AdminRoleController::getRights();
 											<th class="not-export-column">Action</th>
 										</tr>
 									</thead>
-									<tfoot>
+									<!-- <tfoot>
 										<th></th>
 										<th></th>
 										<th></th>
@@ -50,7 +64,7 @@ $rights = AdminRoleController::getRights();
 										<th></th>
 										<th></th>
 										
-									</tfoot>
+									</tfoot> -->
 									<tbody>
 
 									</tbody>
@@ -69,6 +83,7 @@ $rights = AdminRoleController::getRights();
 		<div class="modal-content">
 			<div class="modal-header">
 				<h4 class="modal-title" id="smallModalLabel">Add Module</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
 			</div>
 
 			<form id="style-form" enctype="multipart/form-data"
@@ -191,6 +206,7 @@ $rights = AdminRoleController::getRights();
 		<div class="modal-content">
 			<div class="modal-header">
 				<h4 class="modal-title" id="smallModalLabel">Edit Module</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
 			</div>
 
 			<form id="edit-style-form" enctype="multipart/form-data"
@@ -312,6 +328,11 @@ $rights = AdminRoleController::getRights();
 	</div>
 </div>
 @endif
+@else 
+<section class="content">
+    @include('admin.notavailable')
+</section>
+@endif
 @endsection 
 
 @section('scripts')
@@ -325,18 +346,35 @@ $rights = AdminRoleController::getRights();
             var table = $('.tblcountries').DataTable({
                 processing: true,
                 serverSide: true,
-                responsive: false,
-                stateSave: true,
+                responsive: false, 
                 "ajax": {
                     "url": "{{URL('/')}}/admin/modules/datatables/",
+                    data: function ( d ) {
+                        var status  = $('#status_id').val(); 
+                        $.extend(d, {status:status});
+
+                    }
                 },
                 columns: [
-                	{ data: 'module_name',name:'modules.module_name'},        
-                    { data: 'is_parent_module',name:'pf.module_name'},         
-                    { data: 'menu_rank',name:'modules.menu_rank'},                   
-                    { data: 'url',name:'modules.url'},      
-                    { data: 'menu_item',name:'modules.menu_item'},                 
-                    { data: 'is_status',name:'modules.is_status'},
+                	{ data: 'module_name',name:'module_name'},        
+                    { data: 'parent_module_name',name:'pf.module_name'},         
+                    { data: 'menu_rank',name:'menu_rank'},                   
+                    { data: 'url',name:'url'},      
+                    { data: 'menu_item',name:'menu_item'},    
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+
+                            var tid = data.status;
+                            if(tid == 1) {
+                            	return 'Active';
+                            } else {
+                                return 'Inactive';
+                            }
+                          
+                        },
+
+                    },
                     {
                         data:null,
                         "render": function ( data, type, row, meta ) {
@@ -371,7 +409,7 @@ $rights = AdminRoleController::getRights();
 
             });
 
-            $('.tblcountries tfoot th').each( function () {
+            /*$('.tblcountries tfoot th').each( function () {
                 var title = $(this).text();
                 var index=$(this).index();
                 if(index<5){
@@ -390,7 +428,12 @@ $rights = AdminRoleController::getRights();
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
+
+            $('#status_id').on('change', function() {
+                table.draw();
+            });
+
             @endif
             $('#add_style').on('click', function () {
 
@@ -409,7 +452,7 @@ $rights = AdminRoleController::getRights();
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -431,7 +474,7 @@ $rights = AdminRoleController::getRights();
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
@@ -456,7 +499,7 @@ $rights = AdminRoleController::getRights();
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -478,7 +521,7 @@ $rights = AdminRoleController::getRights();
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 

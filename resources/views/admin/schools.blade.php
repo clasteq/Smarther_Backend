@@ -3,9 +3,13 @@
 @section('master_schools', 'active')
 @section('menuopenu', 'active menu-is-opening menu-open')
 <?php  
+$user_type = Auth::User()->user_type;
 $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'=>'#', 'name'=>'Schools', 'active'=>'active']];
+$session_module = session()->get('module');
+//echo "<pre>"; print_r($session_module); exit;
 ?>
 @section('content') 
+    @if($user_type == "SUPER_ADMIN")
     <style type="text/css">
         .modal-content {
             width: 112% !important;
@@ -18,21 +22,25 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 class="card-title">Schools  
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn" class="btn btn-primary" style="float: right;">Add</button></a>  
-                  </h4>        
-                  <div class="row">
-                        <div class=" col-md-3">
-                            <label class="form-label" style="padding-bottom: 10px;">Status </label>
-                            <div class="form-line">
-                                <select class="form-control" name="status_id" id="status_id" >
-                                    <option value="">All</option>
-                                    <option value="ACTIVE">ACTIVE</option>
-                                    <option value="INACTIVE">INACTIVE</option>
-                                </select> 
-                            </div>
+                  <h4 class="card-title"><!-- Schools   -->
+
+                    <div class="row col-md-12">
+                        <div class="form-inline col-md-3 " >
+                            <label class="form-label mr-1">Status</label>
+                            <select class="form-control" name="status_id" id="status_id">
+                                <option value="" >All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
                         </div>
-                    </div>        
+                        <div class="form-inline col-md-8 float-right " ></div>
+                        <div class="form-inline col-md-1 float-right " >
+                        @if($user_type == 'SUPER_ADMIN')
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                        @endif
+                        </div>
+                    </div> 
+                  </h4>                 
                 </div> 
                 <div class="card-content collapse show">
                   <div class="card-body card-dashboard">
@@ -41,7 +49,6 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                             <table class="table table-striped table-bordered tblcountries">
                               <thead>
                                 <tr>
-                                  <th>Action</th>
                                   <th>Joined Date</th>
                                   <th>Reference No</th>
                                   <th>Name</th> 
@@ -53,15 +60,16 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                   <th>State</th>
                                   <th>City</th>
                                   <th>Status</th> 
+                                  <th>Action</th>
                                 </tr>
                               </thead>
-                              <tfoot>
+                              <!-- <tfoot>
                                   <tr><th></th><th></th><th></th>
                                       <th></th><th></th><th></th>
                                       <th></th><th></th><th></th>
                                       <th></th><th></th><th></th> 
                                   </tr>
-                              </tfoot>
+                              </tfoot> -->
                               <tbody>
                                 
                               </tbody>
@@ -79,6 +87,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add School</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -134,7 +143,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                             <div class="form-group form-float float-left col-md-6">
                                 <label class="form-label">Password</label>
                                 <div class="form-line">
-                                    <input type="text" class="form-control" name="password" required minlength="6" maxlength="20">
+                                    <input type="text" class="form-control" name="password" required minlength="6" maxlength="12">
                                 </div>
                             </div>
                             <div class="form-group form-float float-left col-md-6">
@@ -197,6 +206,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit School</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data"
@@ -266,7 +276,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                             <div class="form-group form-float float-left col-md-6">
                                 <label class="form-label">Password</label>
                                 <div class="form-line">
-                                    <input type="text" class="form-control" name="password"  id="password" required  minlength="6" maxlength="20">
+                                    <input type="text" class="form-control" name="password"  id="password" required  minlength="6" maxlength="12">
                                 </div>
                             </div>
                             <div class="form-group form-float float-left col-md-6">
@@ -331,6 +341,11 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             </div>
         </div>
     </div> 
+    @else 
+    <section class="content">
+        @include('admin.notavailable')
+    </section>
+    @endif
 @endsection
 
 @section('scripts')
@@ -357,16 +372,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                     }
                 },
                 columns: [ 
-                    {
-                        data:null,
-                        "render": function ( data, type, row, meta ) {
-
-                            var tid = data.id; 
-                            return '<a href="#" onclick="loadSchool('+tid+')" title="Edit School"><i class="fas fa-edit"></i></a>'; 
-                        },
-
-                    },
-                    { data: 'joined_date',  name: 'joined_date'},
+                    { data: 'joined_date',  name: 'users.joined_date'},
                     { data: 'admission_no',  name: 'users.admission_no'},
                     { data: 'name',  name: 'users.name'},
                     { data: 'name_code',  name: 'users.name_code'},
@@ -382,22 +388,30 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                         },
 
                     },
-                    { data: 'email',  name: 'email'},  
-                    { data: 'mobile',  name: 'mobile'}, 
+                    { data: 'email',  name: 'users.email'},  
+                    { data: 'mobile',  name: 'users.mobile'}, 
                     { data: 'address',  name: 'schools.address'}, 
                     { data: 'state_name',  name: 'states.state_name'}, 
                     { data: 'district_name',  name: 'districts.district_name'}, 
-                    { data: 'status',  name: 'status'},
+                    { data: 'status',  name: 'users.status'},
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+
+                            var tid = data.id; 
+                            return '<a href="#" onclick="loadSchool('+tid+')" title="Edit School"><i class="fas fa-edit"></i></a> <a href="#" onclick="loginSchool('+tid+')" title="Login School"><i class="fas fa-unlock"></i></a>'; 
+                        },
+
+                    },
                 ],
-                "columnDefs": [
-                    { "orderable": false, "targets": 0 },
+                "columnDefs": [ 
                     { "orderable": false, "targets": 4 },
-                    { "orderable": false, "targets": 10 }
+                    { "orderable": false, "targets": 11 }
                 ]
 
             });
 
-            $('.tblcountries tfoot th').each( function (index) {
+            /*$('.tblcountries tfoot th').each( function (index) {
                 if(index != 4 && index != 0 && index != 10) {
                     var title = $(this).text();
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
@@ -415,7 +429,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                 .draw();
                     }
                 } );
-            } ); 
+            } ); */
 
             $('#status_id').on('change', function() {
                 table.draw();
@@ -439,7 +453,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -461,7 +475,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
@@ -484,7 +498,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -506,7 +520,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
@@ -616,6 +630,44 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
               // Alert the copied text
               return false;
             }
+
+        function loginSchool(id) {
+            swal({
+                title : "",
+                text : "Are you sure to Exit Super Admin and Logged into School?",
+                type : "warning",
+                showCancelButton: true,
+                confirmButtonText: "Yes",
+            },
+            function(isConfirm){
+                if (isConfirm) {
+                    var request = $.ajax({
+                        type: 'post',
+                        url: " {{URL::to('/admin/loginschool')}}",
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        data:{
+                            id:id,
+                        },
+                        dataType:'json',
+                        encode: true
+                    });
+                    request.done(function (response) {
+                        if (response.status == "SUCCESS") { 
+                            window.location.href = "{{URL::to('admin/home')}}";
+                        } else{
+                            swal('Oops',response.message,'error'); 
+                        }
+
+                    });
+                    request.fail(function (jqXHR, textStatus) {
+
+                        swal("Oops!", "Sorry,Could not process your request", "error");
+                    });
+                }
+            })
+        }
     </script>
 
 @endsection

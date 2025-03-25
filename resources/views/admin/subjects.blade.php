@@ -1,8 +1,9 @@
 @extends('layouts.admin_master')
-@section('mastersettings', 'active')
+@section('master_settings', 'active')
 @section('master_subjects', 'active')
 @section('menuopenm', 'active menu-is-opening menu-open')
 <?php
+$user_type = Auth::User()->user_type;
 $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], ['url' => '#', 'name' => 'Subjects', 'active' => 'active']];
 ?>
 @section('content')
@@ -15,21 +16,24 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size: 20px" class="card-title">Subjects
-                            <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn"
-                                    class="btn btn-primary" style="float: right;">Add</button></a>
-                        </h4>
-                        <div class=" col-md-3">
-                            <label class="form-label" >Status </label>
-                            <div class="form-line">
-                                <select class="form-control" name="status_id" id="status_id" >
-                                    <option value="">All</option>
-                                    <option value="ACTIVE" selected>ACTIVE</option>
-                                    <option value="INACTIVE">INACTIVE</option>
-                                </select>
-                                </select>
-                            </div>
-                        </div>
+                        <h4 style="font-size: 20px" class="card-title"><!-- Subjects -->
+                            <div class="row col-md-12">
+                                <div class="form-inline col-md-3 " >
+                                    <label class="form-label mr-1">Status</label>
+                                    <select class="form-control" name="status_id" id="status_id">
+                                        <option value="" >All</option>
+                                        <option value="ACTIVE">ACTIVE</option>
+                                        <option value="INACTIVE">INACTIVE</option>
+                                    </select>
+                                </div>
+                                <div class="form-inline col-md-8 float-right " ></div>
+                                <div class="form-inline col-md-1 float-right " >
+                                @if((isset($session_module['Subjects']) && ($session_module['Subjects']['add'] == 1)) || ($user_type == 'SCHOOL'))
+                                <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                                @endif
+                                </div>
+                            </div> 
+                        </h4> 
 
                     </div>
                     <div class="card-content collapse show">
@@ -39,17 +43,17 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                     <table class="table table-striped table-bordered tblcountries">
                                         <thead>
                                             <tr>
-                                                <th>Action</th>
                                                 <th>Subject Name</th>
                                                 <th>Short Name</th>
                                                 <th>Subject Color Code</th>
                                                 <th>Subject Image</th>
                                                 <th>Position</th>
                                                 <th>Status</th>
+                                                <th>Action</th>
                                                
                                             </tr>
                                         </thead>
-                                        <tfoot>
+                                        <!-- <tfoot>
                                             <tr>
                                                 <th></th>
                                                 <th></th>
@@ -59,7 +63,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                                 <th></th>
                                                 <th></th>
                                             </tr>
-                                        </tfoot>
+                                        </tfoot> -->
                                         <tbody>
 
                                         </tbody>
@@ -78,6 +82,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Subject</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data" action="{{ url('/admin/save/subjects') }}"
@@ -155,6 +160,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Subject</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data" action="{{ url('/admin/save/subjects') }}"
@@ -242,10 +248,9 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             $('#style-form')[0].reset();
         });
 
-        $('.subject_colorcode option').each(function() {
-          
-  $(this).css('background-color', $(this).val());
-});
+        $('.subject_colorcode option').each(function() { 
+            $(this).css('background-color', $(this).val());
+        });
 
         $(function() {
             
@@ -263,16 +268,6 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                     }
                 },
                 columns: [
-                    {
-                        data: null,
-                        "render": function(data, type, row, meta) {
-
-                            var tid = data.id;
-                            return '<a href="#" onclick="loadCountry(' + tid +
-                                ')" title="Edit Country"><i class="fas fa-edit"></i></a>';
-                        },
-
-                    },
                     {
                         data: 'subject_name',
                         name: 'subject_name'
@@ -313,29 +308,39 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                         data: 'status',
                         name: 'status'
                     },
+                    {
+                        data: null,
+                        "render": function(data, type, row, meta) {
+
+                            var tid = data.id;
+                            return '<a href="#" onclick="loadCountry(' + tid +
+                                ')" title="Edit Country"><i class="fas fa-edit"></i></a>';
+                        },
+
+                    },
                     
                 ],
                 "order":[[4, 'asc']],
                 "columnDefs": [
-                    { "orderable": false, "targets": 0 },
+                    { "orderable": false, "targets": 6 },{ "orderable": false, "targets": 5 },
                     { "orderable": false, "targets":3 },
                    
                 ]
 
             });
 
-            $('.tblcountries tfoot th').each(function(index) {
+            /*$('.tblcountries tfoot th').each(function(index) {
                 if (index != 5 && index != 3 && index != 0) {
                     var title = $(this).text();
                     $(this).html('<input type="text" placeholder="Search ' + title + '" />');
                 }
-            });
+            });*/
             $('#status_id').on('change', function() {
                 table.draw();
             });
 
             // Apply the search
-            table.columns().every(function() {
+            /*table.columns().every(function() {
                 var that = this;
 
                 $('input', this.footer()).on('keyup change', function() {
@@ -345,7 +350,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                             .draw();
                     }
                 });
-            });
+            });*/
             $('#add_style').on('click', function() {
 
                 var options = {
@@ -363,7 +368,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -384,7 +389,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops', 'Something went to wrong.', 'error');
 
@@ -407,7 +412,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -428,7 +433,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops', 'Something went to wrong.', 'error');
 

@@ -21,13 +21,13 @@ $rights = AdminRoleController::getRights();
 	<div class="row">
 		<div class="col-12">
 			<div class="card">
-				<div class="card-header"> <h4 class="card-title">Teacher Role Module Mapping</h4> </div>
+				<!-- <div class="card-header"> <h4 class="card-title">Teacher Role Module Mapping</h4> </div> -->
 
 				<form id="edit-style-form" enctype="multipart/form-data" action="{{url('/admin/save/role_access')}}" method="post">
                     {{csrf_field()}} 
 					<div class="modal-body">
 						<div class="row col-md-12">
-							<div class="col-md-12"> <h3><?php echo $role_name;?></h3> </div> 
+							<div class="col-md-12"> <h3><?php echo $role_name;?> Role Module Mapping</h3> </div> 
 							<input type="hidden" name="role_fk" id="role_fk" value="<?php echo $role_fk;?>">
 						</div>
 						<div class="row"> 
@@ -213,7 +213,7 @@ $rights = AdminRoleController::getRights();
 
 		              if (response.status == "SUCCESS") {
 		                swal('Success',response.message,'success');
-		                window.location.href="{{url('/admin/teacher_module_mapping')}}";
+		                window.location.href="{{url('/admin/staff_module_mapping')}}";
 
 		             }
 		             else if (response.status == "FAILED") {

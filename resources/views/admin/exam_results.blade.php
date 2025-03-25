@@ -68,7 +68,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                 overflow-x: scroll !important;
             }
 
-        }
+        } 
+
     </style>
 @endsection
 @section('content')
@@ -438,6 +439,65 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                     });
                 }
             });
+        }
+
+        function loadExamResultsPdf() {
+            var monthyear = $('#monthyear').val(); 
+            monthyear = $.trim(monthyear);  
+            if(monthyear == '') {
+                swal("Oops!", "Please select the Academic Year", "error");
+                return false;
+            } 
+            var class_id = $('#class_id').val(); 
+            if(class_id>0) {} else {
+                swal("Oops!", "Please select the Class", "error");
+                return false;
+            }
+
+            var section_id = $('#section_dropdown').val(); 
+            if(section_id>0) {} else {
+                swal("Oops!", "Please select the Section", "error");
+                return false;
+            }
+            var exam_id = $('#exam_id').val(); 
+            if(exam_id>0) {} else {
+                swal("Oops!", "Please select the Exam", "error");
+                return false;
+            }
+            var student_id = $('#student_id').val(); 
+            var subject_id = $('#subject_id').val(); 
+            var total_marks = $('#total_marks').val(); 
+
+            var url =   "{{ URL::to('admin/load/exam_results_pdf') }}?monthyear="+monthyear+"&class_id="+class_id+"&section_id="+section_id+"&exam_id="+exam_id+"&subject_id="+subject_id+"&student_id="+student_id+"&total_marks="+total_marks;
+            window.open(url, "_blank");
+
+            /*var request = $.ajax({
+                type: 'get',
+                url: "{{ URL::to('admin/load/exam_results_pdf') }}",
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                data: {
+                    monthyear: monthyear, class_id:class_id, section_id:section_id, exam_id:exam_id, subject_id:subject_id,student_id:student_id,total_marks:total_marks
+                },
+                dataType: 'json',
+                encode: true
+                /*contentType:false,
+                processData:false, * /
+            });
+            request.done(function(response) {
+                if (response.status == "SUCCESS") {
+                    $('#attendanceentries').html(response.data);
+                } else {
+                    swal("Oops!", response.message, "error");
+                    // $('#attendanceentries').html(response.message);
+                }
+
+            });
+            request.fail(function(jqXHR, textStatus) {
+
+                swal("Oops!", "Sorry,Could not process your request", "error");
+            });*/
         }
     </script>
 @endsection

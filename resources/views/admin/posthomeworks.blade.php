@@ -36,8 +36,8 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
            visibility:hidden;*/ 
         }
         .activityimage img {
-            width: 70px;
-            height: auto; /*200px;*/
+            width: 20%; /*70px;*/
+            height: 100px;  /*auto;*/ 
             border-radius: 3%;
         }
         .editact {
@@ -81,6 +81,17 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             margin: 1.5em .7rem;
             padding: .5em .7rem; 
         }
+
+        .receiverslist {
+            max-height: 90px;
+            overflow-y: auto;
+            scrollbar-width: thin; 
+        } 
+
+        .modal-full {
+            min-width: 95%;
+            margin: 10;
+        }
 </style>
 
 <section class="content">
@@ -96,7 +107,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 <div class="col-xs-12 col-md-12">
             
                 <div class="card">
-                    <div class="card-header">Homeworks
+                    <div class="card-header"> 
                         @if((isset($session_module['Homeworks']['add']) && ($session_module['Homeworks']['add'] == 1)) || ($user_type == 'SCHOOL'))
                         <a href="#" data-toggle="modal" data-target="#smallModal" id="addbanner"><button id="addbtn"
                                     class="btn btn-primary" style="float: right;">Add</button></a>
@@ -112,7 +123,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     </select>
                                 </div>
                             </div>
-                            <div class=" col-md-2">
+                            <div class="form-group col-md-2">
                                 <label class="form-label">Class </label>
                                 <div class="form-line">
                                     <select class="form-control" name="classid" id="classid" onchange="loadClassSectionHw(this.value);" >
@@ -127,7 +138,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 </div>
                             </div>
 
-                            <div class=" col-md-2">
+                            <div class="form-group col-md-2">
                                 <label class="form-label">Section </label>
                                 <div class="form-line">
                                     <select class="form-control section_id" name="sectionid" id="sectionid" onchange="loadClassSubjectsHw(this.value);">
@@ -144,14 +155,19 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     </select> 
                                 </div>
                             </div>
-                            <div class="form-group col-md-3 " >
+                            <div class="form-group col-md-2 " >
                                 <label class="form-label">From</label>
                                 <input class="date_range_filter date form-control" type="text" id="datepicker_from"  />
                             </div>
-                            <div class="form-group col-md-3 " >
+                            <div class="form-group col-md-2 " >
                                 <label class="form-label">To</label>
                                 <input class="date_range_filter date form-control" type="text" id="datepicker_to"  />
                             </div> 
+
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label"></label> 
+                                <button class="btn btn-danger mt-3"  id="clear_style">Clear Filter</button>
+                            </div>
                         </div>
 
                     </div>
@@ -161,7 +177,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                         <input type="hidden" name="loadsection" id="loadsection" value=".posts .pagination_section">
                     </div>
                     <div class="col-md-9 ml-15" >
-                        @include('admin.posthomeworks_list')   
+                        @include('admin.post_homeworks_list')   
                     </div>  
                 </div>
             </div>
@@ -177,6 +193,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Home Work</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data" action="{{ url('/admin/save/homework') }}"
@@ -277,47 +294,64 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 </div>
                             </div>--}}
 
+                            <a href="javascript:void(0);" onclick="showAdvanced()">Advanced in Details</a>
 
-                            <div class="form-group form-float float-left col-md-6">
-                                <label class="form-label">Upload Home Work File</label>
-                                <div class="form-line">
-                                    <input type="file" class="form-control" name="hw_attachment">
+                            <div class="advanced col-md-12" id="advanced" style="display: none;">
+                                <div class="form-group form-float float-left col-md-8">
+                                    <label class="form-label">Upload Home Work File (jpg, png, jpeg, doc(x), pdf)</label>
+                                    <div class="form-line">
+                                        <input type="file" class="form-control col-md-6" name="file_attachment[]" multiple>
+                                    </div>
+                                </div>
+
+                                <div class="form-group form-float float-left col-md-4">
+                                        <label class="form-check-label" for="defaultCheck1"> Request Acknowledgment </label>  
+                                        <div class="form-line">
+                                        <input class="form-check-input form-control" type="checkbox" value="1" name="req_ack"  id="req_ack">
+                                        </div>
+                                </div>
+
+                                <div class="form-group form-float float-left col-md-6 d-none">
+                                    <label class="form-label">Upload Home Work File</label>
+                                    <div class="form-line">
+                                        <input type="file" class="form-control" name="hw_attachment">
+                                    </div>
+                                </div>
+
+                                <div class="form-group form-float float-left col-md-6 d-none">
+                                    <label class="form-label">Upload Daily Task File</label>
+                                    <div class="form-line">
+                                        <input type="file" class="form-control" name="dt_attachment">
+                                    </div>
+                                </div>
+                                <div class="form-group form-float float-left col-md-6">
+                                    <label class="form-label"> Home Work Date</label>
+                                    <div class="form-line">
+
+
+                                        <!-- <input type="datetime-local" value="<?php echo date('Y-m-d\TH:i:s'); ?>" min="<?php echo date('Y-m-d'); ?>T00:00" required class="form-control" id="hw_date" name="hw_date"> -->
+
+                                        <input type="datetime-local"  min="<?php echo date('Y-m-d'); ?>T00:00" required class="form-control" id="hw_date" name="hw_date" value="<?php echo date('Y-m-d H:i'); ?>">
+
+                                    </div>
+                                </div>
+
+                                <div class="form-group form-float float-left col-md-6">
+                                    <label class="form-label"> Submission Date</label>
+                                    <div class="form-line">
+                                        <input type="datetime-local" value="<?php echo date('Y-m-d'); ?>T09:30:00" required class="form-control" min="<?php echo date('Y-m-d'); ?>T00:00" id="hw_submission_date" name="hw_submission_date">
+                                    </div>
+                                </div>
+                                <div class="form-group form-float float-left col-md-6">
+                                    <label class="form-label">Approval Status <span class="manstar">*</span></label>
+                                    <div class="form-line">
+                                        <select class="form-control" name="approve_status">
+                                            <option value="APPROVED">APPROVED</option>
+                                            <option value="UNAPPROVED">UNAPPROVED</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-group form-float float-left col-md-6">
-                                <label class="form-label">Upload Daily Task File</label>
-                                <div class="form-line">
-                                    <input type="file" class="form-control" name="dt_attachment">
-                                </div>
-                            </div>
-                            <div class="form-group form-float float-left col-md-6">
-                                <label class="form-label"> Home Work Date</label>
-                                <div class="form-line">
-
-
-                                    <!-- <input type="datetime-local" value="<?php echo date('Y-m-d\TH:i:s'); ?>" min="<?php echo date('Y-m-d'); ?>T00:00" required class="form-control" id="hw_date" name="hw_date"> -->
-
-                                    <input type="datetime-local"  min="<?php echo date('Y-m-d'); ?>T00:00" required class="form-control" id="hw_date" name="hw_date" value="<?php echo date('Y-m-d H:i'); ?>">
-
-                                </div>
-                            </div>
-
-                            <div class="form-group form-float float-left col-md-6">
-                                <label class="form-label"> Submission Date</label>
-                                <div class="form-line">
-                                    <input type="datetime-local" value="<?php echo date('Y-m-d'); ?>T09:30:00" required class="form-control" min="<?php echo date('Y-m-d'); ?>T00:00" id="hw_submission_date" name="hw_submission_date">
-                                </div>
-                            </div>
-                            <div class="form-group form-float float-left col-md-6">
-                                <label class="form-label">Approval Status <span class="manstar">*</span></label>
-                                <div class="form-line">
-                                    <select class="form-control" name="approve_status">
-                                        <option value="APPROVED">APPROVED</option>
-                                        <option value="UNAPPROVED">UNAPPROVED</option>
-                                    </select>
-                                </div>
-                            </div>
-
                             <!-- <div class="form-group form-float float-left col-md-6">
                                 <label class="form-label">Position <span class="manstar">*</span></label>
                                 <div class="form-line">
@@ -352,7 +386,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                     <h4 class="modal-title" id="smallModalLabel">Edit Home Work</h4>
                 </div>
 
-                <form id="edit-style-form" enctype="multipart/form-data" action="{{ url('/admin/save/homeworkgrp') }}"
+                <form id="edit-style-form" enctype="multipart/form-data" action="{{ url('/admin/update/homework') }}"
                     method="post">
 
                     {{ csrf_field() }}
@@ -396,7 +430,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                             <div id="edit_subject-homework-container" class="col-md-12">
                                 <div class="edit_subject-homework-row"> 
                                     <input type="hidden" name="subject_hw_id[]" id="edit_subject_hw_id_0" value="0">
-                                    <div class="form-group form-float float-left col-md-6">
+                                    <div class="form-group form-float float-left col-md-4">
                                         <label class="form-label">Subject</label>
                                         <div class="form-line">
                                             <select class="form-control subject_id" name="edit_subject_id[]" id="edit_subject_id_0" required>
@@ -409,7 +443,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="form-group form-float float-left col-md-6">
+                                    <div class="form-group form-float float-left col-md-8">
                                         <label class="form-label">Home Work Details <span class="manstar">*</span></label>
                                         <div class="form-line">
                                             <textarea class="form-control hw_description" name="hw_description[]" id="edit_hw_description_0"  rows="3" cols="30" required></textarea>
@@ -463,7 +497,21 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 </div>
                             </div> --}}
 
-                            <div class="form-group form-float float-left col-md-6">
+                            <div class="form-group form-float float-left col-md-8">
+                                <label class="form-label">Upload Home Work File (jpg, png, jpeg, doc(x), pdf)</label>
+                                <div class="form-line">
+                                    <input type="file" class="form-control col-md-6" name="file_attachment[]" multiple>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-float float-left col-md-4">
+                                    <label class="form-check-label" for="defaultCheck1"> Request Acknowledgment </label>  
+                                    <div class="form-line">
+                                    <input class="form-check-input form-control" type="checkbox" value="1" name="req_ack"  id="edit_req_ack">
+                                    </div>
+                            </div>
+
+                            <div class="form-group form-float float-left col-md-6 d-none">
                                 <label class="form-label">Upload Home Work File</label>
                                 <div class="form-line">
                                     <input type="file" class="form-control" name="hw_attachment">
@@ -476,7 +524,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     <a href="" name="hw_view_file" id="hw_view_file" target="_blank">View</a>
                                 </div>
                             </div>
-                            <div class="form-group form-float float-left col-md-6 ">
+                            <div class="form-group form-float float-left col-md-6 d-none">
                                 <label class="form-label">Upload Daily Task File</label>
                                 <div class="form-line">
                                     <input type="file" class="form-control" name="dt_attachment">
@@ -535,11 +583,65 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                             <button type="sumbit" class="btn btn-link waves-effect" id="edit_style">SAVE</button>
                             <button type="button" class="btn btn-link waves-effect" data-dismiss="modal">CLOSE</button>
                         </div>
+                    </div>
 
                 </form>
             </div>
         </div>
+    </div> 
+
+    <div class="modal fade" id="largeModal-3" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-full" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="smallModalLabel">Homework Status</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="card-body">
+
+
+                    <div id="show_table_result">
+                        <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
+                        <div class="table-responsive">
+
+                            <table class="table table-striped table-bordered tblpoststatus">
+                                <thead>
+                                    <tr> 
+                                      <th>Name</th> 
+                                      <th class="no-sort">Read Date</th>  
+                                      <th class="no-sort">Sent Date</th>
+                                      <th class="no-sort">Acknowledged Status</th>
+                                      <th class="no-sort">Submitted Status</th>
+                                      <th class="no-sort">App Installed</th>
+                                      <th>Mobile</th> 
+                                      <th>Class</th> 
+                                      <th>Section</th>  
+                                    </tr>
+                                </thead>
+                                <tfoot>
+                                      <tr><th></th><th></th><th></th>
+                                          <th></th><th></th><th></th>
+                                          <th></th><th></th><th></th>
+                                      </tr>
+                                </tfoot>
+                                <tbody>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+
+                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
+
+                </div>
+            </div>
+        </div>
     </div>
+
     <input type="hidden" name="getFetchSectionURL" id="getFetchSectionURL"  value="{{ url('admin/fetch-section') }}">
     <input type="hidden" name="getFetchSubjectURL" id="getFetchSubjectURL" value="{{ url('admin/fetch-subject') }}">
 
@@ -553,6 +655,14 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 @section('scripts') 
     <!-- <script src="{{asset('/public/js/homeworks.js')}}" type="text/javascript"></script> -->
     <script> 
+
+
+            $('#clear_style').on('click', function () {
+                $('.card-header').find('input').val('');
+                $('.card-header').find('select').val('');
+                filterposts();
+            }); 
+            
         function deleteactivity(id){
             $('#filter_pagename').val($('#pagename').val());
             swal({
@@ -760,9 +870,9 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
-                        if (response.status == "SUCCESS") {
+                        if (response.status == 1) {
 
                             swal('Success', response.message, 'success');
 
@@ -772,7 +882,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                             $("#style-form")[0].reset();
 
-                        } else if (response.status == "FAILED") {
+                        } else if (response.status == 0) {
 
                             swal('Oops', response.message, 'warning');
 
@@ -783,7 +893,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops', 'Something went to wrong.', 'error');
 
@@ -808,9 +918,9 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
-                        if (response.status == "SUCCESS") {
+                        if (response.status == 1) {
 
                             swal('Success', response.message, 'success');
 
@@ -820,7 +930,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                             $("#edit-style-form")[0].reset();
 
-                        } else if (response.status == "FAILED") {
+                        } else if (response.status == 0) {
 
                             swal('Oops', response.message, 'warning');
 
@@ -831,7 +941,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops', 'Something went to wrong.', 'error');
 
@@ -868,14 +978,32 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 $('#id').val(response.data.id);
                 $('#edit_class_id').val(response.data.homeworks_list[0].class_id);
 
+                $('#smallModal-2').modal('show'); 
+
                 var val = response.data.homeworks_list[0].class_id;
                 var selectedid = response.data.homeworks_list[0].section_id;
                 var selectedval = response.data.homeworks_list[0].is_section_name;
-                loadClassSection(val, selectedid, selectedval);
+
+                var is_all = response.data.homeworks_list[0].is_all;
+
+                if(is_all == 1) {
+                    selectedid = -1;
+                }
+
+                loadClassSectionHw(val, selectedid, selectedval, is_all);
 
                 $('#edit_section_id').val(response.data.homeworks_list[0].section_id);
                 $('#edit_subject_id').val(response.data.subject_id);
-                //loadClassSubjectsHw(response.data.homeworks_list[0].section_id);
+
+                if(response.data.is_req_submission == 1) {
+                    $('#edit_req_ack').prop('checked', true);
+                }   else {
+                    $('#edit_req_ack').prop('checked', false);
+                }
+
+                //loadClassSubjectsHw(response.data.homeworks_list[0].section_id); 
+
+                //loadClassSubjectsHw(val,'','','',1)
 
                 //testList(response.data.subject_id,response.data.class_id,response.data.is_test_id, response.data.is_test_id)
 
@@ -888,7 +1016,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 $('#edit_hw_submission_date').val(response.data.homeworks_list[0].hw_submission_date);
                 //$('#edit_position').val(response.data.position);
                 //$('#edit_status').val(response.data.status);
-                $('#edit_approve_status').val(response.data.homeworks_list[0].approve_status);
+                $('#edit_approve_status').val(response.data.homeworks_list[0].approve_status); 
 
                 if (response.data.homeworks_list[0].hw_attachment != '' && response.data.homeworks_list[0].hw_attachment != null) {
                     $('#edit-style-form .hw_view_file').removeClass('d-none');
@@ -920,7 +1048,6 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                 $('#edit_subject-homework-container').html(response.content);
 
-                $('#smallModal-2').modal('show'); 
 
                 /*$.each(response.data.homeworks_list, function(key, value) {
                     console.log('.edit_subject-homework-row .subject_id' + key + '=='+ value.subject_id)
@@ -1051,10 +1178,11 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
         });
 
 
-        function loadClassSectionHw(val, selectedid, selectedval) {
+        function loadClassSectionHw(val, selectedid, selectedval, is_all) {
 
             selectedid = selectedid || " ";
             selectedval = selectedval || " ";
+            is_all = is_all || 0;
             var class_id = val;
             var selid = selectedid;
             var selval = selectedval;
@@ -1316,6 +1444,148 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             edit_updateMaxRows();
         });  
 
+        function showAdvanced() {
+            var x = document.getElementById("advanced");
+            if (x.style.display === "none") {
+                x.style.display = "block";
+            } else {
+                x.style.display = "none";
+            }
+        }
+
+        function openpoststatus(pid) {
+            if ($.fn.DataTable.isDataTable('.tblpoststatus')) {
+                // Destroy the existing instance before reinitializing
+                $('.tblpoststatus').DataTable().destroy();
+            }
+            $('#largeModal-3').modal('show');
+            var tablefee = $('.tblpoststatus').DataTable({
+                processing: true,
+                serverSide: true,
+                responsive: false,
+                "ajax": {
+                    "url":"{{URL('/')}}/admin/posthomeworkstatus/datatables?id="+pid, 
+                },
+                columns: [
+                    { data: 'name',  name: 'users.name'}, 
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+                            if(data.notify != '' && data.notify != null && data.notify.read_status != null){
+                                var tid = data.notify.read_status;
+                                var tdate = data.notify.read_date;
+                                if(tid == 1)
+                                    return tdate;
+                                else 
+                                    return '-';
+                            }   else {
+                                return '-';
+                            }
+                        },
+
+                    }, 
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+                            if(data.notify != '' && data.notify != null && data.notify.created_at != null){
+                                var tid = data.notify.created_at; 
+                                return tid;
+                            }   else {
+                                return '-';
+                            }
+                        },
+
+                    }, 
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+                            if(data.notify != '' && data.notify != null && data.notify.is_acknowledged != null){
+                                var tid = data.notify.is_acknowledged; 
+                                if(tid == 1)
+                                    return 'Acknowledged';
+                                else 
+                                    return 'Not Acknowledged';
+                            }   else {
+                                return '-';
+                            }
+                        },
+
+                    }, 
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+
+                            var attach = ''; var url = "{{URL('/')}}";
+                            if(data.submissions != '' && data.submissions != null && data.submissions.is_submitted_documents != null){
+                                $( data.submissions.is_submitted_documents ).each(function( index, value ) {
+                                    attach += '<div class="form-group form-float float-left col-md-4 id="img_'+index+'"><span class="image img_'+index+'" ><a href="'+value.img+'" target="_blank"><img src="'+url+'/public/images/file.png" class="" height="40" width="40"></a></span></div>';
+                                  
+                                });
+                            }
+                            return attach;
+                        },
+
+                    }, 
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+                            if(data.is_app_installed == 1){ 
+                                return 'Installed'; 
+                            }   else {
+                                return 'Not Installed';
+                            }
+                        },
+                        name: 'users.is_app_installed'
+                    }, 
+                    { data: 'mobile',  name: 'users.mobile'}, 
+                    { data: 'class_name',  name: 'classes.class_name'}, 
+                    { data: 'section_name',  name: 'sections.section_name'}, 
+                ],
+                "order":[[0, 'asc']],
+                "columnDefs": [{
+                      "targets": 'no-sort',
+                      "orderable": false,
+                }],
+                dom: 'Blfrtip',
+                buttons: [
+                    {
+
+                        extend: 'excel',
+                        text: 'Export Excel',
+                        className: 'btn btn-warning btn-md ml-3',
+                        action: function (e, dt, node, config) {
+                            $.ajax({
+                                "url":"{{URL('/')}}/admin/posthomeworksstatus_excel?id="+pid,
+                                "data": dt.ajax.params(),
+                                "type": 'get',
+                                "success": function(res, status, xhr) {
+                                    var csvData = new Blob([res], {type: 'text/xls;charset=utf-8;'});
+                                    var csvURL = window.URL.createObjectURL(csvData);
+                                    var tempLink = document.createElement('a');
+                                    tempLink.href = csvURL;
+                                    tempLink.setAttribute('download', 'HomeworkStatus.xls');
+                                    tempLink.click();
+                                }
+                            });
+                        }
+                    },
+
+                ],
+
+            }); 
+            // Apply the search
+            tablefee.columns().every( function () {
+                var that = this;
+
+                $( 'input', this.footer() ).on( 'keyup change', function () {
+                    if ( that.search() !== this.value ) {
+                        that
+                                .search( this.value )
+                                .draw();
+                    }
+                } );
+            } );
+        }
     </script>
 @endsection
 

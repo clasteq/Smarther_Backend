@@ -1,5 +1,5 @@
 @extends('layouts.admin_master')
-@section('sta_settings', 'active')
+@section('stasettings', 'active')
 @section('master_import_teachers', 'active')
 @section('menuopensta', 'active menu-is-opening menu-open')
 <?php
@@ -29,6 +29,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                     <table class="table table-striped table-bordered tblstudents">
                                         <thead>          
                                             <tr>  
+                                                <th class="red">User Role</th> 
                                                 <th class="red">Name</th> 
                                                 <th>Name in Tamil</th>  
                                                 <th>Aadhaar Number</th> 
@@ -49,7 +50,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
  
                                         <tbody> 
                                             <tr>
-                                                <th class="red">MALA M</th><th>மாலா எம்</th><th>578755114121</th>
+                                                <th class="red">TEACHER</th><th class="red">MALA M</th><th>மாலா எம்</th><th>578755114121</th>
                                                 <th class="red">9751169878</th><th>Verified</th><th class="red">19-12-1990</th>
                                                 <th class="red">Male</th><th>2020-09-08</th><th>mala@vidhyamhss.com</th>
                                                 <th>3/54,MARIYAMMAN KOVIL STREET,Salem</th><th>606401</th><th>O+ve</th>

@@ -106,7 +106,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                 serverSide: true,
                 responsive: false,
                 "ajax": {
-                    "url":"{{URL('/')}}/admin/teacherleavelist/datatables/",  
+                    "url":"{{URL('/')}}/admin/staff_leavelist/datatables/",  
                     data: function ( d ) {
                         var teacher_id  = $('#teacher_id').val();
                         var minDateFilter  = $('#datepicker_from').val();

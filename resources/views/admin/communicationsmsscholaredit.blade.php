@@ -133,7 +133,15 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                         </h4>
                     </div>
                     <div class="card-body">
-                        <form action="{{ url('admin/post_new_sms_scholar') }}" method="post" id="post_communication_sms_scholar"
+                        <?php 
+                        $content_vars = $post['content_vars'];
+                        if(!empty($content_vars)) {
+                            $content_vars = unserialize($content_vars); 
+                        } else {
+                            $content_vars = [];
+                        }
+                        ?>
+                        <form action="{{ url('admin/post_update_sms_scholar') }}" method="post" id="post_communication_sms_scholar"
                             class="post_communication_sms_scholar">
                             <input type="hidden" name="post_id" id="post_id" value="{{$post['id']}}">
                             @csrf
@@ -141,8 +149,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label for="template">Template:</label>
-                                        <select class="form-control" id="template" name="template" required>
-                                            <option value="" disabled selected>Select Template</option>
+                                        <select class="form-control" id="template" name="template" required onchange="loadtemplatecontent();">
+                                            <option value="" disabled>Select Template</option>
                                             @foreach ($get_template as $template)
                                                 @php($selected = '')
                                                 @if($post['template_id'] == $template->id)
@@ -189,17 +197,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 </div> --}}
                                 
                                 <div class="col-md-6"></div>
-                                
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="batch">Batch:</label>
-                                        <select class="form-control" id="batch" name="batch" required>
-                                            <option value="2023-2024">2023-2024</option>
-                                        </select>
-                                    </div>
-                                </div>
                                
-                                <div class="col-md-6">
+                                <!-- <div class="col-md-6">
                                     <label>Post For:</label>
                                     <div class="form-group">
                                        
@@ -233,7 +232,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </div> -->
                                 
                                 <div class="col-md-6">
                                     <div class="position-relative">
@@ -276,6 +275,16 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                             <label for="scheduleDateTime">Schedule at:</label>
                                             <input type="text" name="schedule_date" class="form-control" id="datetime-picker" placeholder="Select Date and Time" required>
                                         </div>
+                                    </div>
+                                </div>
+
+                                
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="batch">Batch:</label>
+                                        <select class="form-control" id="batch" name="batch" required>
+                                            <option value="2023-2024">2023-2024</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -510,7 +519,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
   
 
 <script>
-     $(function() {
+    $(function() {
     
         $(".post_communication_sms_scholar").on("submit", function(e) {
             e.preventDefault();
@@ -571,25 +580,66 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         });
 
         // This script handles the dynamic content generation when the template changes
-        document.getElementById('template').addEventListener('change', function() {
-
+        //document.getElementById('template').addEventListener('change', function() {
+        /*function loadtemplatecontent() {
             $('#hidee').hide();
 
-            var selectedOption = this.options[this.selectedIndex];
-            var content = selectedOption.getAttribute('data-content');
+            var selectedOption = $('#template  option:selected'); // this.options[this.selectedIndex];
+            var content = selectedOption.attr('data-content');  // selectedOption.getAttribute('data-content');
             // Parse the content to replace '#' symbols with input boxes
             var parsedContent = parseContent(content);
             // Set the parsed content to the content container
             document.getElementById('dynamicContent').innerHTML = parsedContent;
             // Show the content textarea div
             document.getElementById('contentTextareaDiv').style.display = 'block';
-        });
+        }*/
+
+        //});
 
         function parseContent(content) {
             // Replace '#' symbols with input boxes
             return content.split('#').join('<input type="text" class="form-control" style="width: 200px;" placeholder="Input" >');
         }
-});
+    });
+
+
+
+        function loadtemplatecontent() {
+            $('#hidee').hide();
+
+            var selectedOption = $('#template  option:selected'); // this.options[this.selectedIndex];
+            var text = selectedOption.attr('data-content'); 
+
+            var selval = $('#template').val(); selval = parseInt(selval);
+            var postval = <?php echo $post['template_id']; ?>;  postval = parseInt(postval);
+
+            if(selval == postval){
+                var values = <?php echo json_encode($content_vars); ?>; //["John", "Math", "Algebra", "John1", "Math1", "Algebra1"]; // Array of values for input boxes 
+            }   else {
+                var values = [];
+            }
+            var parts = text.split("#");
+            
+            var newHtml = ""; var valcount = values.length;
+            for (let i = 0; i < parts.length - 1; i++) {
+                if(valcount > 0) {
+                    newHtml += parts[i] + `<input type="text" class="form-control" style="width: 200px;" placeholder="Input"  value="${values[i]}" name="vars[]"  />`;
+                } else {
+                    newHtml += parts[i] + `<input type="text" class="form-control" style="width: 200px;" placeholder="Input" name="vars[]"  />`;
+                }
+            }
+            newHtml += parts[parts.length - 1]; // Append the last part of the text
+            
+            document.getElementById('dynamicContent').innerHTML = newHtml;
+            document.getElementById('contentTextareaDiv').style.display = 'block';
+
+        }
+
+
+
+        @if($post['template_id']>0)
+        loadtemplatecontent();
+        @endif
 
 </script>
 

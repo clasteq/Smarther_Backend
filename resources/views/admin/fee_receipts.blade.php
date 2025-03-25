@@ -153,11 +153,11 @@
                                             <table class="table table-striped table-bordered tblcountries example1">
                                               <thead>
                                                 <tr>
-                                                  <th>Receipt#</th>
+                                                  <th>Receipt Name / #</th>
                                                   <th>Receipt Date</th>
-                                                  <th>Amount</th>
-                                                  <th>Receipt Name</th>
+                                                  <th>Amount</th> 
                                                   <th>Account</th>
+                                                  <th>Items</th>
                                                   <th>Cancel</th>
                                                   <th>View</th>
                                                   <th>Created By</th>
@@ -168,17 +168,17 @@
                                               <tfoot>
                                                   <th></th> <th></th> <th></th>
                                                   <th></th> <th></th> <th></th>
-                                                  <th></th> <th></th><th></th>
+                                                  <th></th> <th></th> <th></th> 
                                               </tfoot>        
                                               <tbody>
                                                     @if(!empty($fee_receipts))
                                                         @foreach($fee_receipts as $receipt)
                                                             <tr>
-                                                                <td>{{$receipt->receipt_no}}</td>
+                                                                <td>{{$receipt->is_receipthead_name}}{{$receipt->receipt_no}}</td>
                                                                 <td>{{$receipt->receipt_date}}</td>
-                                                                <td>{{$receipt->amount}}</td>
-                                                                <td>{{$receipt->is_receipthead_name}}</td>
+                                                                <td>{{$receipt->amount}}</td> 
                                                                 <td>{{$receipt->is_account_name}}</td>
+                                                                <td>{{$receipt->is_fee_items}}</td>
                                                                 <td><a href="#" onclick="loadSection('{{$receipt->id}}')" title="Edit Receipt"><i class="fas fa-times text-red"></i></a></td>
                                                                 <td><a target="_blank" href="{{$receipt->is_pdf}}" title="View Receipt"><i class="fas fa-file-pdf fa-2x text-red"></i></a></td>
                                                                 <td>{{$receipt->is_created_name}}</td>
@@ -229,6 +229,7 @@
                                                   <th>Receipt#</th>
                                                   <th>Receipt Date</th>
                                                   <th>Amount</th>
+                                                  <th>Items</th>
                                                   <th>Created By</th>
                                                   <th>Created Date</th>
                                                   <th>Cancelled By</th>
@@ -247,9 +248,10 @@
                                                     @if(!empty($cancelled_fee_receipts))
                                                         @foreach($cancelled_fee_receipts as $receipt)
                                                             <tr>
-                                                                <td>{{$receipt->receipt_no}}</td>
+                                                                <td>{{$receipt->is_receipthead_name}}{{$receipt->receipt_no}}</td>
                                                                 <td>{{$receipt->receipt_date}}</td>
                                                                 <td>{{$receipt->amount}}</td>
+                                                                <td>{{$receipt->is_fee_items}}</td>
                                                                 <td>{{$receipt->is_created_name}}</td>
                                                                 <td>{{$receipt->formatted_created_at}}</td> 
                                                                 <td>{{$receipt->is_canceled_name}}</td>

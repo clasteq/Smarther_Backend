@@ -64,7 +64,7 @@ if(empty($section_id)) {
                         </select> 
                     </td>
                     <td>
-                        <select name=include_practicals" id="include_practicals" class="form-control textwidth" onchange="loadprac();">  
+                        <select name="include_practicals" id="include_practicals" class="form-control textwidth" onchange="loadprac();">  
                             <option value="YES"   @if(isset($examsarr['include_practicals']) && ($examsarr['include_practicals'] ==  "YES")) selected @endif>Yes</option>
                             <option value="NO"  @if(isset($examsarr['include_practicals']) && ($examsarr['include_practicals'] == "NO")) selected @endif>No</option>
                         </select> 

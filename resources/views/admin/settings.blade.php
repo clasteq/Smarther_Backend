@@ -35,8 +35,8 @@
                 <div class="col-xs-12 col-md-12">
             
                 <div class="card">
-                    <div class="card-header">General Settings
-                    </div>
+                    <!-- <div class="card-header">General Settings
+                    </div> -->
 
                     <div class="card-body">
                         <div class="row"><div class="col-md-12">
@@ -157,7 +157,11 @@
                                    type: "success"
                                  },
                                function(){ 
-                                   location.reload();
+                                    if(response.redirect == 1) {
+                                        location.href = "{{URL('/')}}/admin/home";
+                                    }   else {
+                                        location.reload();
+                                    }
                                }
                             );  
 

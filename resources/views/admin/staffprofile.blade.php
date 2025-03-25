@@ -20,6 +20,9 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         width: 100%;
         box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
     }
+    .profile-user-img {
+        height: 100px !important;
+    }
 </style> 
 <meta name="csrf-token" content="{{ csrf_token() }}"> 
 <section class="content">
@@ -36,8 +39,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                                   <h3 class="profile-username text-center">{{$user_details['name']}}</h3>
 
-                                  <p class="text-muted text-center">Admission No : {{$user_details['admission_no']}}</p>
-                                  <p class="text-muted text-center"> {{$user_details['userdetails']['is_class_name']}} -  {{$user_details['userdetails']['is_section_name']}}</p>
+                                  <p class="text-muted text-center">Employee No : {{$user_details['teachers']['emp_no']}}</p> 
 
                                   <ul class="list-group list-group-unbordered">
                                     <li class="list-group-item">
@@ -45,36 +47,21 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                     </li>
                                     <li class="list-group-item">
                                       <b>Mobile</b> <a class="float-right">{{$user_details['mobile']}}</a>
-                                    </li>
+                                    </li> 
                                     <li class="list-group-item">
-                                      <b>Emergency Contact</b> <a class="float-right">{{$user_details['emergency_contact_no']}}</a>
-                                    </li>
+                                      <b>Password</b> <a class="float-right">{{$user_details['passcode']}}</a>
+                                    </li> 
                                     <li class="list-group-item">
                                       <b>Status</b> <a class="float-right">{{$user_details['status']}}</a>
                                     </li>
+                                    <li class="list-group-item">
+                                      <b>Anniversary</b> <a class="float-right">{{$user_details['teachers']['is_anniversary']}}</a>
+                                    </li>
                                   </ul>
  
                                 </div>
                                 <!-- /.box-body -->
-                            </div>
-                            <div class="box box-primary border">
-                                <div class="box-body box-profile">   
-
-                                  <ul class="list-group list-group-unbordered">
-                                    <li class="list-group-item">
-                                       Religion  <a class="float-right">{{$user_details['userdetails']['religion']}}</a>
-                                    </li>
-                                    <li class="list-group-item">
-                                       Community  <a class="float-right">{{$user_details['userdetails']['community']}}</a>
-                                    </li>
-                                    <li class="list-group-item">
-                                       Caste <a class="float-right">{{$user_details['userdetails']['caste']}}</a>
-                                    </li> 
-                                  </ul>
- 
-                                </div>
-                                <!-- /.box-body -->
-                            </div>
+                            </div> 
                         </div>
                         <div class="col-md-9">
                             <div class="box border">
@@ -110,8 +97,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
                                             <label class="form-label">Joined Date </label>
-                                            <div class="form-line">@if(!empty($user_details['joined_date']))
-                                            {{date('d-M-Y', strtotime($user_details['joined_date']))}}
+                                            <div class="form-line">@if(!empty($user_details['teachers']['date_of_joining']))
+                                            {{date('d-M-Y', strtotime($user_details['teachers']['date_of_joining']))}}
                                             @endif</div>
                                         </div>
                                     </div>
@@ -123,23 +110,23 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                     <div class="row">
                                         <div class="form-group form-float float-left col-md-6">
                                             <label class="form-label">Father Name </label>
-                                            <div class="form-line">{{$user_details['userdetails']['father_name']}}</div>
+                                            <div class="form-line">{{$user_details['teachers']['father_name']}}</div>
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Blood Group </label>
-                                            <div class="form-line">{{$user_details['userdetails']['is_blood_group']}}</div>
+                                            <label class="form-label">Post Details </label>
+                                            <div class="form-line">{{$user_details['teachers']['post_details']}}</div>
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Emis id </label>
-                                            <div class="form-line">{{$user_details['userdetails']['emis_id']}}</div>
+                                            <label class="form-label">Qualification</label>
+                                            <div class="form-line">{{$user_details['teachers']['qualification']}}</div>
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Aadhar Number </label>
-                                            <div class="form-line">{{$user_details['userdetails']['aadhar_number']}}</div>
+                                            <label class="form-label">Experience </label>
+                                            <div class="form-line">{{$user_details['teachers']['exp']}}</div>
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
                                             <label class="form-label">Address </label>
-                                            <div class="form-line">{{$user_details['userdetails']['address']}}</div>
+                                            <div class="form-line">{{$user_details['teachers']['address']}}</div>
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
                                             <label class="form-label">Country </label>
@@ -156,24 +143,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                         </div>
                                         <div class="form-group form-float float-left col-md-6">
                                             <label class="form-label">Pincode </label>
-                                            <div class="form-line">{{$user_details['userdetails']['pincode']}}</div>
-                                        </div>
-                                        <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Identification Mark 1 </label>
-                                            <div class="form-line">{{$user_details['userdetails']['identification_mark_1']}}</div>
-                                        </div>
-                                        <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Identification Mark 2</label>
-                                            <div class="form-line">{{$user_details['userdetails']['identification_mark_2']}}</div>
-                                        </div>
-                                        <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Stay </label>
-                                            <div class="form-line">{{$user_details['userdetails']['stay_type']}}</div>
-                                        </div>
-                                        <div class="form-group form-float float-left col-md-6">
-                                            <label class="form-label">Transport </label>
-                                            <div class="form-line">{{$user_details['userdetails']['transport']}}</div>
-                                        </div>
+                                            <div class="form-line">{{$user_details['teachers']['pincode']}}</div>
+                                        </div> 
                                     </div>
                                 </div>
                             </div>

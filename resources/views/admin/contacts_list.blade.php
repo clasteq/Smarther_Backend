@@ -6,6 +6,10 @@
 <?php
 $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'=>'#', 'name'=>'Contacts List ', 'active'=>'active']];
 ?>
+<?php 
+$user_type = Auth::User()->user_type;
+$session_module = session()->get('module'); //echo "<pre>"; print_r($session_module); exit;
+?> 
 @section('content')
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <section class="content">
@@ -14,8 +18,23 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 style="font-size:20px;" class="card-title">Contacts List 
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                  <h4 style="font-size:20px;" class="card-title"><!-- Contacts List  -->
+                    <div class="row col-md-12">
+                        <div class="form-inline col-md-3 " >
+                            <label class="form-label mr-1">Status</label>
+                            <select class="form-control" name="status_id" id="status_id">
+                                <option value="" >All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
+                        </div>
+                        <div class="form-inline col-md-8 float-right " ></div>
+                        <div class="form-inline col-md-1 float-right " >
+                        @if((isset($session_module['Contacts For']) && ($session_module['Contacts For']['add'] == 1)) || ($user_type == 'SCHOOL'))
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                        @endif
+                        </div>
+                    </div>
                   </h4> 
                 </div>
                 <div class="card-content collapse show">
@@ -25,22 +44,22 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                             <table class="table table-striped table-bordered tblcountries">
                               <thead>
                                 <tr>
-                                  <th>Action</th>
                                   <th>For</th>
                                   <th>Name</th>
                                   <th>Mobile</th>
                                   <th>Email</th>
                                   <th>Description</th> 
                                   <th>Status</th>
+                                  <th>Action</th>
 
                                 </tr>
                               </thead>
-                              <tfoot>
+                              <!-- <tfoot>
                                   <tr><th></th><th></th><th></th>
                                       <th></th><th></th><th></th>
                                       <th></th>
                                   </tr>
-                              </tfoot>
+                              </tfoot> -->
                               <tbody>
 
                               </tbody>
@@ -58,6 +77,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Contacts List</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -130,6 +150,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Contacts List</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data"
@@ -214,6 +235,12 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                     "url":"{{URL('/')}}/admin/contacts_list/datatables/", 
                 },
                 columns: [
+                    { data: 'contact_for',  name: 'contact_for'},
+                    { data: 'contact_name',  name: 'contact_name'},
+                    { data: 'contact_mobile',  name: 'contact_mobile'},
+                    { data: 'contact_email',  name: 'contact_email'},
+                    { data: 'contact_info',  name: 'contact_info'},
+                    { data: 'status',  name: 'status'},
                     {
                         data:null,
                         "render": function ( data, type, row, meta ) {
@@ -223,32 +250,26 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                         },
 
                     },
-                    { data: 'contact_for',  name: 'contact_for'},
-                    { data: 'contact_name',  name: 'contact_name'},
-                    { data: 'contact_mobile',  name: 'contact_mobile'},
-                    { data: 'contact_email',  name: 'contact_email'},
-                    { data: 'contact_info',  name: 'contact_info'},
-                    { data: 'status',  name: 'status'},
 
                 ], 
                 "columnDefs": [
-                    { "orderable": false, "targets": 0 }
+                    { "orderable": false, "targets": 6 }
                 ],
                
             });
 
-            $('.tblcountries tfoot th').each( function (index) {
+            /*$('.tblcountries tfoot th').each( function (index) {
                 if( index != 0) {
                     var title = $(this).text();
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
                 }
-            } );
+            } );*/
 
             $('#status_id').on('change', function() {
                 table.draw();
             });
             // Apply the search
-            table.columns().every( function () {
+            /*table.columns().every( function () {
                 var that = this;
 
                 $( 'input', this.footer() ).on( 'keyup change', function () {
@@ -258,7 +279,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
             $('#add_style').on('click', function () {
 
                 var options = {
@@ -276,7 +297,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == 'SUCCESS') {
 
@@ -298,7 +319,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
@@ -321,7 +342,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == 'SUCCESS') {
 
@@ -343,7 +364,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 

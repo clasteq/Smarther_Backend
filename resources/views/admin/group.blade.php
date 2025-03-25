@@ -1,5 +1,5 @@
 @extends('layouts.admin_master')
-@section('communication_settings', 'active')
+@section('comn_settings', 'active')
 @section('master_group', 'active')
 @section('menuopencomn', 'active menu-is-opening menu-open') 
 <?php   use App\Http\Controllers\AdminController;  $slug_name = (new AdminController())->school; ?>
@@ -60,24 +60,24 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 style="font-size:20px;" class="card-title">Group
-                    @if((isset($session_module['Group']) && ($session_module['Group']['add'] == 1)) || ($user_type == 'SCHOOL'))
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
-                    @endif
-                  </h4>
-                  <div class="row">
+                  <h4 style="font-size:20px;" class="card-title"><!-- Group -->
                     <div class="row col-md-12">
-                     <div class="form-group col-md-3 " >
-                         <label class="form-label">Status</label>
-                         <select class="form-control" name="status_id" id="status_id">
-                             <option value="" >All</option>
-                             <option value="ACTIVE">ACTIVE</option>
-                             <option value="INACTIVE">INACTIVE</option>
-                         </select>
-                     </div>
-                 </div>
-
-             </div>
+                        <div class="form-inline col-md-3 " >
+                            <label class="form-label mr-1">Status: </label>
+                            <select class="form-control" name="status_id" id="status_id">
+                                <option value="" >All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
+                        </div>
+                        <div class="form-inline col-md-8 float-right " ></div>
+                        <div class="form-inline col-md-1 float-right " >
+                        @if((isset($session_module['Group']) && ($session_module['Group']['add'] == 1)) || ($user_type == 'SCHOOL'))
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                        @endif
+                        </div>
+                    </div>
+                  </h4> 
                 </div>
                 <div class="card-content collapse show">
                   <div class="card-body card-dashboard">
@@ -88,14 +88,13 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 <tr>
                                   <th>Group Name</th> 
                                   <th>Status</th>
-                                  <th>Action</th>
-
+                                  <th>Action</th> 
                                 </tr>
                               </thead>
-                              <tfoot>
+                              <!-- <tfoot>
                                   <tr><th></th><th></th><th></th> 
                                   </tr>
-                              </tfoot>
+                              </tfoot> -->
                               <tbody>
 
                               </tbody>
@@ -113,6 +112,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Group</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -129,7 +129,31 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     <input type="text" class="form-control" name="group_name" required minlength="3" maxlength="200">
                                 </div>
                             </div>
-                            <div class="form-group scrollable-form col-md-12">
+
+                            <div class="form-group form-float float-left col-md-12">
+                                <label class="form-label">Students</label>
+                                <div class="form-line">
+                                    <select class="form-control select2" name="student_id[]" id="student_id" multiple>
+                                        @foreach($get_student as $student)
+                                        <option value="{{$student->user_id}}">{{$student->is_student_name}}-({{$student->is_class_name}}-{{$student->is_section_name}})</option>
+                                        @endforeach  
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-float float-left col-md-12">
+                                <label class="form-label">Staffs</label>
+                                <div class="form-line">
+                                    <select class="form-control select2" name="staff_id[]" id="staff_id" multiple>
+                                        @foreach($get_staff as $staff)
+                                        <option value="{{$staff->id}}">{{$staff->name}}</option>
+                                        @endforeach  
+                                    </select>
+                                </div>
+                            </div>
+
+
+                            <!-- <div class="form-group scrollable-form col-md-12">
                                 <div class="selectedStudents" ></div>
                             </div>
                             <div class="form-group  col-md-12">
@@ -143,7 +167,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     </div>
                                 @endforeach  
                                 <div class="noResults" id="noStudentResults" style="display: none;">No Matching record</div>
-                            </div>
+                            </div> -->
 
                             <div class="form-group form-float float-left col-md-12">
                                 <label class="form-label">Status</label>
@@ -170,6 +194,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Group</h4> 
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data"
@@ -186,7 +211,30 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     <input type="text" class="form-control "name="group_name" id="group_name" required minlength="3" maxlength="200">
                                 </div>
                             </div>
-                            <div class="form-group scrollable-form col-md-12">
+
+                            <div class="form-group form-float float-left col-md-12">
+                                <label class="form-label">Students</label>
+                                <div class="form-line">
+                                    <select class="form-control select2" name="student_id[]" id="edit_student_id"  multiple>
+                                        @foreach($get_student as $student)
+                                        <option value="{{$student->user_id}}">{{$student->is_student_name}}-({{$student->is_class_name}}-{{$student->is_section_name}})</option>
+                                        @endforeach  
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-float float-left col-md-12">
+                                <label class="form-label">Staffs</label>
+                                <div class="form-line">
+                                    <select class="form-control select2" name="staff_id[]" id="edit_staff_id"  multiple>
+                                        @foreach($get_staff as $staff)
+                                        <option value="{{$staff->id}}">{{$staff->name}} - {{$staff->mobile}}</option>
+                                        @endforeach  
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- <div class="form-group scrollable-form col-md-12">
                                 <div class="selectedStudents" ></div>
                             </div>
                             <div class="form-group col-md-12">
@@ -200,7 +248,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     </div>
                                 @endforeach  
                                 <div class="noResults" id="noStudentResults" style="display: none;">No Matching record</div>
-                            </div>
+                            </div> -->
  
                             <div class="form-group form-float float-left col-md-12">
                                 <label class="form-label">Status</label>
@@ -227,6 +275,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">View Group</h4> 
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="view-style-form" enctype="multipart/form-data"
@@ -245,7 +294,14 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                             </div> 
                             <div class="form-group col-md-12 scrollable-form" id="students" > 
                             </div> 
-                            <div class="noResults" id="noStudentResults" style="display: none;">No Matching record</div>
+                            <div class="noResults" id="noStudentResults" style="display: none;">No Matching Scholars</div>
+
+                            <div class="form-group col-md-12">
+                                <input type="text" class="form-control searchInput" id="searchStaff" placeholder="Search Staff..">
+                            </div> 
+                            <div class="form-group col-md-12 scrollable-form" id="staffs" > 
+                            </div> 
+                            <div class="noResults" id="noStaffResults" style="display: none;">No Matching Staffs</div>
   
                         </div>
                     </div>
@@ -297,7 +353,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             filterList('#style-form #searchStudent', '#style-form .studentItem', '#style-form #noStudentResults'); 
             filterList('#edit-style-form #searchStudent', '#edit-style-form .studentItem', '#edit-style-form #noStudentResults');
             filterList('#view-style-form #searchStudent', '#view-style-form .studentItem', '#view-style-form #noStudentResults'); 
-
+            filterList('#view-style-form #searchStaff', '#view-style-form .staffItem', '#view-style-form #noStaffResults');
         });
     </script>
 
@@ -356,18 +412,18 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                
             });
 
-            $('.tblcountries tfoot th').each( function (index) {
+            /*$('.tblcountries tfoot th').each( function (index) {
                 if( index != 1 && index != 2) {
                     var title = $(this).text();
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
                 }
-            } );
+            } );*/
 
             $('#status_id').on('change', function() {
                 table.draw();
             });
             // Apply the search
-            table.columns().every( function () {
+            /*table.columns().every( function () {
                 var that = this;
 
                 $( 'input', this.footer() ).on( 'keyup change', function () {
@@ -377,7 +433,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
             $('#add_style').on('click', function () {
 
                 var options = {
@@ -483,6 +539,8 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
         function loadGroup(id){
             $('#edit-style-form')[0].reset();
+            $('#edit_student_id').val('').trigger('change');
+            $('#edit_staff_id').val('').trigger('change');
             var request = $.ajax({
                 type: 'post',
                 url: " {{URL::to('/admin/edit/group')}}",
@@ -504,10 +562,20 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 if($.trim(response.data.members) != '') {
                     var members = response.data.members;
                     members = members.split(',');
-                    $.each( members, function( key, value ) {
+                    $('#edit_student_id').val(members).trigger('change');
+                    /*$.each( members, function( key, value ) {
                         $('#edit-style-form #student_'+value).prop('checked', 'checked');
                         selected_students +=  '<div class="studentItem col-md-6 float-left border"> <label>'+$('#edit-style-form #student_'+value).siblings('label').text()+'</label> </div>'; 
-                    });
+                    });*/
+                } 
+                if($.trim(response.data.staff_members) != '') {
+                    var staff_members = response.data.staff_members;
+                    staff_members = staff_members.split(',');
+                    $('#edit_staff_id').val(staff_members).trigger('change');
+                    /*$.each( members, function( key, value ) {
+                        $('#edit-style-form #student_'+value).prop('checked', 'checked');
+                        selected_students +=  '<div class="studentItem col-md-6 float-left border"> <label>'+$('#edit-style-form #student_'+value).siblings('label').text()+'</label> </div>'; 
+                    });*/
                 }
                 $('.selectedStudents').html(selected_students)
                 $('#smallModal-2').modal('show');
@@ -538,12 +606,24 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 $('#id').val(response.data.id);
                 $('#view_group_name').html(response.data.group_name); 
 
+                $('#view-style-form #students').html('');
+                $('#view-style-form #staffs').html('');
+
                 if($.trim(response.data.is_members) != '') {
                     var members = response.data.is_members; 
                     $.each( members, function( key, value ) {
                         $('#view-style-form #students').append('<div class="studentItem col-md-6 float-left border"> <label>'+value.is_student_name+' - '+value.is_class_name+' - '+value.is_section_name+'</label> </div>');
                     });
                 }
+
+                if($.trim(response.data.is_staff_members) != '') {
+                    var members = response.data.is_staff_members; 
+                    $.each( members, function( key, value ) {
+                        $('#view-style-form #staffs').append('<div class="staffItem col-md-6 float-left border"> <label>'+value.name+'</label> </div>');
+                    });
+                }
+
+                
 
                 $('#smallModal-3').modal('show');
 

@@ -1,11 +1,14 @@
 @extends('layouts.admin_master')
-@section('fees_settings', 'active')
+@section('feessettings', 'active')
 @section('master_concession_category', 'active')
 @section('menuopenfee', 'active menu-is-opening menu-open')
 <?php   use App\Http\Controllers\AdminController;  $slug_name = (new AdminController())->school; ?>
 <?php
 $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], ['url' => '#', 'name' => 'Concession Category', 'active' => 'active']];
-?>
+?><?php 
+$user_type = Auth::User()->user_type;
+$session_module = session()->get('module'); //echo "<pre>"; print_r($session_module); exit;
+?> 
 @section('content')
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="{{asset('public/css/select2.min.css') }}"> 
@@ -76,24 +79,24 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size:20px;" class="card-title">Concession Category
-                            <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn"
-                                    class="btn btn-primary" style="float: right;">Add</button></a>
-                        </h4>
-                        <div class="row">
+                        <h4 style="font-size:20px;" class="card-title"><!-- Concession Category -->
                             <div class="row col-md-12">
-                             <div class="form-group col-md-3 " >
-                                 <label class="form-label">Status</label>
-                                 <select class="form-control" name="status_id" id="status_id">
-                                     <option value="" >All</option>
-                                     <option value="ACTIVE" selected>ACTIVE</option>
-                                     <option value="INACTIVE">INACTIVE</option>
-                                 </select>
-                             </div>
-                         </div>
-        
-                     </div>
-
+                            <div class="form-inline col-md-3 " >
+                                    <label class="form-label mr-1">Status</label>
+                                    <select class="form-control" name="status_id" id="status_id">
+                                        <option value="" >All</option>
+                                        <option value="ACTIVE">ACTIVE</option>
+                                        <option value="INACTIVE">INACTIVE</option>
+                                    </select>
+                                </div>
+                                <div class="form-inline col-md-8 float-right " ></div>
+                                <div class="form-inline col-md-1 float-right " >
+                                @if( ($user_type == 'SCHOOL'))
+                                <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                                @endif
+                                </div>
+                            </div>  
+                        </h4> 
                     
                     </div>
                     <div class="card-content collapse show">
@@ -110,14 +113,14 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                                 
                                             </tr>
                                         </thead>
-                                        <tfoot>
+                                        <!-- <tfoot>
                                             <tr>
                                                 <th></th>
                                                 <th></th>
                                                 <th></th>
                                                 <th></th>
                                             </tr>
-                                        </tfoot>
+                                        </tfoot> -->
                                         <tbody>
 
                                         </tbody>
@@ -134,7 +137,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title" id="smallModalLabel">Add Concession Name</h4>
+                    <h4 class="modal-title" id="smallModalLabel">Add Concession Category</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data" action="{{ url('/admin/save/concession_category') }}"
@@ -182,7 +186,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title" id="smallModalLabel">Edit Concession Name</h4>
+                    <h4 class="modal-title" id="smallModalLabel">Edit Concession Category</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data" action="{{ url('/admin/save/concession_category') }}"
@@ -288,7 +293,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                     //  "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
 
                 });
-                $('#example1 tfoot').insertAfter('#example1 thead');
+                /*$('#example1 tfoot').insertAfter('#example1 thead');
                 $('#example1 tfoot th').each( function () {
                         var title = $(this).text();
 
@@ -309,7 +314,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                         .draw();
                             }
                         } );
-                    } );
+                    } );*/
 
                     $('#status_id').on('change', function () {
                             table.draw();
@@ -333,7 +338,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == 1) {
 
@@ -354,7 +359,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops', 'Something went to wrong.', 'error');
 
@@ -378,7 +383,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == 1) {
 
@@ -399,7 +404,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops', 'Something went to wrong.', 'error');
 

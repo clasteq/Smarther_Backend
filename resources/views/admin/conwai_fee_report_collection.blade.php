@@ -36,7 +36,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size: 20px;" class="card-title">Fee Concession Report  </h4>
+                        <h4 style="font-size: 20px;" class="card-title"><!-- Fee Concession Report   --></h4>
                         <div class="row">   
 
                             <div class="col-md-3">
@@ -45,7 +45,9 @@
                                     <option value="">Select Batch</option>
                                     @if(!empty($get_batches))
                                         @foreach($get_batches as $batches)
-                                            <option value="{{$batches['academic_year']}}">{{$batches['display_academic_year']}}</option>
+                                            @php($selected = '') 
+                                            @if($batch == $batches['academic_year']) @php($selected = 'selected') @endif
+                                            <option value="{{$batches['academic_year']}}" {{$selected}}>{{$batches['display_academic_year']}}</option>
                                         @endforeach
                                     @endif 
                                 </select>
@@ -140,15 +142,15 @@
                                                   <th>Category</th>
                                                   <th>Item</th>
                                                   <th>Amount</th> 
-                                                  <th>Concession / Waiver</th>
-                                                  <th>Concession / Waiver Amount</th>
+                                                  <!-- <th>Concession / Waiver</th> -->
+                                                  <th>Concession Amount</th>
                                                   <th>Concession Date</th> 
                                                   <th>Concession Remarks</th>  
                                                   <th>Collected By</th> 
                                                   <th>Collected Date</th>  
                                             </tr>
                                         </thead>
-                                        <tfoot>
+                                        <!-- <tfoot>
                                             <tr>
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th><th></th>
@@ -156,7 +158,7 @@
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th>  
                                             </tr>
-                                        </tfoot>
+                                        </tfoot> -->
                                         <tbody>
 
                                         </tbody>
@@ -258,7 +260,7 @@
                     { data: 'name', name: 'name'},
                     { data: 'item_name', name: 'item_name'},
                     { data: 'amount', name:'amount'}, 
-                    {
+                    /*{
                         data:null,
                         "render": function ( data, type, row, meta ) {
                             if(data.is_concession == 1){ 
@@ -268,7 +270,7 @@
                             }
                         },
 
-                    }, 
+                    }, */
                     {
                         data:null,
                         "render": function ( data, type, row, meta ) {
@@ -277,16 +279,15 @@
                             }   else {
                                 return '<span style="color:red;">-'+data.concession_amount +'</span>';
                             }
-                        },
-
+                        }, name:'fees_payment_details.concession_amount'
                     }, 
                     { data: 'concession_date', name:'concession_date'},  
                     { data: 'concession_remarks', name: 'concession_remarks'},
-                    { data: 'creator_name', name:'fees_payment_details.created_by'}, 
+                    { data: 'creator_name', name:'creator.name'}, 
                     { data: 'created_at', name:'fees_payment_details.created_at'}, 
 
                 ],
-                "order" : [[10,'desc']],
+                "order" : [[9,'desc']],
                 "columnDefs": [{
                     "targets": 'no-sort',
                     "orderable": false,
@@ -386,7 +387,7 @@
             }
 
             // Apply the search
-            table.columns().every(function() {
+            /*table.columns().every(function() {
                 var that = this;
 
                 $('input', this.footer()).on('keyup change', function() {
@@ -396,7 +397,7 @@
                             .draw();
                     }
                 });
-            }); 
+            }); */
 
             $('#clear_style').on('click', function () {
                 $('.card-header').find('input').val('');

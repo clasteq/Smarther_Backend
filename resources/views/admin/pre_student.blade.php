@@ -15,13 +15,11 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size: 20px;" class="card-title">Pre Admission Students
-                            <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn"
-                                    class="btn btn-primary" style="float: right;">Add</button></a> 
-                        </h4>
+                        <!-- <h4 style="font-size: 20px;" class="card-title">Pre Admission Students</h4> -->
+                        
                         <div class="row"> 
                           
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="from-label">Class</label>
                                 <select class="form-control course_id" name="class_id" id="class_id"
                                         onchange="loadSection(this.value)">
@@ -34,7 +32,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 </select>
                             </div>
 
-                            <div class=" col-md-3">
+                            <div class=" col-md-2">
                                 <label class="form-label" >Section</label>
                                 <div class="form-line">
                                     <select class="form-control" name="section_id" id="section_id" required>
@@ -43,7 +41,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 </div>
                             </div>
                          
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                               
                                 <div class="form-line">
                                     <label class="form-label">Status</label>
@@ -56,6 +54,15 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 </div>
                             </div> 
 
+                            <div class="form-group col-md-2" >
+                                <label class="form-label"></label> 
+                                <button class="btn btn-danger "  id="clear_style">Clear Filter</button>
+                            </div> 
+
+                            <div class="form-group col-md-2"> 
+                                <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn"
+                                    class="btn btn-primary" style="float: right;">Add</button></a>  
+                            </div>
                         </div>
                     </div>
                     <div class="card-content collapse show">
@@ -498,6 +505,11 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         $('#addbtn').on('click', function() {
             $('#style-form')[0].reset();
         });
+        $('#clear_style').on('click', function () {
+            $('.card-header').find('input').val('');
+            $('.card-header').find('select').val('');
+            $('.tblcountries').DataTable().ajax.reload();
+        }); 
         $(function() {
             var table = $('.tblcountries').DataTable({
                 processing: true,

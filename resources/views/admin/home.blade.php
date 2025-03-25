@@ -5,7 +5,7 @@
 use App\Http\Controllers\CommonController;
 $user_type = Auth::User()->user_type;
 $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'=>'#', 'name'=>'Dashboard', 'active'=>'active']];
-$session_module = session()->get('module');
+$session_module = session()->get('module'); 
 ?>
 
 <style type="text/css">
@@ -168,18 +168,144 @@ $session_module = session()->get('module');
             height: 90px !important;
             width: 90px !important;
         }
+
+        .module_updated_status td { 
+            text-wrap-mode: nowrap;
+        } 
 </style>
 
 <meta name="csrf-token" content="{{ csrf_token() }}"> 
   @section('pagetitle', 'Dashboard') 
-  @if(!in_array($user_type, ['GUESTUSER', 'STUDENT'])) 
+
+  @if(in_array($user_type, ['SUPER_ADMIN']))  
+    <div class="row">
+      <div class="col-12 col-sm-6 col-md-3">
+
+        <?php $url = URL('/').'/admin/schools'; ?>
+        <div class="info-box elevation-3" style="cursor: pointer;" onclick="window.location.href='{{$url}}'">
+          <span class="info-box-icon bg-info elevation-2"><i class="fas fa-user"></i></span>
+
+          <div class="info-box-content">
+            <span class="info-box-text">Schools</span>
+          </div><div class="info-box-content">
+            <span class="info-box-number ta-right">{{$schools_count}}</span>
+          </div>
+          <!-- /.info-box-content -->
+        </div>
+        <!-- /.info-box -->
+      </div>
+      <!-- /.col -->
+
+    </div>
+
+    <div class="row">
+      <div class="col-md-4 float-left"> <h5 class="title"> SMS Credits </h5>  
+        <div class="card">
+          <div class="card-content collapse show">
+            <div class=" card-dashboard">
+              <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
+                <div class="table-responsicve">
+                  <table class="table table-striped table-bordered smscredits">
+                    <thead><th>School Name</th><th>Available Credits</th><th> </th></thead>
+                    <tbody>
+                      @if(!empty($school_credits))
+                        @foreach($school_credits as $credits)
+
+                          @if($credits->available_credits <= 1000) @php($style = 'background:red !important; color:white;')
+                          @elseif($credits->available_credits > 1000 && $credits->available_credits <= 2000)  @php($style = 'background:yellow !important; color:red;')
+                          @elseif($credits->available_credits > 2000) @php($style = 'background:green !important; color:white;')
+                          @endif
+
+                          <tr style="{{$style}}"><td>{{$credits->name}}</td><td>{{$credits->available_credits}}</td>
+                            <td><a href="{{URL('/')}}/admin/smscredits?id={{$credits->school_id}}"  title="View Credit" target="_blank"><i class="fas fa-eye mr-1"></i></a></td>
+                          </tr>
+                        @endforeach
+                      @endif
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>  
+
+      <div class="col-md-8 float-left"> <h5 class="title"> Last Logged In Schools </h5>
+        <div class="card">
+        <div class="card-content collapse show">
+        <div class=" card-dashboard">
+        <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
+          <div class="table-responsicve">
+            <table class="table table-striped table-bordered lastlogged">
+              <thead><th>School Name</th><th>Email</th><th>Mobile</th><th>Last Logged At</th></thead>
+              <tbody>
+                @if(!empty($last_logged_in))
+                  @foreach($last_logged_in as $logged)
+                    <tr><td>{{$logged->name}}</td><td>{{$logged->email}}</td><td>{{$logged->mobile}}</td><td>{{$logged->last_login_date}}</td></tr>
+                  @endforeach
+                @endif
+              </tbody>
+            </table>
+          </div>
+        </div></div></div></div>
+      </div>
+    </div>
+
+    <div class="row mb-3 mt-2 ">
+      <div class="col-md-12"> <h5 class="title"> Modules </h5> </div> 
+      <div class="col-md-12">
+        <div class="card elevation-3" style="height: 100% !important;"> 
+          <!-- /.card-header -->
+          <div class="card body p-0">
+            <div class="col-md-12 post mt-4 ms-md-5 ms-sm-2 ">
+              <div class="d-flex activity activityimage"> 
+                  <p class="mt-2 ms-3"><input type="date" name="module_date" id="module_date" class="form-control" onchange="loadModuleStatus();" value="{{date('Y-m-d')}}"> </p> 
+                  <p style="margin-left: 2%; margin-top: 1%;"><i class="far fa-dot-circle greentick" aria-hidden="true"></i> - Approved; <i class="far fa-dot-circle yellow" aria-hidden="true"></i> - Yet to Approve; <i class="far fa-dot-circle redcross" aria-hidden="true"></i> - Not Done</p> 
+              </div>
+              <div class="d-flex activity activityimage module_status">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mb-3 mt-2 ">
+      <div class="col-md-12"> <h5 class="title"> Modules - Last Updated At </h5> </div> 
+      <div class="col-md-12">
+        <div class="card elevation-3" style="height: 100% !important;"> 
+          <!-- /.card-header -->
+          <div class="card body p-0">
+            <div class="col-md-12 post mt-4 ms-md-5 ms-sm-2 "> 
+              <div class="d-flex activity activityimage module_updated_status">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  @endif
+
+  @if(!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']))  
+
+    @if($user_type == 'SCHOOL')
+      @if($sms_available_credits <= 1000) @php($style = 'background:red !important;')
+      @elseif($sms_available_credits > 1000 && $sms_available_credits <= 2000)  @php($style = 'background:yellow !important; color:red;')
+      @elseif($sms_available_credits > 2000) @php($style = 'background:green !important;')
+      @endif
+    
+      <div class="row">
+        <div class="col-md-12"> <h5 class="title" style="{{$style}}">  <b>{{$sms_available_credits}} SMS Credits Available</b> </h5> </div>
+      </div>
+    @endif
+
     @if((isset($session_module['Fees Collection'])) || ($user_type == 'SCHOOL'))
         <div class="row">
           <div class="col-md-12"> <h5 class="title">Fee Collection</h5> </div>
           <div class="col-md-6"> 
             <div class="col-md-6 col-6 float-left">
               <!-- small box -->
-              <div class="small-box bg-info shadow">
+              <div class="small-box bg-primary shadow">
                 <div class="inner">
 
                   <h5>Total Amount</h5>
@@ -192,7 +318,8 @@ $session_module = session()->get('module');
               </div>
             </div> 
 
-            <div class="col-md-6 col-6 float-left">
+            <?php $url = URL('/').'/admin/fee_report/collection'; ?> 
+            <div class="col-md-6 col-6 float-left" style="cursor: pointer;" onclick="window.location.href='{{$url}}'">
               <!-- small box -->
               <div class="small-box bg-success shadow">
                 <div class="inner">
@@ -207,7 +334,8 @@ $session_module = session()->get('module');
               </div>
             </div> 
 
-            <div class="col-md-6 col-6 float-left">
+            <?php $url = URL('/').'/admin/conwai_fee_report/collection'; ?> 
+            <div class="col-md-6 col-6 float-left" style="cursor: pointer;" onclick="window.location.href='{{$url}}'">
               <!-- small box -->
               <div class="small-box bg-warning shadow">
                 <div class="inner">
@@ -222,9 +350,25 @@ $session_module = session()->get('module');
               </div>
             </div> 
 
-            <div class="col-md-6 col-6 d-none float-left">
+            <?php $url = URL('/').'/admin/waiver_fee_report/collection'; ?> 
+            <div class="col-md-6 col-6 float-left" style="cursor: pointer;" onclick="window.location.href='{{$url}}'">
               <!-- small box -->
-              <div class="small-box bg-warning shadow">
+              <div class="small-box bg-info shadow">
+                <div class="inner">
+
+                  <h5>Waiver Amount</h5>
+                  <h4><b>{{CommonController::price_format($overall_fee_waiver)}}</b></h4>
+                </div>
+                <div class="icon">
+                    <i class="fas fa-rupee-sign"></i>
+                </div>
+
+              </div>
+            </div>  
+
+            <div class="col-md-6 col-6 float-left">
+              <!-- small box -->
+              <div class="small-box bg-secondary shadow">
                 <div class="inner">
 
                   <h5>Over Due Amount</h5>
@@ -235,9 +379,10 @@ $session_module = session()->get('module');
                 </div>
 
               </div>
-            </div> 
-
-            <div class="col-md-6 col-6 float-left">
+            </div>  
+            
+            <?php $url = URL('/').'/admin/pending_fee_report/collection'; ?> 
+            <div class="col-md-6 col-6 float-left" style="cursor: pointer;" onclick="window.location.href='{{$url}}'">
               <!-- small box -->
               <div class="small-box bg-danger shadow">
                 <div class="inner">
@@ -251,9 +396,10 @@ $session_module = session()->get('module');
 
               </div>
             </div>  
+
           </div>
           <div class="col-md-6">
-            <div id="chartContainer" style="height: 140%; width: 100%; margin-top: -10%;"></div>
+            <div id="chartContainer" style="height: 120%; width: 100%; margin-top: -10%;"></div>
           </div>
         </div> 
     @endif
@@ -292,7 +438,7 @@ $session_module = session()->get('module');
           <!-- /.col -->
 
           <div class="col-12 col-sm-6 col-md-3">
-            <?php $url = URL('/').'/admin/teachers'; ?>
+            <?php $url = URL('/').'/admin/staffs'; ?>
             <div class="info-box mb-3 elevation-3"  style="cursor: pointer;" onclick="window.location.href='{{$url}}'">
               <span class="info-box-icon bg-danger elevation-2"><i class="fas fa-user-graduate"></i></span>
 
@@ -341,18 +487,42 @@ $session_module = session()->get('module');
                   @php($id = $post['id'])
                   <div class="col-md-12 post mt-4 ms-md-5 ms-sm-2 ">
                       <div class="d-flex activity activityimage">
-                          <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle">
-                          <p class="mt-2 ms-3"><b>{{$post['post_category']}} </b><br> {{$post['posted_user']['name_code']}} <br> 
+                        <?php $shortcode = $post['posted_user']['is_shortname']; ?>
+                        @if(empty($post['posted_user']['profile_image']))
+                        <svg class="col-md-2" height="100" width="100">
+                          <defs>
+                            <linearGradient id="grad1">
+                              <stop offset="0%" stop-color="#FF6F61" />
+                              <stop offset="100%" stop-color="#FF6F61" />
+                            </linearGradient>
+                          </defs>
+                          <ellipse cx="30" cy="40" rx="30" ry="30" fill="url(#grad1)" />
+                          <text fill="#ffffff" font-size="35" font-family="Verdana" x="5" y="55">{{$shortcode}}</text>
+                          Sorry, your browser does not support inline SVG.
+                        </svg>
+                        @else 
+                        <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle col-md-2">
+                        @endif 
+                          <!-- <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle"> -->
+                          <p class="mt-2 ms-3"><b>{{$post['post_category']}} </b><br> @if(!empty($post['posted_user']['name_code'])) {{$post['posted_user']['name_code']}} @else {{$shortcode}} @endif <br> 
                           Notify At: {{date('d M, Y h:i A', strtotime($post['notify_datetime']))}}</p> 
                       </div>
                       <div class="activitycontent mt-3">
                           <p>{{$post['title']}}</p>
                       </div>  
-                      <?php $img = $post['post_theme']['is_image'];
+                      <?php 
+                        if(isset($post['post_theme'])) {
+                          $img = $post['post_theme']['is_image'];
+                        } else {
+                          $img = '';
+                        }
                         $style = "background-image:url('".$img."'); background-size: cover;  background-repeat: no-repeat;";
                         $class = "offerolympiaimg";
                         if(!empty($post['image_attachment'])) {
                           $style = ''; $class = 'offerolympia';
+                        }
+                        if(empty($img)) {
+                          $style .= " color:#000 !important; ";
                         }
                         $ogg = '';
                         if(!empty($post['media_attachment'])) {
@@ -404,7 +574,7 @@ $session_module = session()->get('module');
                       @endif
                       <div class="col-md-12 justify-content-between likeicon mt-3 ms-4">
                           <div class=" ">
-                             <div class="likeact float-left" id="likeact_{{$id}}" > <a href="{{URL('/')}}/admin/poststatus?id={{$post['id']}}" target="_blank">
+                             <div class="likeact float-left" id="likeact_{{$id}}" > <a href="#" javascript="void(0);">
                                <p>{{$post['sent_count']}} <img class="editact w-15" src="{{asset('/public/images/check.png')}}"> / {{$post['users_count']}} <img class="editact w-15" src="{{asset('/public/images/read.png')}}">  {{$post['acknowledged_count']}} <img class="editact w-15" src="{{asset('/public/images/image 2269 (1).png')}}"></p> 
                                </a>
                               </div>  
@@ -429,8 +599,31 @@ $session_module = session()->get('module');
                 @php($id = $post['id']) 
                 <div class="col-md-12 post mt-4 ms-md-5 ms-sm-2 postsms">
                     <div class="d-flex activity activityimage">
+
+                      <?php $shortcode = $post['posted_user']['is_shortname']; ?>
+                      @if(empty($post['posted_user']['profile_image']))
+                      <svg class="col-md-2" height="100" width="100">
+                        <defs>
+                          <linearGradient id="grad1">
+                            <stop offset="0%" stop-color="#FF6F61" />
+                            <stop offset="100%" stop-color="#FF6F61" />
+                          </linearGradient>
+                        </defs>
+                        <ellipse cx="30" cy="40" rx="30" ry="30" fill="url(#grad1)" />
+                        <text fill="#ffffff" font-size="35" font-family="Verdana" x="5" y="55">{{$shortcode}}</text>
+                        Sorry, your browser does not support inline SVG.
+                      </svg>
+                      @else 
+                      <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle col-md-2">
+                      @endif 
+
+                      <!-- @if(isset($post['posted_user']) && !empty($post['posted_user'])) 
                         <img src="{{$post['posted_user']['is_profile_image']}}" class="img-responsive img-circle">
-                        <p class="mt-2 ms-3"><b>{{$post['post_category']}} </b><br> {{$post['posted_user']['name_code']}} <br> 
+                      @else 
+                        <img src="{{URL('/')}}/public/image/default.png" class="img-responsive img-circle">
+                      @endif -->
+                        <p class="mt-2 ms-3"><b>{{$post['post_category']}} </b><br> 
+                          @if(!empty($post['posted_user']['name_code'])) {{$post['posted_user']['name_code']}} @else {{$shortcode}} @endif <br> 
                         Notify At: {{date('d M, Y h:i A', strtotime($post['notify_datetime']))}}</p> 
                         <?php if(strtotime($post['notify_datetime']) > strtotime(date('Y-m-d H:i:s'))) {  ?>
                         <a href="{{URL('/')}}/admin/editpostsms?id={{$post['id']}}" title="Edit post" style="padding-left:60%;display: none;"><img class="editact w-15" src="{{asset('/public/images/edit 1.png')}}"></a> 
@@ -596,7 +789,7 @@ $session_module = session()->get('module');
               </div>
               <!-- /.card-body -->
               <div class="card-footer text-center">
-              <a href="{{URL::to('/')}}/admin/teachers">View All Staffs</a>
+              <a href="{{URL::to('/')}}/admin/staffs">View All Staffs</a>
               </div>
               <!-- /.card-footer -->
             </div>
@@ -612,6 +805,17 @@ $session_module = session()->get('module');
 
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript">
+      @if(in_array($user_type, ['SUPER_ADMIN'])) 
+      $('.lastlogged').DataTable({
+        "order":[[3, 'desc']],
+      });
+      $('.smscredits').DataTable({
+        "order":[[1, 'asc']],
+      });
+
+      @endif
+
+      @if(!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']))  
       google.charts.load("current", {packages:["corechart"]});
       google.charts.setOnLoadCallback(drawChart);
       function drawChart() {
@@ -619,6 +823,7 @@ $session_module = session()->get('module');
           ['Title', 'Amount'],
           ['Collected', {{$collected_percent}}],
           ['Concession', {{$concession_percent}}],
+          ['Waiver', {{$waiver_percent}}],
           ['Pending', {{$pending_percent}}],
           ['Overdue', {{$due_percent}}], 
         ]);
@@ -630,14 +835,16 @@ $session_module = session()->get('module');
           slices: {
             0: { color: '#5eb66c' },
             1: { color: '#ffcb46' },
-            2: { color: '#ff4800' },
-            3: { color: '#e35864' }
+            2: { color: '#17a2b8' },
+            3: { color: '#ff4800' },
+            4: { color: '#e35864' },
           }
         };
 
         var chart = new google.visualization.PieChart(document.getElementById('chartContainer'));
         chart.draw(data, options);
       }
+      @endif
     </script>
 
 <!-- <script type="text/javascript" src="https://canvasjs.com/assets/script/jquery-1.11.1.min.js"></script>  
@@ -748,6 +955,63 @@ $session_module = session()->get('module');
       }
   }
 
+  function loadModuleStatus()  {
+      var moddate = $('#module_date').val();
+      if(moddate != '' && moddate != null) {
+          var request = $.ajax({
+              type: 'post',
+              url: " {{ URL::to('admin/load/modulestatus') }}",
+              headers: {
+                  'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+              },
+              data: {
+                  moddate: moddate 
+              },
+              dataType: 'json',
+              encode: true
+          });
+          request.done(function(response) {
+              if (response.status == "SUCCESS") {
+                  $('.module_status').html(response.data);
+              } else { 
+                  swal("Oops!", response.message, "error");
+              }
+
+          });
+          request.fail(function(jqXHR, textStatus) {
+
+              swal("Oops!", "Sorry,Could not process your request", "error");
+          });
+      }   else {
+          swal("Oops!", "Please select the Date", "error");
+      }
+  }
+
+  function loadModuleLastUpdatedStatus()  {  
+          var request = $.ajax({
+              type: 'post',
+              url: " {{ URL::to('admin/load/moduleupdatedstatus') }}",
+              headers: {
+                  'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+              }, 
+              dataType: 'json',
+              encode: true
+          });
+          request.done(function(response) {
+              if (response.status == "SUCCESS") {
+                  $('.module_updated_status').html(response.data);
+              } else { 
+                  swal("Oops!", response.message, "error");
+              }
+
+          });
+          request.fail(function(jqXHR, textStatus) {
+
+              swal("Oops!", "Sorry,Could not process your request", "error");
+          });
+       
+  }
+
   @if($user_type == "SCHOOL")
     @if((isset($session_module['Homeworks'])) || ($user_type == 'SCHOOL'))
     loadHomeworkStatus();
@@ -755,6 +1019,11 @@ $session_module = session()->get('module');
     @if((isset($session_module['Scholar Attendance'])) || ($user_type == 'SCHOOL'))
     loadAttendanceStatus();
     @endif
+  @endif
+
+  @if(in_array($user_type, ['SUPER_ADMIN'])) 
+  loadModuleStatus();
+  loadModuleLastUpdatedStatus();
   @endif
 </script>
 

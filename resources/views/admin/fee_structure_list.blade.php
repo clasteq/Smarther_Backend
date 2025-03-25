@@ -69,6 +69,57 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             width: 100% !important;
         }
     }
+
+    .option-container {
+            padding: 1px;
+            margin: 2px;
+        }
+
+
+        .btn input[type="radio"] {
+            display: none;
+        }
+
+        .scrollable-form {
+            height: 200px;
+            /* Adjust height as needed */
+            overflow-y: scroll;
+            border: 1px solid #ddd;
+            padding: 15px;
+        }
+
+    
+        .border {
+            border: 1px solid #ced4da; /* Border color */
+            border-radius: 0.25rem; /* Border radius */
+        }
+
+        .abs{
+            top: -10px !important;
+            left: 12px !important;
+        }
+
+
+        #dynamicContent input {
+        margin-bottom: 5px; /* Adjust spacing between input boxes */
+    }
+
+    .scrollable-form {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    #noResults {
+        color: red;
+        font-weight: bold;
+    }
+
+    .select2-container--default .select2-selection--multiple {
+        min-height: 50px;
+    }
+
+    .dataTables_filter {
+       display: none;
+    }
 </style>
     <section class="content">
         <!-- Exportable Table -->
@@ -76,10 +127,137 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size:20px;" class="card-title">Fee Structure
-                            <a href="{{ URL('/admin/fee_structure/add') }}"><button id="addbtn"
+                        <h4 style="font-size:20px;" class="card-title"><!-- Fee Structure --></h4>
+
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <div class="position-relative" >
+                                        <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Batch</label>
+                                        <div class="form-group">
+                                            <select class="form-control" id="batch" name="batch" required style="height:50px;"> 
+                                                <option value="">Select Batch</option>
+                                                @if(!empty($get_batches))
+                                                    @foreach($get_batches as $batches)
+                                                        <option value="{{$batches['academic_year']}}" @if($batch == $batches['academic_year']) selected @endif>{{$batches['display_academic_year']}}</option>
+                                                    @endforeach
+                                                @endif 
+                                            </select>
+                                        </div>
+                                    </div>  
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="position-relative" >
+                                        <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Fee Term</label>
+                                        <div class="form-group">
+                                           <select class="form-control" id="fee_term_id" name="fee_term_id" required style="height:50px;">
+                                               <option value="">Select Term</option>
+                                               @if(!empty($get_fee_terms))
+                                                    @foreach($get_fee_terms as $terms)
+                                                        <option value="{{$terms->id}}">{{$terms->name}}</option>
+                                                    @endforeach
+                                               @endif
+                                            </select>
+                                        </div>
+                                    </div>  
+                                </div>
+                               
+                                <div class="col-md-3">
+                                    <div class="position-relative" >
+                                        <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Fee Category</label>
+                                        <div class="form-group">
+                                            <select class="form-control" id="fee_category" name="fee_category" required style="height:50px;">
+                                                <option value="">Select Fee Category</option>
+                                                @foreach ($get_fee_category as $fee )
+                                                <option value="{{$fee->id}}">{{$fee->name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>  
+                                </div> 
+                                <div class="col-md-3">
+                                    <div class="position-relative" >
+                                        <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Fee Item</label>
+                                        <div class="form-group">
+                                           <select class="form-control" id="fee_filters" name="fee_item" id="pay_type" required style="height:50px;">
+                                               
+                                            </select>
+                                        </div>
+                                    </div>  
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="position-relative" >
+                                        <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Fee Type</label>
+                                        <div class="form-group">
+                                            <select class="form-control" id="fee_type" name="fee_type" required style="height:50px;">
+                                                <option value="">All</option>
+                                                <option value="1">Mandatory</option>
+                                                <option value="2">Variable</option>
+                                                <option value="3">Optional</option>
+                                            </select>
+                                        </div>
+                                    </div>  
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="position-relative">
+                                        <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Fee Post Type</label>
+                                        <div class="form-group">
+                                            <select class="form-control" id="fee_post_type" name="fee_post_type" required style="height:50px;">
+                                                <option value="">All</option>
+                                                <option value="1">Class</option>
+                                                <option value="2">Section</option>
+                                                <option value="3">All</option>
+                                                <option value="4">Group</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3" id="class_list_container">
+                                    <div class="form-group">
+                                        <select class="form-control" name="class_list" id="class_list" data-placeholder="Select Class" data-dropdown-css-class="select2-info" style="height:50px;"  >
+                                            <option value="">All</option>
+                                        @foreach ($get_classes as $classes )
+                                            <option value="{{$classes->id}}">{{$classes->class_name}}</option>
+                                        @endforeach
+                                        </select>
+                                        
+                                    </div>
+                                   
+                                </div>
+                                <div class="col-md-3" id="section_list_container" style="display: none;">
+                                    <div class="form-group">
+                                        <select class="form-control" name="section_list" id="section_list" data-placeholder="Select Section" data-dropdown-css-class="select2-info" style="height:50px;">
+                                            <option value="">All</option>
+                                        @foreach ($get_sections as $section)
+                                            <option value="{{$section->id}}">{{$section->is_class_name}}-{{$section->section_name}}</option>
+                                        @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3" id="group_list_container" style="display: none;">
+                                    <div class="form-group">
+                                        <select class="form-control" name="group_list" id="group_list" data-placeholder="Select Group" data-dropdown-css-class="select2-info" style="height:50px;">
+                                            <option value="">All</option>
+                                        @foreach ($get_groups as $group)
+                                            <option value="{{$group->id}}">{{$group->group_name}}</option>
+                                        @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group col-md-1 " >
+                                    <label class="form-label"></label> 
+                                    <button class="btn btn-danger "  id="clear_style">Clear</button>
+                                </div> 
+
+                                <div class="col-md-1" id="group_list_container"></div>
+                                <div class="col-md-3 float-right" id="group_list_container">
+                                    <a href="{{ URL('/admin/fee_structure/add') }}"><button id="addbtn"
                                     class="btn btn-primary" style="float: right;">Add</button></a>
-                        </h4>
+                                </div>
+                            </div>
+
+                            
+                        
                     <div class="card-content collapse show">
                         <div class="card-body card-dashboard">
                             <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
@@ -91,23 +269,23 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                                 <th>Term</th>
                                                 <th>Category Name</th>
                                                 <th>Item Name</th>
-                                                <th>For</th>
-                                                <th></th>
-                                                <th>Gender</th>
+                                                <th class="no-sort">For</th>
+                                                <th class="no-sort"></th>
+                                                <th class="no-sort">Gender</th>
                                                 <th>Amount</th>
-                                                <th>Fee Type</th>
+                                                <th class="no-sort">Fee Type</th>
                                                 <th class="nowrap">Due Date</th> 
                                                 <th class="no-sort nowrap"></th>
                                             </tr>
                                         </thead>
-                                        <tfoot>
+                                        <!-- <tfoot>
                                             <tr>
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th><th></th> 
                                                 <th></th><th></th>  
                                             </tr>
-                                        </tfoot>
+                                        </tfoot> -->
                                         <tbody>
 
                                         </tbody>
@@ -174,6 +352,10 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 @section('scripts')
 
     <script>
+
+        $('[data-widget="pushmenu"]').PushMenu("collapse");
+
+
         document.addEventListener('DOMContentLoaded', function () {
             flatpickr('.datetime-picker', {
                 enableTime: false   ,
@@ -194,23 +376,44 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
         
 
+        $('#clear_style').on('click', function () {
+            $('.card-header').find('input').val('');
+            $('.card-header').find('select').val('');
+            $('#example1').DataTable().ajax.reload();
+        }); 
+
         $(function() {
 
                 var table = $('#example1').DataTable({
 
                     processing: false,
                     serverSide: true,
-                    responsive: true,
-                    "lengthChange": false,
+                    responsive: false, 
                     "ajax": {
-                        "url": "{{URL('/')}}/admin/fee_structure_list/datatables/", 
+                        "url": "{{URL('/')}}/admin/fee_structure_list/datatables/",   
+                        data: function ( d ) {
+                            var batch  = $('#batch').val();
+                            var fee_term_id  = $('#fee_term_id').val();
+                            var fee_category  = $('#fee_category').val();
+                            var fee_filters  = $('#fee_filters').val();
+                            var fee_type  = $('#fee_type').val();
+                            var fee_post_type  = $('#fee_post_type').val();
+                            var class_list  = $('#class_list').val();
+                            var section_list  = $('#section_list').val();
+                            var class_list  = $('#class_list').val();
+                            var group_list  = $('#group_list').val();
+                            $.extend(d, {batch:batch,fee_term_id:fee_term_id,fee_category:fee_category,fee_filters:fee_filters, 
+                                fee_type:fee_type,fee_post_type:fee_post_type,class_list:class_list,
+                                section_list:section_list,group_list:group_list});
+
+                        } 
                     },
                     columns: [  
                        
-                        { data: 'batch'},
-                        { data: 'term_name'},
-                        { data: 'name'},
-                        { data: 'item_name'},
+                        { data: 'batch', name:'batch'},
+                        { data: 'term_name', name:'term_name' },
+                        { data: 'name', name:'name'},
+                        { data: 'item_name', name:'item_name'},
                         {
                             data: null,
                             "render": function(data, type, row, meta) {
@@ -267,7 +470,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                                 return gender;
                             },
-
+                            name:'fee_structure_items.gender'
                         }, 
                         { data: null,
                             "render": function(data, type, row, meta) {
@@ -277,6 +480,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                     return '<span style="color:red;">'+data.amount+'</span>';
                                 }
                             },
+                            name:'fee_structure_items.amount'
                         },
                         {
                             data: null,
@@ -297,7 +501,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                             },
 
                         }, 
-                        { data: 'due_date'},      
+                        { data: 'due_date', name:'due_date'},      
                         {
                             data: null,
                             "render": function(data, type, row, meta) {
@@ -317,12 +521,9 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                         { "targets": 'nowrap', "className": 'nowrap', },
                     ], 
 
-                });
-               
+                }); 
 
-                  
-
-                $('#status_id').on('change', function () {
+                $('#status_id,#batch,#fee_term_id,#fee_category,#fee_filters,#fee_type,#fee_post_type,#class_list,#section_list,#group_list').on('change', function () {
                         table.draw();
                 });
 
@@ -491,5 +692,77 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
         }
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const feePostType = document.getElementById('fee_post_type');
+            const classListContainer = document.getElementById('class_list_container');
+            const sectionListContainer = document.getElementById('section_list_container');
+            const groupListContainer = document.getElementById('group_list_container');
+            const classListSelect = classListContainer.querySelector('select');
+            const sectionListSelect = sectionListContainer.querySelector('select');
+            const groupListSelect = groupListContainer.querySelector('select');
 
+            function resetSelect(selectElement) {
+                selectElement.selectedIndex = -1; // Deselect all options
+                // Alternatively, if you want to clear all selections for a multiple select:
+                Array.from(selectElement.options).forEach(option => option.selected = false);
+            }
+
+            feePostType.addEventListener('change', function () {
+                const selectedValue = this.value;
+
+                // Hide all containers initially
+                classListContainer.style.display = 'none';
+                sectionListContainer.style.display = 'none';
+                groupListContainer.style.display = 'none';
+                classListSelect.disabled = false;
+
+                // Reset all select elements
+                resetSelect(classListSelect);
+                resetSelect(sectionListSelect);
+                resetSelect(groupListSelect);
+
+                if (selectedValue == '1') {
+                    classListContainer.style.display = 'block';
+                } else if (selectedValue == '2') {
+                    sectionListContainer.style.display = 'block';
+                } else if (selectedValue == '3') {
+                    classListContainer.style.display = 'block';
+                    classListSelect.disabled = true;
+                } else if (selectedValue == '4') {
+                    groupListContainer.style.display = 'block';
+                }
+            });
+
+            // Trigger change event on page load to set the initial state
+            feePostType.dispatchEvent(new Event('change'));
+        });
+
+
+        $('#fee_category').on('change', function(){
+            var selected_category = $(this).val();
+    
+            $.ajax({
+                type: 'get',
+                url: " {{ URL::to('/admin/filter_fee_item') }}",
+                dataType: 'json',
+                data: {'selected_category': selected_category},
+                success: function(data){
+
+                    $('#fee_filters').empty();
+
+                    if (data.filter_data.length === 0) {
+                        $('#fee_filters').append('<option value="">No items found</option>');
+                    } else {
+                    $('#fee_filters').html('<option value="">Select Fee Item</option>');
+                    $.each(data.filter_data, function(key, value) {
+                        $("#fee_filters").append('<option value="' + value.id + '"> ' + value.item_name + '</option>');
+                    });
+
+                }
+                }
+            });
+        });
+
+    </script>
 @endsection

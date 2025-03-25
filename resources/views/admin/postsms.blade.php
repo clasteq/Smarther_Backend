@@ -36,7 +36,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
            visibility:hidden;*/ 
         }
         .activityimage img {
-            width: 70px;
+            width: 20%; /*70px;*/
             height: auto; /*200px;*/
             border-radius: 3%;
         }
@@ -87,35 +87,42 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 <div class="col-xs-12 col-md-12">
             
                 <div class="card">
-                    <div class="card-header">SMS for Scholars
+                    <div class="card-header"><!-- SMS for Scholars -->
                         @if((isset($session_module['SMS']) && ($session_module['SMS']['add'] == 1)) || ($user_type == 'SCHOOL'))
                         <a href="{{url('/admin/addpostsms')}}" id="addbanner"><button class="btn btn-primary" style="float: right;">Add</button></a> 
                         @endif
                         <div class="row">
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">Search</label>
-                                <input class="form-control" type="text" id="search"  />
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label mr-1">Search</label>
+                                <input class="form-control " type="text" id="search"  placeholder="Search" />
                             </div>
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">From</label>
-                                <input class="date_range_filter date form-control" type="text" id="datepicker_from"  />
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label mr-1">From</label>
+                                <input class="date_range_filter date form-control " type="text" id="datepicker_from" placeholder="From Date" />
                             </div>
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">To</label>
-                                <input class="date_range_filter date form-control" type="text" id="datepicker_to"  />
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label mr-1">To</label>
+                                <input class="date_range_filter date form-control " type="text" id="datepicker_to" placeholder="To Date" />
                             </div>
-                            <div class=" col-md-3">
-                                <label class="form-label">Categories</label>
+                            <div class="form-group col-md-4">
+                                <label class="form-label mr-1">Categories</label>
                                 <div class="form-line">
-                                    <select class="form-control" name="category_id" id="category_id" >
-                                        <option value="">All</option>
+                                    <select class="form-control " name="category_id" id="category_id" >
+                                        <option value="">All Categories</option>
                                      @if (!empty($categories))
                                          @foreach ($categories as $cat)
                                          <option value={{$cat->id}}>{{$cat->name}}</option>  
                                          @endforeach
-                                     @endif
+                                     @endif 
+                                        <option value="Deleted">Deleted</option>
+                                        <option value="Inactive">Rejected</option>
                                     </select> 
                                 </div>
+                            </div>
+
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label"></label> 
+                                <button class="btn btn-danger mt-3"  id="clear_style">Clear Filter</button>
                             </div>
                         </div>
                     </div>
@@ -194,7 +201,12 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 @section('scripts')
 <script src="https://cdn.ckeditor.com/4.14.1/standard/ckeditor.js"></script>
       <script>
-
+        $('#clear_style').on('click', function () {
+            $('.card-header').find('input').val('');
+            $('.card-header').find('select').val('');
+            filterposts();
+        });
+        
         function deletepostsms(id){
             $('#filter_pagename').val($('#pagename').val());
             swal({
@@ -207,7 +219,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                     confirmButtonText: "Yes!",
                     cancelButtonText: "No",
                     closeOnConfirm: false,
-                    closeOnCancel: false
+                    closeOnCancel: true
                     
                     
                    
@@ -444,6 +456,66 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                     }
                 } );
             } );
+        }
+
+        //function updatestatus(obj, id) {
+        function confirmactivity(id, status) {
+            var str = "Are you sure you want to change?";
+            if(status == "ACTIVE") {
+                str = "Are you sure to Confirm?";
+            } else {
+                str = "Are you sure to Reject?";
+            }
+            //var status = $(obj).val();
+            swal({
+                    title: str,
+                    text: "",
+                    type: "warning",
+                    showCancelButton: true,
+                    confirmButtonClass: "btn-info",
+                    cancelButtonColor: "btn-danger",
+                    confirmButtonText: "Yes!",
+                    cancelButtonText: "No",
+                    closeOnConfirm: false,
+                    closeOnCancel: true
+                    
+                    
+                   
+            },function(inputValue){
+                if(inputValue===false) {
+                      swal('Info',"Nothing done",'info');
+                      
+                      $( ".confirm.btn.btn-lg.btn-primary" ).trigger( "click" );
+                }else{
+                        $('#filter_pagename').val($('#pagename').val());
+                        var request = $.ajax({
+                        type: 'post',
+                        url: " {{URL::to('admin/update/postsms')}}",
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        data:{
+                            post_id:id,status:status
+                        },
+                        dataType:'json',
+                        encode: true
+                    });
+                    request.done(function (response) {
+                        if(response.status == 1)   {
+                             swal('Success',response.message,'success');
+                             filterProducts();
+                         } else {
+                             swal('warning',response.message,'warning');
+                         }
+                    
+                    });
+        
+                    request.fail(function (jqXHR, textStatus) {
+
+                        swal("Oops!", "Sorry,Could not process your request", "error");
+                    });  
+                }
+            });  
         }
     </script>
  

@@ -1,12 +1,14 @@
 @extends('layouts.admin_master')
-@section('mastersettings', 'active')
+@section('master_settings', 'active')
 @section('master_countries', 'active')
 @section('menuopenm', 'active menu-is-opening menu-open')
 <?php   use App\Http\Controllers\AdminController;  $slug_name = (new AdminController())->school; ?>
 <?php
+$user_type = Auth::User()->user_type;
 $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'=>'#', 'name'=>'Country', 'active'=>'active']];
 ?>
 @section('content')
+@if($user_type == "SUPER_ADMIN")
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <section class="content">
         <!-- Exportable Table -->
@@ -14,23 +16,24 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 style="font-size:20px;" class="card-title">Countries
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn" class="btn btn-primary" style="float: right;">Add</button></a>
-                  </h4>
-
-                    <div class="row">
-                           <div class="row col-md-12">
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">Status</label>
-                                <select class="form-control" name="status_id" id="status_id">
-                                    <option value="" >All</option>
-                                    <option value="ACTIVE" selected>ACTIVE</option>
-                                    <option value="INACTIVE">INACTIVE</option>
-                                </select>
-                            </div>
+                  <h4 style="font-size:20px;" class="card-title"><!-- Countries -->
+                    <div class="row col-md-12">
+                        <div class="form-inline col-md-3 " >
+                            <label class="form-label mr-1">Status</label>
+                            <select class="form-control" name="status_id" id="status_id">
+                                <option value="" >All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
                         </div>
-
-                    </div>
+                        <div class="form-inline col-md-8 float-right " ></div>
+                        <div class="form-inline col-md-1 float-right " >
+                        @if($user_type == 'SUPER_ADMIN')
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                        @endif
+                        </div>
+                    </div> 
+                  </h4> 
                 </div>
                 <div class="card-content collapse show">
                   <div class="card-body card-dashboard">
@@ -39,7 +42,6 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                             <table class="table table-striped table-bordered tblcountries">
                               <thead>
                                 <tr>
-                                  <th class="no-sort">Action</th>
                                   <th>Code</th>
                                   <th>Name</th>
                                   <th>Phone Code</th>
@@ -48,8 +50,9 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                   <th>Currency Symbol</th>
                                   <th>Position</th>
                                   <th>Status</th>
+                                  <th class="no-sort">Action</th>
                                 </tr>
-                              </thead>
+                              </thead><!-- 
                               <tfoot>
                                   <tr>
                                     <th></th>
@@ -62,7 +65,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                     <th></th>
                                     <th></th>
                                   </tr>
-                              </tfoot>
+                              </tfoot> -->
                               <tbody>
 
                               </tbody>
@@ -80,6 +83,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Country</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -169,6 +173,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Country</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data"
@@ -260,6 +265,11 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             </div>
         </div>
     </div>
+@else 
+<section class="content">
+    @include('admin.notavailable')
+</section>
+@endif
 
 @endsection
 
@@ -283,15 +293,6 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                     }
                 },
                 columns: [
-                    {
-                        data:null,
-                        "render": function ( data, type, row, meta ) {
-
-                            var tid = data.id;
-                            return '<a href="#" onclick="loadCountry('+tid+')" title="Edit Country"><i class="fas fa-edit"></i></a>';
-                        },
-
-                    },
                     { data: 'code',  name: 'code'},
                     { data: 'name',  name: 'name'},
                     /*{ data: 'alias_name',  name: 'alias_name'},*/
@@ -313,6 +314,15 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                     { data: 'currency_symbol',  name: 'currency_symbol'},
                     { data: 'position',  name: 'position'},
                     { data: 'status',  name: 'status'},
+                    {
+                        data:null,
+                        "render": function ( data, type, row, meta ) {
+
+                            var tid = data.id;
+                            return '<a href="#" onclick="loadCountry('+tid+')" title="Edit Country"><i class="fas fa-edit"></i></a>';
+                        },
+
+                    },
 
                 ],
                 "order":[],
@@ -324,16 +334,12 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
             });
 
-            $('.tblcountries tfoot th').each( function (index) {
+            /*$('.tblcountries tfoot th').each( function (index) {
                 if(index != 4 && index != 0 && index != 8) {
                     var title = $(this).text();
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
                 }
             } );
-
-            $('#status_id').on('change', function() {
-                table.draw();
-            });
 
             // Apply the search
             table.columns().every( function () {
@@ -346,7 +352,11 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
+
+            $('#status_id').on('change', function() {
+                table.draw();
+            });
 
 
             $('#add_style').on('click', function () {
@@ -366,7 +376,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -388,7 +398,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
@@ -411,7 +421,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -433,7 +443,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 

@@ -1,7 +1,7 @@
 @extends('layouts.admin_master')
-@section('rolesettings', 'active')
+@section('mapsettings', 'active')
 @section('masterrole_module_mapping', 'active')
-@section('menuopenur', 'active menu-is-opening menu-open')
+@section('menuopenmap', 'active menu-is-opening menu-open')
 @section('content')
 <?php 
 use App\Http\Controllers\AdminRoleController;
@@ -16,7 +16,7 @@ $rights = AdminRoleController::getRights();
 	<div class="row">
 		<div class="col-12">
 			<div class="card">
-				<div class="card-header">
+				<!-- <div class="card-header">
 					<h4 class="card-title">
 						Role Module Mapping
                         @if($rights['rights']['add'] == 1)
@@ -24,7 +24,7 @@ $rights = AdminRoleController::getRights();
                         @endif
 					</h4>
 
-				</div>
+				</div> -->
 				<div class="card-content collapse show">
 					<div class="card-body card-dashboard">
 						<div style="width: 100%; overflow-x: scroll; padding-left: -10px;">

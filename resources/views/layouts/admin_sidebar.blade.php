@@ -28,14 +28,14 @@ if($user_type == 'TEACHER') {
     <!-- Sidebar -->
     <div class="sidebar">
       <!-- Sidebar user panel (optional) -->
-      <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+      <!-- <div class="user-panel mt-3 pb-3 mb-3 d-flex">
         <div class="image">
           <img src="{{$profile_image}}" class="img-circle elevation-2" alt="User Image">
         </div>
         <div class="info" style="text-wrap: pretty;">
           <a href="#" class="d-block">{{$username}}</a>
         </div>
-      </div>
+      </div> -->
       <!-- Sidebar Menu -->
       <nav class="mt-2">
         <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
@@ -54,7 +54,7 @@ if($user_type == 'TEACHER') {
           @if (!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']) && (isset($session_module['Communication']) || ($user_type == 'SCHOOL')))
 
           <li class="nav-item @yield('menuopencomn')">
-            <a href="#" class="nav-link @yield('communicationsettings')">
+            <a href="#" class="nav-link @yield('comn_settings')">
               <img src="{{asset('/public/menuicons/communication.png')}}" class="menuicon">
               <p>Communication
                 <i class="fas fa-angle-left right"></i>
@@ -90,6 +90,15 @@ if($user_type == 'TEACHER') {
               </li> 
               @endif
 
+              @if((isset($session_module['Staff Posts'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/posts_staff')}}" class="nav-link @yield('master_posts_staff')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Staff Posts</p>
+                </a>
+              </li> 
+              @endif
+
               @if((isset($session_module['Group'])) || ($user_type == 'SCHOOL'))
               <li class="nav-item">
                 <a href="{{URL('/admin/group')}}" class="nav-link @yield('master_group')">
@@ -97,7 +106,7 @@ if($user_type == 'TEACHER') {
                   <p>Group</p>
                 </a>
               </li> 
-              @endif
+              @endif 
 
               @if((isset($session_module['Background Themes'])) || ($user_type == 'SCHOOL'))
               <li class="nav-item">
@@ -122,6 +131,24 @@ if($user_type == 'TEACHER') {
                 <a href="{{URL('/admin/survey')}}" class="nav-link @yield('master_survey')">
                   <i class="fas fa-database nav-icon"></i>
                   <p>Survey</p>
+                </a>
+              </li> 
+              @endif
+
+              @if((isset($session_module['Remarks'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/remarks')}}" class="nav-link @yield('master_remarks')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Remarks</p>
+                </a>
+              </li> 
+              @endif
+
+              @if((isset($session_module['Rewards'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/rewards')}}" class="nav-link @yield('master_rewards')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Rewards</p>
                 </a>
               </li> 
               @endif
@@ -157,6 +184,47 @@ if($user_type == 'TEACHER') {
                       </a>
                   </li> 
                   @endif
+                  @if((isset($session_module['Fees Report'])) || ($user_type == 'SCHOOL'))
+                  <li class="nav-item">
+                      <a href="{{ URL('/admin/fees_report') }}" class="nav-link @yield('fee_report')">
+                          <i class="fas fa-database nav-icon"></i>
+                          <p>Fees Report</p>
+                      </a>
+                  </li> 
+                  @endif
+                  @if((isset($session_module['Fees Summary'])) || ($user_type == 'SCHOOL'))
+                  <li class="nav-item">
+                      <a href="{{ URL('/admin/fees_summary_report') }}" class="nav-link @yield('fee_summary')">
+                          <i class="fas fa-database nav-icon"></i>
+                          <p>Fees Summary</p>
+                      </a>
+                  </li>
+                  @endif
+                  @if((isset($session_module['Fees Receipts'])) || ($user_type == 'SCHOOL'))
+                  <li class="nav-item">
+                      <a href="{{ URL('/admin/fees_receipts_report') }}" class="nav-link @yield('fee_receipts')">
+                          <i class="fas fa-database nav-icon"></i>
+                          <p>Fees Receipts</p>
+                      </a>
+                  </li>
+                  @endif
+                  @if((isset($session_module['Fees Receipts Cancelled'])) || ($user_type == 'SCHOOL'))
+                  <li class="nav-item">
+                      <a href="{{ URL('/admin/fees_receipts_cancelled_report') }}" class="nav-link @yield('fee_receipts_cancelled')">
+                          <i class="fas fa-database nav-icon"></i>
+                          <p>Fees Receipts Cancelled</p>
+                      </a>
+                  </li>
+                  @endif
+                  @if((isset($session_module['Fees Overall'])) || ($user_type == 'SCHOOL'))
+                  <li class="nav-item">
+                      <a href="{{ URL('/admin/fees_overall_report') }}" class="nav-link @yield('fee_overall')">
+                          <i class="fas fa-database nav-icon"></i>
+                          <p>Fees Overall</p>
+                      </a>
+                  </li>
+                  @endif
+
                   @if((isset($session_module['Fees Concession Report'])) || ($user_type == 'SCHOOL'))
                   <li class="nav-item">
                       <a href="{{ URL('/admin/conwai_fee_report/collection') }}" class="nav-link @yield('conwai_fee_report')">
@@ -341,15 +409,31 @@ if($user_type == 'TEACHER') {
             <ul class="nav nav-treeview"> 
               @if((isset($session_module['Staffs'])) || ($user_type == 'SCHOOL'))
               <li class="nav-item">
-                <a href="{{URL('/admin/teachers')}}" class="nav-link @yield('master_teachers')">
+                <a href="{{URL('/admin/staffs')}}" class="nav-link @yield('master_teachers')">
                   <i class="fas fa-code-branch nav-icon"></i>
                   <p>Staffs</p>
                 </a>
               </li>
               @endif
+              @if((isset($session_module['Roles'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/userroles')}}" class="nav-link @yield('master_userroles')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Roles</p>
+                </a>
+              </li>
+              @endif
+              @if((isset($session_module['Departments'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/departments')}}" class="nav-link @yield('master_departments')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Departments</p>
+                </a>
+              </li>
+              @endif
               @if((isset($session_module['Import'])) || ($user_type == 'SCHOOL'))
               <li class="nav-item">
-                <a href="{{URL('/admin/import_teachers')}}" class="nav-link @yield('master_import_teachers')">
+                <a href="{{URL('/admin/import_staffs')}}" class="nav-link @yield('master_import_teachers')">
                   <i class="fas fa-code-branch nav-icon"></i>
                   <p>Import</p>
                 </a>
@@ -372,7 +456,7 @@ if($user_type == 'TEACHER') {
             <ul class="nav nav-treeview">
               @if((isset($session_module['Class Teacher'])) || ($user_type == 'SCHOOL'))     
               <li class="nav-item">
-                <a href="{{URL('/admin/class_teachers')}}" class="nav-link @yield('master_class_teachers')">
+                <a href="{{URL('/admin/ctutors')}}" class="nav-link @yield('master_class_teachers')">
                   <i class="fas fa-code-branch nav-icon"></i>
                   <p>Class Teacher</p>
                 </a>
@@ -388,9 +472,25 @@ if($user_type == 'TEACHER') {
               @endif
               @if((isset($session_module['Teacher Role Module'])) || ($user_type == 'SCHOOL'))
               <li class="nav-item">
-                <a href="{{URL('/admin/teacher_module_mapping')}}" class="nav-link @yield('master_teacher_module_mapping')">
+                <a href="{{URL('/admin/staff_module_mapping')}}" class="nav-link @yield('master_teacher_module_mapping')">
                   <i class="fas fa-code-branch nav-icon"></i>
                   <p>Teacher Role Module</p>
+                </a>
+              </li>
+              @endif
+              @if((isset($session_module['Role Module Mapping'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/role_module_mapping')}}" class="nav-link @yield('masterrole_module_mapping')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Role Module Mapping</p>
+                </a>
+              </li>
+              @endif
+              @if((isset($session_module['Role Class Module'])) || ($user_type == 'SCHOOL'))
+              <li class="nav-item">
+                <a href="{{URL('/admin/role_class_mapping')}}" class="nav-link @yield('masterrole_class_mapping')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Role Class Mapping</p>
                 </a>
               </li>
               @endif
@@ -407,16 +507,23 @@ if($user_type == 'TEACHER') {
           </li> 
 
           <li class="nav-item">
-            <a href="{{URL('/admin/smscredits')}}" class="nav-link @yield('master_smscredits')">
+            <a href="{{URL('/admin/smsschoolcredits')}}" class="nav-link @yield('master_smsschoolcredits')">
               <i class="fas fa-database nav-icon"></i>
               <p>SMS Credits</p>
+            </a>
+          </li> 
+
+          <li class="nav-item">
+            <a href="{{URL('/admin/smscredits')}}" class="nav-link @yield('master_smscredits')">
+              <i class="fas fa-database nav-icon"></i>
+              <p>SMS Credits History</p>
             </a>
           </li> 
           @endif
           
           @if(!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']) && (isset($session_module['Academic Details']) || ($user_type == 'SCHOOL')))
           <li class="nav-item @yield('menuopena')">
-            <a href="#" class="nav-link @yield('academicsettings')">
+            <a href="#" class="nav-link @yield('academic_settings')">
               <img src="{{asset('/public/menuicons/academics.png')}}" class="menuicon">
               <p>Academic Details
                 <i class="fas fa-angle-left right"></i>
@@ -512,7 +619,7 @@ if($user_type == 'TEACHER') {
 
           @if(!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']) && (isset($session_module['Scholar Attendance']) || ($user_type == 'SCHOOL')))
           <li class="nav-item @yield('menuopenatt')">
-            <a href="#" class="nav-link @yield('attendancesettings')">
+            <a href="#" class="nav-link @yield('attendance_settings')">
               <img src="{{asset('/public/menuicons/scholarattendance.png')}}" class="menuicon">
               <p>Scholar Attendance
                 <i class="fas fa-angle-left right"></i>
@@ -521,6 +628,17 @@ if($user_type == 'TEACHER') {
             </a>
 
             <ul class="nav nav-treeview">
+
+              <li class="nav-item">
+                <a href="{{URL('/admin/mark_attendance')}}" class="nav-link @yield('master_mark_attendance')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Mark Attendance</p>
+                </a>
+              </li>
+
+
+
+
               <li class="nav-item">
                 <a href="{{URL('/admin/oa_student_attendance_approval')}}" class="nav-link @yield('master_oa_student_attendance_approval')">
                   <i class="fas fa-database nav-icon"></i>
@@ -585,7 +703,7 @@ if($user_type == 'TEACHER') {
 
           @if(!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']) && (isset($session_module['Staff Attendance']) || ($user_type == 'SCHOOL')))
           <li class="nav-item @yield('menuopenstaatt')">
-            <a href="#" class="nav-link @yield('staattendancesettings')">
+            <a href="#" class="nav-link @yield('staattendance_settings')">
               <img src="{{asset('/public/menuicons/staffattendance.png')}}" class="menuicon">
               <p>Staff Attendance
                 <i class="fas fa-angle-left right"></i>
@@ -595,14 +713,14 @@ if($user_type == 'TEACHER') {
 
             <ul class="nav nav-treeview">
               <li class="nav-item">
-                <a href="{{URL('/admin/teacher_dailyattendance')}}" class="nav-link @yield('master_tattendance')">
+                <a href="{{URL('/admin/staff_dailyattendance')}}" class="nav-link @yield('master_tattendance')">
                   <i class="fas fa-database nav-icon"></i>
                   <p>Staff Daily Attendance</p>
                 </a>
               </li>
 
               <li class="nav-item">
-                <a href="{{URL('/admin/teacherleavelist')}}" class="nav-link @yield('master_teacherleave')">
+                <a href="{{URL('/admin/staff_leavelist')}}" class="nav-link @yield('master_teacherleave')">
                   <i class="fas fa-database nav-icon"></i>
                   <p>Staff Leave</p>
                 </a>
@@ -610,7 +728,7 @@ if($user_type == 'TEACHER') {
 
 
               <li class="nav-item">
-                <a href="{{URL('/admin/teacherattendancerep')}}" class="nav-link @yield('master_teachersatten')">
+                <a href="{{URL('/admin/staff_attendancerep')}}" class="nav-link @yield('master_teachersatten')">
                   <i class="fas fa-database nav-icon"></i>
                   <p>Teachers Attendance Report</p>
                 </a>
@@ -821,6 +939,12 @@ if($user_type == 'TEACHER') {
                 </a>
               </li>
               <li class="nav-item">
+                <a href="{{URL('/admin/gallery')}}" class="nav-link @yield('master_gallery')">
+                  <i class="fas fa-database nav-icon"></i>
+                  <p>Gallery</p>
+                </a>
+              </li>
+              <li class="nav-item">
                 <a href="{{URL('/admin/circulars')}}" class="nav-link @yield('master_circulars')">
                   <i class="fas fa-database nav-icon"></i>
                   <p>Circulars</p>
@@ -873,7 +997,7 @@ if($user_type == 'TEACHER') {
           </li>
           @endif
 
-          @if($user_type == 'SCHOOL')
+          @if($user_type == 'SCHOOLS')
           <li class="nav-item @yield('menuopenur')">
             <a href="#" class="nav-link @yield('rolesettings')">
               <img src="{{asset('/public/menuicons/activities.png')}}" class="menuicon">
@@ -938,7 +1062,7 @@ if($user_type == 'TEACHER') {
           
           @if(!in_array($user_type, ['GUESTUSER', 'STUDENT', 'SUPER_ADMIN']) && (isset($session_module['Reports']) || ($user_type == 'SCHOOL')))
           <li class="nav-item @yield('menuopen')">
-            <a href="#" class="nav-link @yield('settings1')">
+            <a href="#" class="nav-link @yield('settings')">
               <img src="{{asset('/public/menuicons/settings.png')}}" class="menuicon">
               <p>General Settings
                 <i class="fas fa-angle-left right"></i>
@@ -1003,6 +1127,31 @@ if($user_type == 'TEACHER') {
                 </a>
               </li>
               @endif
+            </ul>
+          </li>
+          @elseif($user_type == 'SUPER_ADMIN')
+          <li class="nav-item @yield('menuopen')">
+            <a href="#" class="nav-link @yield('settings')">
+              <img src="{{asset('/public/menuicons/settings.png')}}" class="menuicon">
+              <p>General Settings
+                <i class="fas fa-angle-left right"></i>
+                <span class="badge badge-info right"></span>
+              </p>
+            </a>
+
+            <ul class="nav nav-treeview"> 
+              <li class="nav-item">
+                <a href="{{URL('/admin/generalsettings')}}" class="nav-link @yield('settings_saadmin')">
+                  <i class="fas fa-cogs nav-icon"></i>
+                  <p>Admin Settings</p>
+                </a>
+              </li> 
+              <li class="nav-item">
+                <a href="{{URL('/admin/smstemplates')}}" class="nav-link @yield('settings_smstemplates')">
+                  <i class="fas fa-cogs nav-icon"></i>
+                  <p>SMS Templates</p>
+                </a>
+              </li> 
             </ul>
           </li>
           @endif

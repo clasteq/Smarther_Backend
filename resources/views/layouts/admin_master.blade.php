@@ -5,7 +5,7 @@ scratch. This page gets rid of all links and provides the needed markup only.
 -->
 <html lang="en">
     @include('layouts.admin_head')
-
+ 
 <body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">
 
@@ -72,6 +72,112 @@ scratch. This page gets rid of all links and provides the needed markup only.
 
     @include('layouts.admin_footer')
     @yield('scripts')
+
+    <script>
+        // Toggle dropdown on click
+        document.addEventListener("DOMContentLoaded", function() {
+            let notificationToggle = document.getElementById("notificationToggle");
+            let notificationMenu = document.getElementById("notificationMenu");
+            let notificationCount = document.getElementById("notificationCount");
+            let notificationList = document.getElementById("notificationList");
+             
+
+            let notifications = []; var notify_count = 0;
+
+            
+            // Function to render notifications
+            function renderNotifications() { 
+                /*let notifications = [{
+                    icon: "fas fa-bell",
+                    message: "New message from John"
+                },
+                {
+                    icon: "fas fa-bell",
+                    message: "Task completed successfully"
+                }, 
+                {
+                    icon: "fas fa-bell",
+                    message: "Task completed successfully"
+                }, 
+            ];*/
+            console.log(notifications);
+                notificationList.innerHTML = ""; // Clear existing items
+                $.ajax({
+                    url: "{{ url('admin/fetch-notifications') }}",
+                    type: "POST",
+                    data: { 
+                        _token: '{{ csrf_token() }}'
+                    },
+                    dataType: 'json',
+                    success: function(res) {
+                        if(res.status == 'SUCCESS')  {
+                            notifications = res.data;
+                            notify_count = res.notify_count; 
+                            console.log(notifications);
+                            notifications.forEach((notification, index) => {
+                                let notificationItem = document.createElement("a");
+                                notificationItem.href = "#";
+                                notificationItem.classList.add("notification-item");
+                                notificationItem.innerHTML = `
+                            <i class="fas fa-bell"></i>
+                            <span>${notification.message}</span> `;
+                                notificationList.appendChild(notificationItem);
+                            });
+
+                            let notificationItem = document.createElement("a");
+                                notificationItem.href = "{{URL('/admin/notifications')}}";
+                                notificationItem.classList.add("notification-item");
+                                notificationItem.innerHTML = `
+                            <i class="fas fa-eye"></i>
+                            <span>View All</span> `;
+                                notificationList.appendChild(notificationItem);
+
+                            // Update badge count
+                            let count = notifications.length;
+                            notificationCount.innerText = count;
+                            notificationCount.style.display = count > 0 ? "flex" : "none";
+                            // Enable scrolling if there are more than 7 notifications
+                            if (count > 7) {
+                                notificationMenu.style.overflowY = "auto";
+                            } else {
+                                notificationMenu.style.overflowY = "hidden";
+                            }
+                        } else {
+                            let notificationItem = document.createElement("a");
+                                notificationItem.href = "{{URL('/admin/notifications')}}";
+                                notificationItem.classList.add("notification-item");
+                                notificationItem.innerHTML = `
+                            <i class="fas fa-eye"></i>
+                            <span>View All</span> `;
+                                notificationList.appendChild(notificationItem);
+                        }
+                    }
+                });
+
+                
+                
+            }
+            // Toggle dropdown on click
+            notificationToggle.addEventListener("click", function(event) {
+                event.preventDefault();
+                notificationMenu.style.display = (notificationMenu.style.display === "none" ||
+                    notificationMenu.style.display === "") ? "block" : "none";
+            });
+            // Close dropdown when clicking outside
+            document.addEventListener("click", function(event) {
+                if (!notificationToggle.contains(event.target) && !notificationMenu.contains(event
+                        .target)) {
+                    notificationMenu.style.display = "none";
+                }
+            });
+            // Render notifications on page load
+            renderNotifications();
+        });
+    </script>
+
+
+
+
     <script type="text/javascript">
       
         function loadClassSection(val, selectedid, selectedval) {

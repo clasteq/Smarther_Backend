@@ -141,10 +141,10 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header">
+                    <!-- <div class="card-header">
                         <h4 style="font-size:20px;" class="card-title"> Add Fee Structure
                         </h4>
-                    </div>
+                    </div> -->
                     <div class="card-body">
                         <form action="{{ url('admin/post_fee_structure') }}" method="post" id="post_fee_structure"
                             class="post_fee_structure">
@@ -201,6 +201,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                                 <option value="2">Section</option>
                                                 <option value="3">All</option>
                                                 <option value="4">Group</option>
+                                                <option value="5">Scholar</option>
                                             </select>
                                         </div>
                                     </div>
@@ -234,7 +235,15 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                         </select>
                                     </div>
                                 </div>
-
+                                <div class="col-md-3" id="scholar_list_container" style="display: none;">
+                                    <div class="form-group">
+                                        <select class="select2" name="scholar_list" data-placeholder="Select Scholar" data-dropdown-css-class="select2-info" style="height:50px;">
+                                        @foreach ($get_student as $student)
+                                            <option value="{{$student->user_id}}">{{$student->name}} - {{$student->mobile}}</option>
+                                        @endforeach
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             <div class="card">
                                 <div class="card-body">
@@ -614,9 +623,12 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         const classListContainer = document.getElementById('class_list_container');
         const sectionListContainer = document.getElementById('section_list_container');
         const groupListContainer = document.getElementById('group_list_container');
+        const scholarListContainer = document.getElementById('scholar_list_container');
+
         const classListSelect = classListContainer.querySelector('select');
         const sectionListSelect = sectionListContainer.querySelector('select');
         const groupListSelect = groupListContainer.querySelector('select');
+        const scholarListSelect = scholarListContainer.querySelector('select');
 
         function resetSelect(selectElement) {
             selectElement.selectedIndex = -1; // Deselect all options
@@ -637,6 +649,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             resetSelect(classListSelect);
             resetSelect(sectionListSelect);
             resetSelect(groupListSelect);
+            resetSelect(scholarListSelect);
 
             if (selectedValue == '1') {
                 classListContainer.style.display = 'block';
@@ -647,6 +660,8 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                 classListSelect.disabled = true;
             } else if (selectedValue == '4') {
                 groupListContainer.style.display = 'block';
+            } else if (selectedValue == '5') {
+                scholarListContainer.style.display = 'block';
             }
         });
 

@@ -1,5 +1,5 @@
 @extends('layouts.admin_master')
-@section('communication_settings', 'active')
+@section('comn_settings', 'active')
 @section('master_bthemes', 'active')
 @section('menuopencomn', 'active menu-is-opening menu-open') 
 <?php   use App\Http\Controllers\AdminController;  $slug_name = (new AdminController())->school; ?>
@@ -12,6 +12,13 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 $user_type = Auth::User()->user_type;
 $session_module = session()->get('module'); //echo "<pre>"; print_r($session_module); exit;
 ?> 
+
+<style type="text/css">
+    .bgtheme {
+            border: 1px solid black;
+    } 
+</style>
+
 @if((isset($session_module['Background Themes']) && ($session_module['Background Themes']['list'] == 1)) || ($user_type == 'SCHOOL'))
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <section class="content">
@@ -20,24 +27,24 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 style="font-size:20px;" class="card-title">Background Themes
-                    @if((isset($session_module['Background Themes']) && ($session_module['Background Themes']['add'] == 1)) || ($user_type == 'SCHOOL'))
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
-                    @endif
-                  </h4>
-                  <div class="row">
+                  <h4 style="font-size:20px;" class="card-title"><!-- Background Themes -->
                     <div class="row col-md-12">
-                     <div class="form-group col-md-3 " >
-                         <label class="form-label">Status</label>
-                         <select class="form-control" name="status_id" id="status_id">
-                             <option value="" >All</option>
-                             <option value="ACTIVE">ACTIVE</option>
-                             <option value="INACTIVE">INACTIVE</option>
-                         </select>
-                     </div>
-                 </div>
-
-             </div>
+                        <div class="form-inline col-md-3 " >
+                            <label class="form-label mr-1">Status</label>
+                            <select class="form-control" name="status_id" id="status_id">
+                                <option value="" >All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
+                        </div>
+                        <div class="form-inline col-md-8 float-right " ></div>
+                        <div class="form-inline col-md-1 float-right " >
+                        @if((isset($session_module['Background Themes']) && ($session_module['Background Themes']['add'] == 1)) || ($user_type == 'SCHOOL'))
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                        @endif
+                        </div>
+                    </div>
+                  </h4> 
                 </div>
                 <div class="card-content collapse show">
                   <div class="card-body card-dashboard">
@@ -54,11 +61,11 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
                                 </tr>
                               </thead>
-                              <tfoot>
+                              <!-- <tfoot>
                                   <tr><th></th><th></th><th></th>
                                       <th></th><th></th>
                                   </tr>
-                              </tfoot>
+                              </tfoot> -->
                               <tbody>
 
                               </tbody>
@@ -76,6 +83,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Background Theme</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -129,6 +137,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Background Theme</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data"
@@ -215,7 +224,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                         "render": function ( data, type, row, meta ) {
                             if(data.image != '' || data.image != null){
                                 var tid = data.is_image;
-                                return '<img src="'+tid+'" height="50" width="50">';
+                                return '<img src="'+tid+'" height="50" width="50" class="bgtheme ">';
                             }   else {
                                 return '';
                             }
@@ -227,36 +236,41 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                     {
                         data:null,
                         "render": function ( data, type, row, meta ) {
+                            var urls = ''
                             @if((isset($session_module['Background Themes']) && ($session_module['Background Themes']['edit'] == 1)) || ($user_type == 'SCHOOL'))
                             var tid = data.id;
-                            return '<a href="#" onclick="loadCategory('+tid+')" title="Edit Category"><i class="fas fa-edit"></i></a>';
-                            @else 
-                            return '';
+                            urls +=  '<a href="#" onclick="loadCategory('+tid+')" title="Edit Background Themes"><i class="fas fa-edit"></i></a>';
                             @endif
+                            @if((isset($session_module['Background Themes']) && ($session_module['Background Themes']['delete'] == 1)) || ($user_type == 'SCHOOL'))
+                            var tid = data.id;
+                            urls += ' <a href="#" onclick="deletedata(' + tid +')" title="Delete Background Themes"><i class="fas fa-trash"></i></a>';
+                            @endif
+
+                            return urls; 
                         },
 
                     },
 
                 ],
-                "order":[[1, 'asc']],
+                "order":[[0, 'asc']],
                 "columnDefs": [
                     { "orderable": false, "targets": 1 }, { "orderable": false, "targets": 3 }, { "orderable": false, "targets": 4 }
                 ],
                
             });
 
-            $('.tblcountries tfoot th').each( function (index) {
+           /* $('.tblcountries tfoot th').each( function (index) {
                 if( index != 1 && index != 3 && index != 4) {
                     var title = $(this).text();
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
                 }
-            } );
+            } );*/
 
             $('#status_id').on('change', function() {
                 table.draw();
             });
             // Apply the search
-            table.columns().every( function () {
+            /*table.columns().every( function () {
                 var that = this;
 
                 $( 'input', this.footer() ).on( 'keyup change', function () {
@@ -266,7 +280,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
             $('#add_style').on('click', function () {
 
                 var options = {
@@ -391,7 +405,49 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             });
         }
 
+        function deletedata(id){
+            swal({
+                title : "",
+                text : "Are you sure to delete?",
+                type : "warning",
+                showCancelButton: true,
+                confirmButtonText: "Yes",
+            },
+            function(isConfirm){
+                if (isConfirm) {
+                    var request = $.ajax({
+                        type: 'post',
+                        url: " {{URL::to('/admin/delete/bthemes')}}",
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        data:{
+                            id:id,
+                        },
+                        dataType:'json',
+                        encode: true
+                    });
+                    request.done(function (response) {
+                        if (response.status == 1) {
 
+                            swal('Success',response.message,'success');
+
+                            $('.tblcountries').DataTable().ajax.reload();
+                        }
+                        else{
+                            swal('Oops',response.message,'error'); 
+                        }
+
+                    });
+                    request.fail(function (jqXHR, textStatus) {
+
+                        swal("Oops!", "Sorry,Could not process your request", "error");
+                    });
+                }
+            })
+
+
+        }
     </script>
 
 @endsection

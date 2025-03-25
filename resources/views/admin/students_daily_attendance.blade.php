@@ -69,6 +69,14 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             }
 
         }
+
+        .rounded {
+            border-radius: 1rem !important;
+        }
+
+        #absentlist .rounded {
+            max-width: 50%;
+        }
     </style>
 @endsection
 @section('content')
@@ -263,7 +271,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
             var request = $.ajax({
                 type: 'post',
-                url: " {{ URL::to('admin/load/student_daily_attendance') }}",
+                url: " {{ URL::to('admin/load/scholar_daily_attendance') }}",
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },

@@ -144,11 +144,11 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                                 </div>
                             </div>
 
-                            <div class=" col-md-3">
+                            <div class=" col-md-3 d-none">
                                
                                 <label class="form-label" style="padding-bottom: 10px;">Total Marks per Subject</label>
                                 <div class="form-line">
-                                    <input type="text" onkeypress="return isNumber(event)" class="form-control" name="total_marks" id="total_marks" required value="100"> 
+                                    <input type="text" onkeypress="return isNumber(event)" class="form-control" name="total_marks" id="total_marks"   value="100"> 
                                 </div>
                             </div>
 
@@ -250,10 +250,10 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                 swal("Oops!", "Please select the Academic Year", "error");
                 return false;
             }
-            if(total_marks>0) {} else {
+            /*if(total_marks>0) {} else {
                 swal("Oops!", "Please enter the Total Marks", "error");
                 return false;
-            }
+            }*/
             var class_id = $('#class_id').val(); 
             if(class_id>0) {} else {
                 swal("Oops!", "Please select the Class", "error");

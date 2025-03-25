@@ -1,7 +1,7 @@
 @extends('layouts.admin_master')
-@section('rolesettings', 'active')
+@section('mapsettings', 'active')
 @section('masterrole_module_mapping', 'active')
-@section('menuopenur', 'active menu-is-opening menu-open')
+@section('menuopenmap', 'active menu-is-opening menu-open')
 @section('content')
 <?php
 use App\Models\Module;

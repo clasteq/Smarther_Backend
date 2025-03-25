@@ -179,143 +179,76 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 <textarea type="text" id="message" name="message" class="form-control summernote" rows="5"></textarea>
                                 <span class="text-danger error-text message_error"></span>
                             </div>
-
-                            <div class="form-group">
-                                <label for="title">Title (Push Notification):</label>
-                                <input type="text" maxlength="75" class="form-control" id="title_push" name="title_push" required>
-                                <span class="text-danger error-text title_push_error"></span>
-                            </div>
-                            <div class="form-group">
-                                <label>Message (Push Notification):</label>
-                                <textarea name="message_push" maxlength="150" class="form-control" rows="2" required></textarea>
-                                <span class="text-danger error-text message_push_error"></span>
-                            </div>
                             <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
+                                <div class="col-md-4">
+                                    <div class="form-inline">
                                         <label for="category">Category:</label>
-                                        <select class="form-control" id="category" name="category" required>
+                                        <select class="form-control ml-3" id="category" name="category" required onchange="loadbgtheme();">
                                             <option value="" disabled selected>Select a category</option>
                                             @foreach ($get_category as $category)
-                                                <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                                <option value="{{ $category->id }}" data-bgtheme_id="{{ $category->background_theme_id }}" data-text_color="{{$category->text_color}}">{{ $category->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-8">
                                     <div class="form-group">
-                                        <label for="batch">Batch:</label> <?php $acadamic_year = trim($acadamic_year); ?>
-                                        <select class="form-control" id="batch" name="batch" required onchange="loadModalcontents();">
-                                            <!-- <option value="2023-2024">2023-2024</option> -->
-                                            <option value="">Select Batch</option>
-                                            @if(!empty($get_batches))
-                                                @foreach($get_batches as $batches)
-                                                    @php($selected = '')
-                                                    @if($acadamic_year == $batches['academic_year'])
-                                                    @php($selected = 'selected')
-                                                    @endif
-                                                    <option value="{{$batches['academic_year']}}" {{$selected}}>{{$batches['display_academic_year']}}</option>
-                                                @endforeach
-                                            @endif
+                                        <label>Post For:</label>
+                                        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                            <div class="option-container mr-3">
+                                                <label class="btn btn-outline-primary">
+                                                    <input type="radio" name="post_type" autocomplete="off" value="3" checked> All
+                                                    Scholars
+                                                </label>
+                                            </div>
+                                            <div class="option-container mr-3">
+                                                <label class="btn btn-outline-primary">
+                                                    <input data-toggle="modal" data-target="#exampleModalCenter" type="radio"
+                                                        name="post_type" autocomplete="off" value="1" > Class & Sections
+                                                </label>
 
-                                        </select>
+
+                                            </div>
+                                            <div class="option-container mr-3">
+                                                <label class="btn btn-outline-primary">
+                                                    <input data-toggle="modal" data-target="#exampleModalCenter1" type="radio"
+                                                        name="post_type" autocomplete="off" value="2">
+                                                    Specific Scholars
+                                                </label>
+                                            </div>
+                                            <div class="option-container mr-3">
+                                                <label class="btn btn-outline-primary">
+                                                    <input data-toggle="modal" data-target="#exampleModalCenter2" type="radio"
+                                                        name="post_type" autocomplete="off" value="4"> Group
+                                                </label>
+                                            </div>
+                                        </div> 
+                                    </div>
+                                    <div class="form-group">
+                                        <label>CC Staff:</label>
+                                        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                            <div class="option-container mr-3">
+                                                <label class="btn btn-outline-primary" id="exampleModalCenter3_label">
+                                                    <input data-toggle="modal" data-target="#exampleModalCenter3" type="radio"
+                                                        name="cc" autocomplete="off" value="1">
+                                                    Specific Staffs
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="form-group">
-                                <label>Post For:</label>
-                                <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                                    <div class="option-container mr-3">
-                                        <label class="btn btn-outline-primary">
-                                            <input type="radio" name="post_type" autocomplete="off" value="3" checked> All
-                                            Scholars
-                                        </label>
-                                    </div>
-                                    <div class="option-container mr-3">
-                                        <label class="btn btn-outline-primary">
-                                            <input data-toggle="modal" data-target="#exampleModalCenter" type="radio"
-                                                name="post_type" autocomplete="off" value="1" > Class & Sections
-                                        </label>
-
-
-                                    </div>
-                                    <div class="option-container mr-3">
-                                        <label class="btn btn-outline-primary">
-                                            <input data-toggle="modal" data-target="#exampleModalCenter1" type="radio"
-                                                name="post_type" autocomplete="off" value="2">
-                                            Specific Scholars
-                                        </label>
-                                    </div>
-                                    <div class="option-container mr-3">
-                                        <label class="btn btn-outline-primary">
-                                            <input data-toggle="modal" data-target="#exampleModalCenter2" type="radio"
-                                                name="post_type" autocomplete="off" value="4"> Group
-                                        </label>
-                                    </div>
+                            <div class="row">
+                                <div class="col-md-6 float-left form-inline">
+                                    <label for="batch">Background and Text Colour:</label>
+                                    <select class="form-control ml-3" id="bg_color" name="bg_color" id="bg_color" required onchange="loadpreview();">
+                                        <option value="" disabled selected>Select Background</option>
+                                        @foreach ($get_background as $theme)
+                                            <option value="{{ $theme->id }}" data-src="{{$theme->is_image}}">{{ $theme->name }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
-                            </div>
-
-                            <div class="col-md-12 imageupload justify-content-center " style="margin: 0%;">
-                                <div  class="col-md-3 float-left">
-                                    <p>
-                                    <input class="fileatt" type="file" name="image_attachment[]" class="image" id="upload_image" multiple data-multiple-caption="{count} files selected">  <img src="{{asset('/public/images/image.png')}}" class="imgatt" for="upload_image"> <label for="upload_image"> Image (jpg / jpeg / png) </label>
-                                    
-                                    </p>
-                                </div> 
-
-                                <div  class="col-md-3 float-left">
-                                    <p>
-                                    <input class="fileatt" type="file" name="media_attachment" class="image" id="upload_image1" >
-                                    <img src="{{asset('/public/images/Audio.png')}}" class="imgatt"  for="upload_image1" style="width: 21px !important;height: 18px !important;">   
-                                    <label for="upload_image1"> Audio (mp3 / wav) </label> 
-                                    </p>
-                                </div> 
-
-                                <div   class="col-md-3 float-left">
-                                    <p>
-                                    <input class="fileatt" type="file" name="video_attachment" class="image" id="upload_image2" >
-                                    <img src="{{asset('/public/images/video.png')}}" class="imgatt" for="upload_image2" style="width: 21px !important;height: 18px !important;">  
-                                    <label for="upload_image2"> Video (mp4 / wmv) </label>   
-                                    </p>
-                                </div> 
-
-                                <div   class="col-md-3 float-left">
-                                    <p>
-                                    <input class="fileatt" type="file" name="files_attachment[]" class="image" id="upload_image3" multiple data-multiple-caption="{count} files selected">
-                                    <img src="{{asset('/public/images/pdf.png')}}" class="imgatt" for="upload_image3"  style="width: 21px !important;height: 18px !important;">
-                                    <label for="upload_image3"> Files (doc / pdf / xls / pptx) </label>   
-                                    </p> 
-                                </div> 
-                            </div>
- 
-
-                            <div class="row col-md-12 mb-3">
-                            <div class="col-md-8 float-left">
-                                <label class="form-label">Youtube Video (ex: <b>https://www.youtube.com/watch?v=PY8xGz-lQK0</b>)</label>
-                                <div class="form-line">
-                                    <input type="text" class="form-control" name="youtube_link"   placeholder="https://www.youtube.com/watch?v=PY8xGz-lQK0"> 
-                                </div>
-                            </div>
-
-                            <div class="col-md-4 float-left">
-                                <label for="batch">Background and Text Colour:</label>
-                                <select class="form-control" id="bg_color" name="bg_color" id="bg_color" required onchange="loadpreview();">
-                                    <option value="" disabled selected>Select Background</option>
-                                    @foreach ($get_background as $theme)
-                                        <option value="{{ $theme->id }}" data-src="{{$theme->is_image}}">{{ $theme->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            </div>
-
-                            <div class="form-group col-md-12 mb-3">
-                                <label for="title">Preview:</label>
-                                <div id="preview_content"></div>
-                            </div> 
-
-                            <div class="row col-md-12 mb-3 ml-3">
-                            <div class="col-md-6 float-left">
+                                <div class="col-md-2 float-left">
                                     <!-- Hidden field to send '0' if checkbox is not checked -->
                                     <input type="hidden" name="req_ack" value="0">
                                     <input class="form-check-input" type="checkbox" value="1" name="req_ack"
@@ -323,24 +256,107 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     <label class="form-check-label" for="defaultCheck1">
                                         Request Acknowledgment
                                     </label> 
+                                </div>
+                                <div class="col-md-4 float-left ">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="" name="sendLaterCheckbox"
+                                            id="sendLaterCheckbox">
+                                        <label class="form-check-label" for="sendLaterCheckbox">
+                                            Send Later
+                                        </label>
+                                    </div>
+                                
+                                    <div class="form-group" id="scheduleInput" style="display: none;">
+                                        <label for="scheduleDateTime">Schedule at:</label>
+                                        <input type="text" name="schedule_date" class="form-control" id="datetime-picker"
+                                            placeholder="Select Date and Time" required>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="col-md-6 float-left">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" value="" name="sendLaterCheckbox"
-                                        id="sendLaterCheckbox">
-                                    <label class="form-check-label" for="sendLaterCheckbox">
-                                        Send Later
-                                    </label>
+                            <a href="javascript:void(0);" onclick="showAdvanced()">Advanced in Details</a>
+
+                            <div class="advanced col-md-12 float-left" id="advanced" style="display: none;">
+                                <div class="form-group">
+                                    <label for="title">Title (Push Notification):</label>
+                                    <input type="text" maxlength="75" class="form-control" id="title_push" name="title_push">
+                                    <span class="text-danger error-text title_push_error"></span>
                                 </div>
+                                <div class="form-group">
+                                    <label>Message (Push Notification):</label>
+                                    <textarea name="message_push" id="message_push" maxlength="150" class="form-control" rows="2"></textarea>
+                                    <span class="text-danger error-text message_push_error"></span>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-group">
+                                            <label for="batch">Batch:</label> <?php $acadamic_year = trim($acadamic_year); ?>
+                                            <select class="form-control" id="batch" name="batch" required onchange="loadModalcontents();">
+                                                <!-- <option value="2023-2024">2023-2024</option> -->
+                                                <option value="">Select Batch</option>
+                                                @if(!empty($get_batches))
+                                                    @foreach($get_batches as $batches)
+                                                        @php($selected = '')
+                                                        @if($acadamic_year == $batches['academic_year'])
+                                                        @php($selected = 'selected')
+                                                        @endif
+                                                        <option value="{{$batches['academic_year']}}" {{$selected}}>{{$batches['display_academic_year']}}</option>
+                                                    @endforeach
+                                                @endif
+
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-9">
+                                        <div class="form-group">
+                                            <label class="form-label">Youtube Video (ex: <b>https://www.youtube.com/watch?v=PY8xGz-lQK0</b>)</label>
+                                            <div class="form-line">
+                                                <input type="text" class="form-control" name="youtube_link"   placeholder="https://www.youtube.com/watch?v=PY8xGz-lQK0"> 
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-12 imageupload justify-content-center " style="margin: 0%;">
+                                    <div  class="col-md-3 float-left">
+                                        <p>
+                                        <input class="fileatt" type="file" name="image_attachment[]" class="image" id="upload_image" multiple data-multiple-caption="{count} files selected">  <img src="{{asset('/public/images/image.png')}}" class="imgatt" for="upload_image"> <label for="upload_image"> Image (jpg / jpeg / png) </label>
+                                        
+                                        </p>
+                                    </div> 
+
+                                    <div  class="col-md-3 float-left">
+                                        <p>
+                                        <input class="fileatt" type="file" name="media_attachment" class="image" id="upload_image1" >
+                                        <img src="{{asset('/public/images/Audio.png')}}" class="imgatt"  for="upload_image1" style="width: 21px !important;height: 18px !important;">   
+                                        <label for="upload_image1"> Audio (mp3 / wav) </label> 
+                                        </p>
+                                    </div> 
+
+                                    <div   class="col-md-3 float-left">
+                                        <p>
+                                        <input class="fileatt" type="file" name="video_attachment" class="image" id="upload_image2" >
+                                        <img src="{{asset('/public/images/video.png')}}" class="imgatt" for="upload_image2" style="width: 21px !important;height: 18px !important;">  
+                                        <label for="upload_image2"> Video (mp4 / wmv) </label>   
+                                        </p>
+                                    </div> 
+
+                                    <div   class="col-md-3 float-left">
+                                        <p>
+                                        <input class="fileatt" type="file" name="files_attachment[]" class="image" id="upload_image3" multiple data-multiple-caption="{count} files selected">
+                                        <img src="{{asset('/public/images/pdf.png')}}" class="imgatt" for="upload_image3"  style="width: 21px !important;height: 18px !important;">
+                                        <label for="upload_image3"> Files (doc / pdf / xls / pptx) </label>   
+                                        </p> 
+                                    </div> 
+                                </div> 
+
+                            </div>
                             
-                                <div class="form-group" id="scheduleInput" style="display: none;">
-                                    <label for="scheduleDateTime">Schedule at:</label>
-                                    <input type="text" name="schedule_date" class="form-control" id="datetime-picker"
-                                        placeholder="Select Date and Time" required>
-                                </div>
-                            </div>
-                            </div>
+
+                            <div class="form-group col-md-12 mb-3 float-left">
+                                <label for="title">Preview:</label>
+                                <div id="preview_content"></div>
+                            </div>  
 
                             <button type="submit" class="btn btn-primary float-right" id="send">Save</button>
 
@@ -352,6 +368,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title" id="exampleModalLongTitle">Post Receiver</h5>
+                                        <button type="button" class="close" data-dismiss="modal" id="closeBtnSectionx">&times;</button>
 
                                     </div>
                                     <div class="modal-body">
@@ -388,6 +405,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     <div class="modal-content">
                                         <div class="modal-header">
                                             <h5 class="modal-title" id="exampleModalLongTitle">Post Receiver</h5>
+                                            <button type="button" class="close" data-dismiss="modal" id="closeBtnStudentx">&times;</button>
 
                                         </div>
                                         <div class="modal-body">
@@ -440,8 +458,8 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                 <div class="modal-dialog modal-dialog-centered" role="document">
                                     <div class="modal-content">
                                         <div class="modal-header">
-                                            <h5 class="modal-title" id="exampleModalLongTitle">Post Receiver</h5>
-
+                                            <h5 class="modal-title" id="exampleModalLongTitle">Post Receiver</h5> 
+                                            <button type="button" class="close" data-dismiss="modal" id="closeBtnx">&times;</button>
                                         </div>
                                         <div class="modal-body">
                                             <div class="form-group">
@@ -464,7 +482,38 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                                     </div>
                                 </div>
                             </div>
+                            <!-- Specific Staff -->
+                            <div class="modal fade" id="exampleModalCenter3" tabindex="-1" role="dialog"
+                                aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="exampleModalLongTitle">Post CC</h5>
+                                            <button type="button" class="close" data-dismiss="modal" id="closeBtnStaffx">&times;</button>
 
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="form-group">
+                                                <input type="text" class="form-control searchInput" id="searchStaff" placeholder="Search Staff..">
+                                            </div> 
+
+                                            <div class="scrollable-form exampleModalCenterscroll3">
+                                                @foreach($get_staff as $staff)
+                                                    <div class="staffItem">
+                                                        <input type="checkbox" id="staff_{{$staff->user_id}}" name="staff_post[]" value="{{$staff->user_id}}">
+                                                        <label for="staff_{{$staff->id}}">{{$staff->name}}-({{$staff->mobile}})</label><br>
+                                                    </div>
+                                                @endforeach   
+                                                <div class="noResults" id="noStaffResults" style="display: none;">No Matching record</div>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-danger" data-dismiss="modal" id="closeBtnStaff">Cancel</button>
+                                            <button type="button" class="btn btn-primary" id="doneBtnStaff">Done</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -479,6 +528,16 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 @section('scripts')
 
 <script>
+
+    function showAdvanced() {
+        var x = document.getElementById("advanced");
+        if (x.style.display === "none") {
+            x.style.display = "block";
+        } else {
+            x.style.display = "none";
+        }
+    }
+
     $(document).ready(function() {
 
         $('.note-popover').css('display', 'none');
@@ -486,24 +545,59 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
         // Function to filter list items based on search term
         function filterList(inputId, itemClass, noResultsId) {
             $(inputId).on('input', function() {
-                var searchTerm = $(this).val().toLowerCase();
+                var searchTerm = $(this).val().toLowerCase(); 
                 var found = false;
 
-                $(itemClass).each(function() {
-                    var itemName = $(this).find('label').text().toLowerCase();
-                    if (itemName.includes(searchTerm)) {
-                        $(this).show();
-                        found = true;
-                    } else {
-                        $(this).hide();
-                    }
-                });
+                if(inputId == '#searchStudent') {
+                    var class_id = $('#class_id').val();
+                    var section_id = $('#section_dropdown').val();
+                }  else {
+                    var class_id = 0;
+                    var section_id = 0;
+                }
+ 
+                
+                    $(itemClass).each(function() {
+                        var itemName = $(this).find('label').text().toLowerCase();
+                        if (itemName.includes(searchTerm)) {
+                            //$(this).show();
+                            $(this).removeClass('d-none');
+                            found = true;
+
+                            if(section_id > 0) {
+                                if($(this).data('section_id') == section_id) {
+                                    $(this).removeClass('d-none');
+                                    found = true;
+                                } else {
+                                    $(this).addClass('d-none');
+                                    found = false;
+                                }
+                                //$('.'+itemClass+'[data-section_id='+section_id+']').show()
+                            }   else if(class_id > 0) {
+                                if($(this).data('class_id') == class_id) {
+                                    $(this).removeClass('d-none');
+                                    found = true;
+                                } else {
+                                    $(this).addClass('d-none');
+                                    found = false;
+                                }
+                                //$('.studentItem[data-class_id='+class_id+']').show()
+                            } 
+
+                        } else {
+                            //$(this).hide();
+                            $(this).addClass('d-none');
+                        }
+                    });
+
 
                 if (found) {
-                    $(noResultsId).hide();
+                    $(noResultsId).addClass('d-none'); //$(noResultsId).hide();
                 } else {
-                    $(noResultsId).show();
+                    $(noResultsId).removeClass('d-none');    //$(noResultsId).show();
                 }
+
+                
             });
         }
 
@@ -511,6 +605,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
         filterList('#searchGroup', '.groupItem', '#noGroupResults');
         filterList('#searchStudent', '.studentItem', '#noStudentResults');
         filterList('#searchSection', '.sectionItem', '#noSectionResults');
+        filterList('#searchStaff', '.staffItem', '#noStaffResults');
 
         loadModalcontents();
     });  
@@ -593,10 +688,17 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             });
             $('#exampleModalCenter').modal('hide');
         });
+        document.getElementById('closeBtnSectionx1').addEventListener('click', function() {
+            // Uncheck all checkboxes
+            $('input[name="section_post[]"]').each(function() {
+                $(this).prop('checked', false);
+            });
+            $('#exampleModalCenter').modal('hide');
+        });
     });
     </script>
 
-<script>
+    <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Store the initial state of checkboxes
         let initialCheckboxState = [];
@@ -616,6 +718,13 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
     
         // Handle the Close button click
         document.getElementById('closeBtnStudent').addEventListener('click', function() {
+            // Uncheck all checkboxes
+            $('input[name="student_post[]"]').each(function() {
+                $(this).prop('checked', false);
+            });
+            $('#exampleModalCenter1').modal('hide');
+        });
+        document.getElementById('closeBtnStudentx1').addEventListener('click', function() {
             // Uncheck all checkboxes
             $('input[name="student_post[]"]').each(function() {
                 $(this).prop('checked', false);
@@ -651,10 +760,52 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 });
                 $('#exampleModalCenter2').modal('hide');
             });
+            document.getElementById('closeBtnx1').addEventListener('click', function() {
+                // Uncheck all checkboxes
+                $('input[name="group_post[]"]').each(function() {
+                    $(this).prop('checked', false);
+                });
+                $('#exampleModalCenter2').modal('hide');
+            });
         });
         </script> 
     
-
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Store the initial state of checkboxes
+            let initialCheckboxState = [];
+        
+            // Save the initial state when the modal is opened
+            $('#exampleModalCenter3').on('shown.bs.modal', function () {
+                initialCheckboxState = [];
+                $('input[name="staff_post[]"]').each(function() {
+                    initialCheckboxState.push($(this).prop('checked'));
+                });
+            });
+        
+            // Handle the Done button click
+            document.getElementById('doneBtnStaff').addEventListener('click', function() {
+                $('#exampleModalCenter3').modal('hide');
+            });
+        
+            // Handle the Close button click
+            document.getElementById('closeBtnStaff').addEventListener('click', function() {
+                // Uncheck all checkboxes
+                $('input[name="staff_post[]"]').each(function() {
+                    $(this).prop('checked', false);
+                });
+                $('#exampleModalCenter3_label').removeClass('active');
+                $('#exampleModalCenter3').modal('hide');
+            });
+            document.getElementById('closeBtnStaffx1').addEventListener('click', function() {
+                // Uncheck all checkboxes
+                $('input[name="staff_post[]"]').each(function() {
+                    $(this).prop('checked', false);
+                });
+                $('#exampleModalCenter3').modal('hide');
+            });
+        });
+        </script>
 
 
     <script src="{{ asset('public/js/select2.full.min.js') }}"></script>
@@ -688,6 +839,15 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
     </script>
     <script>
         $(function() {
+
+
+
+            $(".note-editable").on('keyup', function () {  
+                var push_message = $(this).text(); 
+                push_message = $.trim(push_message);   
+                 console.log($(this).text())
+                $('#message_push').val(push_message);
+            });
 
             $('#message').summernote({
                 placeholder: '',
@@ -832,6 +992,12 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             });
         });
 
+        function loadbgtheme() {
+            var bgtheme_id = $('#category').find(':selected').data('bgtheme_id');
+            $('#bg_color').val(bgtheme_id);
+            loadpreview();
+        }
+
         function loadpreview() {
             var up = $('#upload_image').prop('files').length;
             var up1 = $('#upload_image1').prop('files').length;
@@ -841,8 +1007,14 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             if(up == 0 && up  == 0 && up2 == 0 && up3 == 0) { console.log('if')
                 content = $('#message').val();
                 var bg_color = $('#bg_color').find(':selected').data('src');
+                var text_color = $('#category').find(':selected').data('text_color');
                 $('#preview_content').addClass('offerolympiaimg'); 
-                $('#preview_content').attr('style', 'background-image:url("'+bg_color+'"); background-size: cover;  background-repeat: no-repeat;');
+                if(text_color != '' && text_color != null) {
+                    text_color = 'color:'+text_color+' !important;';
+                } else {
+                     text_color = '';
+                }
+                $('#preview_content').attr('style', 'background-image:url("'+bg_color+'"); background-size: cover;  background-repeat: no-repeat;'+text_color);
                 $('#preview_content').html(content);
             } else { console.log('if')
                 content = $('#message').val();
@@ -851,6 +1023,17 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 $('#preview_content').attr('style', '');
                 $('#preview_content').html(content); 
             }
+        }
+
+        $("#title").on('keyup', function () { 
+            generatetitle($(this), '#title_push');
+        });
+
+        function generatetitle($obj, $destobj) { 
+            var push_title = $( $obj ).val(); 
+            push_title = $.trim(push_title);   
+
+            $($destobj).val(push_title);
         }
     </script>
 

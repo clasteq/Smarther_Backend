@@ -15,24 +15,11 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h4 style="font-size:20px;" class="card-title">Class Teachers
+                    <div class="card-headerd">
+                        <h4 style="font-size:20px;" class="card-title"><!-- Class Teachers
                             <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn"
-                                    class="btn btn-primary" style="float: right;">Add</button></a>
-                        </h4>
-                        <div class="row">
-                            <div class="row col-md-12">
-                             <div class="form-group col-md-3 " >
-                                 <label class="form-label">Status</label>
-                                 <select class="form-control" name="status_id" id="status_id">
-                                     <option value="" >All</option>
-                                     <option value="ACTIVE" selected>ACTIVE</option>
-                                     <option value="INACTIVE" >INACTIVE</option>
-                                 </select>
-                             </div>
-                         </div>
-
-                     </div>
+                                    class="btn btn-primary" style="float: right;">Add</button></a> -->
+                        </h4> 
                     </div>
                     <div class="card-content collapse show">
                         <div class="card-body card-dashboard">
@@ -115,7 +102,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                     if (isConfirm) {
                         var request = $.ajax({
                             type: 'post',
-                            url: " {{ URL::to('admin/save/class_teacher_mapping') }}",
+                            url: " {{ URL::to('admin/save/ctutors_mapping') }}",
                             headers: {
                                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                             },
@@ -143,7 +130,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             } else {
                 var request = $.ajax({
                     type: 'post',
-                    url: " {{ URL::to('admin/save/class_teacher_mapping') }}",
+                    url: " {{ URL::to('admin/save/ctutors_mapping') }}",
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     },

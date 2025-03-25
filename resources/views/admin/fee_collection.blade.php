@@ -140,12 +140,12 @@ $slug_name = (new AdminController())->school; ?>
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size:20px;" class="card-title">Fee Collections
+                        <h4 style="font-size:20px;" class="card-title"><!-- Fee Collections -->
                         </h4>
                     </div>
 
                         <div class=" d-flex justify-content-center mt-3 mb-3">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="position-relative">
                                     <label
                                         class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Batch</label>
@@ -161,11 +161,11 @@ $slug_name = (new AdminController())->school; ?>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="position-relative">
                                     <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Class Filter</label>
                                     <div class="form-group">
-                                        <select class="form-control" id="classSelect" name="batch" required style="height:50px;">
+                                        <select class="form-control" id="classSelect" name="batch" required style="height:50px;" onchange="loadClassSection(this.value);">
                                         <option value="">Class Filter</option>
                                         @foreach ($get_classes as $classes )
                                             <option value="{{$classes->id}}">{{$classes->class_name}}</option>
@@ -174,7 +174,17 @@ $slug_name = (new AdminController())->school; ?>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <div class="position-relative">
+                                    <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Section Filter</label>
+                                    <div class="form-group">
+                                        <select class="form-control" id="section_dropdown" name="section" style="height:50px;">
+                                        <option value="">Section Filter</option> 
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
                                 <div class="position-relative">
                                     <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Scholar Name</label>
                                         <div class="form-group">
@@ -408,6 +418,64 @@ $slug_name = (new AdminController())->school; ?>
         </div>
     </div>
 
+    <div class="modal fade in" id="smallModal-24" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="smallModalLabel">Variable Waiver</h4>
+                </div>
+
+                <form id="editwaiver-style-form" enctype="multipart/form-data"
+                                  action="{{url('/admin/save/feewaiver')}}"
+                                  method="post">
+
+                        {{csrf_field()}}
+                    <input type="hidden" name="feewaiver_student_id" id="feewaiver_student_id">
+                    <input type="hidden" name="feeconcession_item_id" id="feewaiver_item_id">
+                    <input type="hidden" name="feebalance_amount" id="feewaiver_balance_amount">
+                    <div class="modal-body">
+                        <div class="row">
+
+                            <div class="form-group form-float float-left col-md-4">
+                                <label class="form-label">Waiver Category</label>
+                                <div class="form-line">
+                                    <select class="form-control " name="concession_category" id="concession_category" required>
+                                        <option value="">Select Category</option>
+                                        @if(!empty($get_waiver_category))
+                                            @foreach($get_waiver_category as $ccat)
+                                                <option value="{{$ccat->id}}">{{$ccat->name}}</option>
+                                            @endforeach
+                                        @endif
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-float float-left col-md-4">
+                                <label class="form-label">Waiver Amount</label>
+                                <div class="form-line">
+                                    <input type="text" class="form-control " name="concession_amount" id="waiver_amount" required min="0" max=""  onkeypress="return isNumber(event, this)">
+                                </div>
+                            </div>
+
+                            <div class="form-group form-float float-left col-md-4">
+                                <label class="form-label">Waiver Remarks</label>
+                                <div class="form-line">
+                                    <input type="text" class="form-control " name="concession_remarks" id="waiver_remarks" maxlength="200">
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                       <button type="sumbit" class="btn btn-link waves-effect" id="editwaiver_style">SAVE</button>
+                        <button type="button" class="btn btn-link waves-effect" data-dismiss="modal">CLOSE</button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade in" id="smallModal-3" tabindex="-1" role="dialog">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
@@ -509,7 +577,7 @@ $slug_name = (new AdminController())->school; ?>
                     </div>
                     <div class="modal-footer">
 
-                        <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
+                        <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button>
 
                     </div>
                 </form>
@@ -547,12 +615,48 @@ $slug_name = (new AdminController())->school; ?>
                                     </tr>
                                 </thead>
 
-                              <tfoot>
+                              <!-- <tfoot>
                                   <th></th> <th></th> <th></th>
                                   <th></th> <th></th> <th></th>
                                   <th></th> <th></th> <th></th>
                                   <th></th> <th></th>
-                              </tfoot>
+                              </tfoot> -->
+
+                              <tbody>
+
+                              </tbody>
+                            </table>
+                        </div>
+                        </div>
+                    </div>
+
+                    <div id="show_table_result1">
+                        <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
+                        <div class="table-responsive">
+
+                            <table class="table table-striped table-bordered tblfeesummarydeleted w-100">
+                                <thead>
+                                    <tr>
+                                      <th>Category</th>
+                                      <th>Item</th>
+                                      <th>Amount</th>
+                                      <th>Due Date</th>
+                                      <th>Paid Amount</th>
+                                      <th>Paid Date</th>
+                                      <th>Concession Amount</th>
+                                      <th>Concession Date</th>
+                                      <th>Processed By</th>
+                                      <th>Processed Date</th>
+                                      <!-- <th>Action</th> -->
+                                    </tr>
+                                </thead>
+
+                              <!-- <tfoot>
+                                  <th></th> <th></th> <th></th>
+                                  <th></th> <th></th> <th></th>
+                                  <th></th> <th></th> <th></th>
+                                  <th></th> <th></th>
+                              </tfoot> -->
 
                               <tbody>
 
@@ -565,7 +669,7 @@ $slug_name = (new AdminController())->school; ?>
                 </div>
                 <div class="modal-footer">
 
-                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
+                    <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button>
 
                 </div>
             </div>
@@ -657,7 +761,7 @@ $slug_name = (new AdminController())->school; ?>
                 </div>
                 <div class="modal-footer">
 
-                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
+                    <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button>
 
                 </div>
             </div>
@@ -703,7 +807,7 @@ $slug_name = (new AdminController())->school; ?>
                 </div> 
                 <div class="modal-footer">
 
-                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
+                    <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button>
 
                 </div>
             </div>
@@ -752,16 +856,33 @@ $slug_name = (new AdminController())->school; ?>
                             </div>
                         </div>
                     </div>
-                    <div class="card" id="waiver_content">
+                    <!-- <div class="card" id="waiver_content"> </div> -->
 
-
-
+                    <div class="row fee_concessions_list">
+                        <div class="col-md-12 mt-3 mb-3" id=" "> 
+                            <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
+                                <div class="table-responsicve">
+                                    <table class="table table-striped table-bordered">
+                                      <thead>
+                                        <tr> 
+                                          <th>Item</th> 
+                                          <th>Balance Amount</th>
+                                          <th></th> 
+                                          <th>Waiver Amount</th>
+                                          <th>Waiver Remarks</th>
+                                        </tr>
+                                      </thead>  
+                                      <tbody id="waiver_content">
+                                      </tbody>
+                                    </table>
+                                </div>
+                            </div> 
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-
-                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
-                    <button type="submit" class="btn btn-primary" id="edit_style_feewaive">SAVE</button>
+                    <button type="sumbit" class="btn btn-link waves-effect" id="edit_style_feewaive">SAVE</button>
+                    <button type="button" class="btn btn-link waves-effect" data-dismiss="modal">CLOSE</button> 
 
                 </div>
             </form>
@@ -851,8 +972,8 @@ $slug_name = (new AdminController())->school; ?>
                     </div>
                     <div class="modal-footer">
 
-                        <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
-                        <button type="submit" class="btn btn-primary" id="edit_style_feerecep">SAVE</button>
+                        <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button>
+                        <button type="submit" class="btn btn-link" id="edit_style_feerecep">SAVE</button>
                     </div>
                 </form>
             </div>
@@ -880,7 +1001,7 @@ $slug_name = (new AdminController())->school; ?>
                 </div>
                 <div class="modal-footer">
 
-                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button> 
+                    <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button> 
 
                 </div>
             </form>
@@ -1000,7 +1121,7 @@ $slug_name = (new AdminController())->school; ?>
                 </div> 
                 <div class="modal-footer">
 
-                    <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
+                    <button type="button" class="btn btn-link" data-dismiss="modal">CLOSE</button>
 
                 </div>
             </div>
@@ -1020,6 +1141,35 @@ $slug_name = (new AdminController())->school; ?>
                         {{csrf_field()}}
                         <input type="hidden" name="feeconcession_student_id" id="add_feeconcession_student_id" > 
                     <div class="modal-body"> 
+
+                        <div class=" d-flex  mt-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="position-relative">
+                                    <label class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Date</label>
+                                    <div class="form-group">
+                                        <input type="date" name="concession_date" class="form-control" placeholder="Select Date" required style="background-color: white;height:50px;" value="{{date('Y-m-d')}}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="position-relative">
+                                    <label
+                                        class="d-block position-absolute abs top-0 start-50 translate-middle-x bg-white px-3">Category</label>
+                                    <div class="form-group">
+                                        <select class="form-control" id="concessionCategory" name="concession_category" required style="height:50px;">
+                                            <option value="">Select Category</option>
+                                            @if(!empty($get_concession_category))
+                                                @foreach($get_concession_category as $cat)
+                                                    <option value="{{$cat['id']}}">{{$cat['name']}}</option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
                         <div class="row fee_concessions_list">
                              <div class="col-md-12 mt-3 mb-3" id=" "> 
                                 <div style="width: 100%; overflow-x: scroll; padding-left: -10px;">
@@ -1159,6 +1309,58 @@ $slug_name = (new AdminController())->school; ?>
             $("#edit-style-form").ajaxForm(options);
         });
 
+        $('#editwaiver_style').on('click', function () {
+
+            var feewaiver_student_id = $('#feewaiver_student_id').val();
+
+            var options = {
+
+                beforeSend: function (element) {
+
+                    $("#editwaiver_style").text('Processing..');
+
+                    $("#editwaiver_style").prop('disabled', true);
+
+                },
+                success: function (response) {
+
+                    if (response.status == "SUCCESS") {
+
+                       $('#smallModal-24').modal('hide');
+
+                       swal('Success',response.message,'success');
+
+                       sendStudentId(feewaiver_student_id);
+
+                        $("#editwaiver_style").prop('disabled', false);
+
+                        $("#editwaiver_style").text('SAVE');
+
+                    }
+                    else if (response.status == "FAILED") {
+
+                        swal('Oops',response.message,'warning');
+
+                        $("#editwaiver_style").prop('disabled', false);
+
+                        $("#editwaiver_style").text('SAVE');
+
+                    }
+
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+
+                    $("#editwaiver_style").prop('disabled', false);
+
+                    $("#editwaiver_style").text('SAVE');
+
+                    swal('Oops','Something went to wrong.','error');
+
+                }
+            };
+            $("#editwaiver-style-form").ajaxForm(options);
+        });
+
         $(".post_pay_fee").on("submit", function(e) {
 
             e.preventDefault();
@@ -1265,7 +1467,7 @@ $slug_name = (new AdminController())->school; ?>
         });
 
 
-        $(".post_fee_waiver").on("submit", function(e) {
+        /*$(".post_fee_waiver").on("submit", function(e) {
 
             e.preventDefault();
 
@@ -1316,9 +1518,61 @@ $slug_name = (new AdminController())->school; ?>
                     }
                 }
             });
+        });*/
+
+        $('#edit_style_feewaive').on('click', function () {
+
+            var options = {
+
+                beforeSend: function (element) {
+
+                    $("#edit_style_feewaive").text('Processing..');
+
+                    $("#edit_style_feewaive").prop('disabled', true);
+
+                },
+                success: function (response) {
+
+
+
+                    $("#edit_style_feewaive").prop('disabled', false);
+
+                    $("#edit_style_feewaive").text('SAVE');
+
+                    if (response.status == "SUCCESS") {
+
+                        swal({
+                            title: "Success",
+                            text: response.message,
+                            type: "success"
+                            },
+                        function(){
+                            //$('#largeModal-6').modal('hide');
+                            $('#fee_waiver_sub').modal('hide');
+                            loadfeewaiversummary();
+                            var stuid = $('#student_id').val();
+                            sendStudentId(stuid);
+                        }); 
+                    }
+                    else if (response.status == "FAILED") {
+
+                        swal('Oops',response.message,'warning');
+
+                    }
+
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+
+                    $("#edit_style_feewaive").prop('disabled', false);
+
+                    $("#edit_style_feewaive").text('SAVE');
+
+                    swal('Oops','Something went to wrong.','error');
+
+                }
+            };
+            $("#edit-fee-waiver").ajaxForm(options);
         });
-
-
     });
 </script>
 
@@ -1384,6 +1638,7 @@ $(document).ready(function() {
 });
 
 function searchStudentNames(name) {
+    var section_id = $('#section_dropdown').val();
     var class_id = $('#classSelect').val();
     var batch = $('#batchSelect').val();
     $.ajax({
@@ -1391,7 +1646,7 @@ function searchStudentNames(name) {
         url: " {{ URL::to('/admin/search_student') }}",
         dataType: 'json',
         data: {
-            name: name, class_id:class_id, batch:batch
+            name: name, class_id:class_id, batch:batch, section_id:section_id
         },
         success: function(data) {
             displaySuggestions(data.students);
@@ -1414,8 +1669,15 @@ function displaySuggestions(students) {
     }
 
     students.forEach(student => {
+        var father_name = '';
+        if(student.father_name != '' && student.father_name != null) {
+            father_name = student.father_name;
+        }   else {
+            father_name = '-';
+        }
+
         const suggestionItem = $('<div class="suggestion-item"></div>')
-            .html(`<strong>${student.is_student_name} [${student.is_class_name}-${student.is_section_name}]</strong> <br> Adm No: ${student.admission_no}`)
+            .html(`<strong>${student.is_student_name} [${student.is_class_name}-${student.is_section_name}]</strong> <br> Father: ${father_name} Mobile ${student.mobile} Adm No: ${student.admission_no}`)
             .attr('data-id', student.user_id)
             .css({ padding: '5px', cursor: 'pointer' });
         suggestionsDiv.append(suggestionItem);
@@ -1507,7 +1769,7 @@ function displayResults(student) {
             // Determine if the checkbox should be disabled and if the paid label should be shown
             let checkboxDisabled = '';
             let paidLabel = '<span class="badge bg-warning">Pending</span>';
-            let paidInfo = ''; let feeitempaid = '';  let balanceInfo = '';  let feeitemconcession = ''; 
+            let paidInfo = ''; let feeitempaid = '';  let balanceInfo = '';  let feeitemconcession = '';  let feeitemwaiver = ''; 
             let concessionInfo = ''; let feeitemcancel = ''; let waiverinfo = '';
 
             if (feeItem.payment_status_flag == 1) { // Fully paid
@@ -1537,6 +1799,8 @@ function displayResults(student) {
                 balanceInfo = `<p><span style="text-wrap: nowrap; color: #fff;">B: &#8377;${feeItem.balance_amount}</span> </p>`;
 
                 feeitemconcession = '<div class="feescollection float-right"> <i class="fas fa-tags" style="color: #919191;"  onclick="loadConcession('+feeItem.id+', '+feeItem.balance_amount+')" ></i> </div>';
+
+                feeitemwaiver = '<div class="feescollection float-right"> <i class="fas fa-tags" style="color: #919191;"  onclick="loadWaiver('+feeItem.id+', '+feeItem.balance_amount+')" ></i> </div>';
             }
 
             if(feeItem.paid_amount == 0 && student.fee_type != 1) {
@@ -1598,6 +1862,7 @@ function displayResults(student) {
                         <div class=" text-right col-md-5">
                             ${waiverinfo}
                         </div> 
+                        <div class=" col-md-3">${feeitemwaiver}</div>
                     </div>  
                 </div>
             `;
@@ -1642,6 +1907,7 @@ function displayTable(student,cancelled_records){
             let paidLabel = '<span class="badge bg-warning">Pending</span>';
             let balanceInfo = '';
             let feeitemconcession = '';
+            let feeitemwaiver = '';
             let concessionInfo = '';
             let feeitemcancel = '';
 
@@ -1659,22 +1925,40 @@ function displayTable(student,cancelled_records){
                 case 4:
                     paidLabel = '<span class="badge bg-danger">Over Due</span>';
                     break;
+                case 5:
+                    paidLabel = '<span class="badge bg-warning">Pending</span>';
+                    break;
+                case 6:
+                    paidLabel = '<span class="badge bg-danger">Deleted</span>';
+                    break;
             }
 
             if (feeItem.balance_amount > 0) {
                 balanceInfo = `&#8377;${feeItem.balance_amount}`;
                 feeitemconcession = `<i class="fas fa-tags" style="color: #919191;" onclick="loadConcession(${feeItem.id}, ${feeItem.balance_amount})"></i>`;
-            }
+                feeitemwaiver = '<i class="fas fa-tags" style="color: #919191;" onclick="loadWaiver(${feeItem.id}, ${feeItem.balance_amount})"></i>';
+
+            } 
 
             // Determine if the delete icon should be enabled or disabled
             if (student.fee_post_type === 5) {
                 if (feeItem.paid_amount === 0) {
-                    feeitemcancel = `<i class="fas fa-trash" style="color: #f00;" onclick="loadDeleteAddonItem(${feeItem.id}, ${feeItem.fee_structure_id})"></i>`;
+                    feeitemcancel = `<i class="fas fa-trash" style="color: #919191;" onclick="loadDeleteAddonItem(${feeItem.id}, ${feeItem.fee_structure_id})"></i>`;
                 } else {
-                    feeitemcancel = `<i class="fas fa-trash" style="color: #ccc;"></i>`;
+                    if(feeItem.paid_amount == 0 && student.fee_type == 1 && (feeItem.balance_amount == feeItem.amount)) {
+                        feeitemcancel = '<div class="feescollection float-left"> <i class="fas fa-trash mr-2" style="color: #0f0;"  onclick="loadDeleteFeeItem('+feeItem.id+', '+feeItem.fee_structure_id+')" ></i> </div>';
+                    } else {
+                        feeitemcancel = ``;
+                    }
+                    //feeitemcancel = `<i class="fas fa-trash" style="color: #ccc;"></i>`;
                 }
             } else {
-                feeitemcancel = `<i class="fas fa-trash" style="color: #ccc;"></i>`;
+                if(feeItem.paid_amount == 0 && student.fee_type == 1 && (feeItem.balance_amount == feeItem.amount)) {
+                    feeitemcancel = '<div class="feescollection float-left"> <i class="fas fa-trash mr-2" style="color: #919191;"  onclick="loadDeleteFeeItem('+feeItem.id+', '+feeItem.fee_structure_id+')" ></i> </div>';
+                } else {
+                    feeitemcancel = ``;
+                }
+                //feeitemcancel = `<i class="fas fa-trash" style="color: #ccc;"></i>`;
             }
 
             if (feeItem.concession_amount > 0) {
@@ -1690,9 +1974,7 @@ function displayTable(student,cancelled_records){
                     <td>&#8377;${feeItem.amount}</td>
                     <td>${balanceInfo}</td>
                     <td>${concessionInfo}</td>
-                    <td>
-                        ${feeitemcancel}
-                    </td>
+                    <td>${feeitemcancel} </td>
                 </tr>
             `;
             });
@@ -1743,6 +2025,20 @@ function deleteConcession(itemid, structureid, conamount){
         $('#smallModal-22').modal('show');
     }   else {
         swal("Oops!", "Sorry, No Consession available", "error");
+    }
+}
+
+function loadWaiver(itemid, balanceamount){
+
+    if(itemid > 0 && balanceamount > 0) {
+        $('#feewaiver_student_id').val($('#student_id').val());
+        $('#feewaiver_item_id').val(itemid);
+        $('#feewaiver_balance_amount').val(balanceamount);
+        $('#waiver_amount').val(balanceamount);
+        $('#waiver_amount').attr('max', balanceamount);
+        $('#smallModal-24').modal('show');
+    }   else {
+        swal("Oops!", "Sorry, No Waiver available", "error");
     }
 }
 
@@ -2080,12 +2376,12 @@ function loadfeesummary() {
             }
         },
         columns: [
-            { data: 'name', name: 'name'},
-            { data: 'item_name', name: 'item_name'},
-            { data: 'amount', name:'amount'},
-            { data: 'due_date', name: 'due_date'},
-            { data: 'amount_paid', name: 'amount_paid'},
-            { data: 'paid_date', name:'paid_date'},
+            { data: 'name', name: 'fee_categories.name'},
+            { data: 'item_name', name: 'fee_items.item_name'},
+            { data: 'amount', name:'fee_structure_items.amount'},
+            { data: 'due_date', name: 'fee_structure_items.due_date'},
+            { data: 'amount_paid', name: 'fees_payment_details.amount_paid'},
+            { data: 'paid_date', name:'fees_payment_details.paid_date'},
             {
                 data:null,
                 "render": function ( data, type, row, meta ) {
@@ -2103,7 +2399,7 @@ function loadfeesummary() {
                         }
                     } 
                     return textline;
-                }, name: 'concession_amount'
+                }, name: 'fees_payment_details.concession_amount'
             }, 
             {
                 data:null,
@@ -2117,7 +2413,7 @@ function loadfeesummary() {
                         } 
                     } 
                     return ddate;
-                }, name: 'concession_date'
+                }, name: 'fees_payment_details.concession_date'
             },  
             { data: 'creator_name', name:'fees_payment_details.created_by'},
             { data: 'created_at', name:'fees_payment_details.updated_at'},
@@ -2136,7 +2432,7 @@ function loadfeesummary() {
 
             },
         ],
-        "order":[[5, 'asc']],
+        "order":[[9, 'desc']],
         dom: 'Blfrtip',
         buttons: [
             {
@@ -2164,8 +2460,116 @@ function loadfeesummary() {
         ],
 
     }); 
+
+
+
+    if ($.fn.DataTable.isDataTable('.tblfeesummarydeleted')) {
+        // Destroy the existing instance before reinitializing
+        $('.tblfeesummarydeleted').DataTable().destroy();
+    }
+
+    var tablefee = $('.tblfeesummarydeleted').DataTable({
+        processing: true,
+        serverSide: true,
+        responsive: false,
+        "ajax": {
+            "url":"{{URL('/')}}/admin/feesummarydeleted/datatables/",
+            data: function ( d ) {
+                var batch = $('#batchSelect').val();
+                var student_id = $('#student_id').val();
+                $.extend(d, {batch:batch, student_id:student_id});
+
+            }
+        },
+        columns: [
+            { data: 'name', name: 'fee_categories.name'},
+            { data: 'item_name', name: 'fee_items.item_name'},
+            { data: 'amount', name:'fee_structure_items.amount'},
+            { data: 'due_date', name: 'fee_structure_items.due_date'},
+            { data: 'amount_paid', name: 'fees_payment_details.amount_paid'},
+            { data: 'paid_date', name:'fees_payment_details.paid_date'},
+            {
+                data:null,
+                "render": function ( data, type, row, meta ) {
+                    var textline = '';
+                    if(data.concession_amount > 0) {
+                        if(data.is_concession == 1) {
+                            textline = 'C: ';
+                        }   else if(data.is_waiver == 1) {
+                            textline = 'W: ';
+                        }
+                        if(data.cancel_status != 0){ 
+                            textline += '<span style="color:red;">-'+data.concession_amount +'</span>';
+                        }   else {
+                            textline += '<span style="color:green;">+'+data.concession_amount +'</span>';
+                        }
+                    } 
+                    return textline;
+                }, name: 'fees_payment_details.concession_amount'
+            }, 
+            {
+                data:null,
+                "render": function ( data, type, row, meta ) {
+                    var ddate = ''; 
+                    if(data.concession_amount > 0) {
+                        if(data.is_concession == 1) {
+                            ddate =  data.concession_date;
+                        }   else if(data.is_waiver == 1) {
+                            ddate =  data.is_waiver_date;
+                        } 
+                    } 
+                    return ddate;
+                }, name: 'fees_payment_details.concession_date'
+            },  
+            { data: 'creator_name', name:'fees_payment_details.created_by'},
+            { data: 'created_at', name:'fees_payment_details.updated_at'},
+            /*{
+                data:null,
+                "render": function ( data, type, row, meta ) {
+
+                    var tid = data.id;
+                    if((data.is_concession == 1 || data.is_waiver == 1) && (data.cancel_status == 0)) {
+                        return '<a  class="ml-2" style="cursor:pointer" onclick="deletefeedata('+tid+')" title="Delete Fee Data"><i class="fas fa-times text-red"></i></a>';
+                    } else {
+                        return '';
+                    }
+                    
+                },
+
+            },*/
+        ],
+        "order":[[9, 'desc']],
+        dom: 'Blfrtip',
+        buttons: [
+            {
+
+                extend: 'excel',
+                text: 'Export Excel',
+                className: 'btn btn-warning btn-md ml-3',
+                action: function (e, dt, node, config) {
+                    $.ajax({
+                        "url":"{{URL('/')}}/admin/scholar_fee_summary_deleted_excel/",
+                        "data": dt.ajax.params(),
+                        "type": 'get',
+                        "success": function(res, status, xhr) {
+                            var csvData = new Blob([res], {type: 'text/xls;charset=utf-8;'});
+                            var csvURL = window.URL.createObjectURL(csvData);
+                            var tempLink = document.createElement('a');
+                            tempLink.href = csvURL;
+                            tempLink.setAttribute('download', 'Scholar_Fee_Deleted_Summary.xls');
+                            tempLink.click();
+                        }
+                    });
+                }
+            },
+
+        ],
+
+    }); 
+
+
     // Apply the search
-    tablefee.columns().every( function () {
+    /*tablefee.columns().every( function () {
         var that = this;
 
         $( 'input', this.footer() ).on( 'keyup change', function () {
@@ -2175,7 +2579,7 @@ function loadfeesummary() {
                         .draw();
             }
         } );
-    } );
+    } );*/
 }
  
 
@@ -2285,6 +2689,24 @@ function loadFeeWaiver(student, student_detail) {
             const showAmount=overallAmount-concessionAmount;
 
             const checkboxDisabled = balanceAmount === 0 ? 'disabled' : '';
+            if(balanceAmount > 0) {
+                var cardHTML = `<tr> 
+                                <td>${feeItem.fee_item.item_name}</td>
+                                <td>${balanceAmount}
+                                <input type="hidden" name="feebalance_amount[${feeItem.id}]" value="${balanceAmount}">
+                                <input type="hidden" name="feeconcession_student_id[${feeItem.id}]" value="${student_detail.user_id}">
+                                <input type="hidden" name="feeconcession_item_id[${feeItem.id}]" value="${feeItem.id}">
+                                </td>
+                                <td><input type="checkbox" name="waiver_checkbox[${feeItem.id}]" ${checkboxDisabled}  value="${feeItem.id}"></td>
+                                <td><input type="text" class="form-control waiver_amount" name="waiver_amount[${feeItem.id}]"  minlength="1" maxlength="5" min="0" max="${balanceAmount}"  onkeypress="return isNumber(event, this);" onkeyup=" checkbalance(this);" ${checkboxDisabled}></td>
+                                <td><input type="text" class="form-control" name="waiver_remarks[${feeItem.id}]" minlength="3" maxlength="50"></td>
+                            </tr>`; 
+           
+
+                resultsDiv.innerHTML += cardHTML;
+            }
+
+            /*const checkboxDisabled = balanceAmount === 0 ? 'disabled' : '';
             
             let cardHTML = `
                 <div class="card mb-3">
@@ -2314,7 +2736,7 @@ function loadFeeWaiver(student, student_detail) {
                     </div>
                 </div>
             `;
-            resultsDiv.innerHTML += cardHTML;
+            resultsDiv.innerHTML += cardHTML;*/
         });
     });
 

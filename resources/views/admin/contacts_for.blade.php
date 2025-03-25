@@ -1,11 +1,15 @@
 @extends('layouts.admin_master')
 @section('settings_contacts_for', 'active')
-@section('settings1', 'active')
+@section('settings', 'active')
 @section('menuopen', 'active menu-is-opening menu-open') 
 <?php   use App\Http\Controllers\AdminController;  $slug_name = (new AdminController())->school; ?>
 <?php
 $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'=>'#', 'name'=>'Contacts For', 'active'=>'active']];
 ?>
+<?php 
+$user_type = Auth::User()->user_type;
+$session_module = session()->get('module'); //echo "<pre>"; print_r($session_module); exit;
+?> 
 @section('content')
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <section class="content">
@@ -14,22 +18,24 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 style="font-size:20px;" class="card-title">Contacts For
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
-                  </h4>
-                  <div class="row">
+                  <h4 style="font-size:20px;" class="card-title"><!-- Contacts For -->
                     <div class="row col-md-12">
-                     <div class="form-group col-md-3 " >
-                         <label class="form-label">Status</label>
-                         <select class="form-control" name="status_id" id="status_id">
-                             <option value="" >All</option>
-                             <option value="ACTIVE">ACTIVE</option>
-                             <option value="INACTIVE">INACTIVE</option>
-                         </select>
-                     </div>
-                 </div>
-
-             </div>
+                        <div class="form-inline col-md-3 " >
+                            <label class="form-label mr-1">Status</label>
+                            <select class="form-control" name="status_id" id="status_id">
+                                <option value="" >All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                            </select>
+                        </div>
+                        <div class="form-inline col-md-8 float-right " ></div>
+                        <div class="form-inline col-md-1 float-right " >
+                        @if((isset($session_module['Contacts For']) && ($session_module['Contacts For']['add'] == 1)) || ($user_type == 'SCHOOL'))
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                        @endif
+                        </div>
+                    </div>
+                  </h4> 
                 </div>
                 <div class="card-content collapse show">
                   <div class="card-body card-dashboard">
@@ -38,18 +44,18 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                             <table class="table table-striped table-bordered tblcountries">
                               <thead>
                                 <tr>
-                                  <th>Action</th>
                                   <th>Name</th>
                                   <th>Position</th>
                                   <th>Status</th>
+                                  <th>Action</th>
 
                                 </tr>
                               </thead>
-                              <tfoot>
+                              <!-- <tfoot>
                                   <tr><th></th><th></th><th></th>
                                       <th></th>
                                   </tr>
-                              </tfoot>
+                              </tfoot> -->
                               <tbody>
 
                               </tbody>
@@ -67,6 +73,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Contacts For</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -114,6 +121,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Contacts For</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="edit-style-form" enctype="multipart/form-data"
@@ -178,6 +186,9 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                     }
                 },
                 columns: [
+                    { data: 'name',  name: 'name'},
+                    { data: 'position',  name: 'position'},
+                    { data: 'status',  name: 'status'},
                     {
                         data:null,
                         "render": function ( data, type, row, meta ) {
@@ -187,30 +198,27 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                         },
 
                     },
-                    { data: 'name',  name: 'name'},
-                    { data: 'position',  name: 'position'},
-                    { data: 'status',  name: 'status'},
 
                 ],
-                "order":[[2, 'asc']],
+                "order":[[1, 'asc']],
                 "columnDefs": [
-                    { "orderable": false, "targets": 0 }
+                    { "orderable": false, "targets": 2 }, { "orderable": false, "targets": 3 }
                 ],
                
             });
 
-            $('.tblcountries tfoot th').each( function (index) {
+            /*$('.tblcountries tfoot th').each( function (index) {
                 if( index != 0 && index != 3) {
                     var title = $(this).text();
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
                 }
-            } );
+            } );*/
 
             $('#status_id').on('change', function() {
                 table.draw();
             });
             // Apply the search
-            table.columns().every( function () {
+            /*table.columns().every( function () {
                 var that = this;
 
                 $( 'input', this.footer() ).on( 'keyup change', function () {
@@ -220,7 +228,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
             $('#add_style').on('click', function () {
 
                 var options = {
@@ -238,7 +246,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == 'SUCCESS') {
 
@@ -260,7 +268,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
@@ -283,7 +291,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         if (response.status == 'SUCCESS') {
 
@@ -305,7 +313,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
 
                         $("#edit_style").prop('disabled', false);
 
-                        $("#edit_style").text('SUBMIT');
+                        $("#edit_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 

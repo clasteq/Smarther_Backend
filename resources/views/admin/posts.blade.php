@@ -37,7 +37,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
         }
         .activityimage img {
             width: 70px;
-            height: auto; /*200px;*/
+            height: 100px; /*auto; */
             border-radius: 3%;
         }
         .editact {
@@ -117,6 +117,11 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
         .modal-full .modal-body {
             overflow-y: auto;
         }
+        .receiverslist {
+            max-height: 90px;
+            overflow-y: auto;
+            scrollbar-width: thin; 
+        } 
 </style>
 
 <section class="content">
@@ -132,35 +137,41 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                 <div class="col-xs-12 col-md-12">
             
                 <div class="card">
-                    <div class="card-header">Posts for Scholars
+                    <div class="card-header"> 
                         @if((isset($session_module['Posts']['add']) && ($session_module['Posts']['add'] == 1)) || ($user_type == 'SCHOOL'))
                         <a href="{{url('/admin/addposts')}}" id="addbanner"><button class="btn btn-primary" style="float: right;">Add</button></a> 
                         @endif
                         <div class="row">
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">Search</label>
-                                <input class="form-control" type="text" id="search"  />
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label mr-1">Search: </label>
+                                <input class="form-control " type="text" id="search" placeholder="Search" />
                             </div>
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">From</label>
-                                <input class="date_range_filter date form-control" type="text" id="datepicker_from"  />
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label mr-1">From: </label>
+                                <input class="date_range_filter date form-control " type="text" id="datepicker_from" placeholder="From Date" />
                             </div>
-                            <div class="form-group col-md-3 " >
-                                <label class="form-label">To</label>
-                                <input class="date_range_filter date form-control" type="text" id="datepicker_to"  />
+                            <div class="form-group col-md-2 " >
+                                <label class="form-label mr-1">To: </label>
+                                <input class="date_range_filter date form-control " type="text" id="datepicker_to" placeholder="To Date"  />
                             </div>
-                            <div class=" col-md-3">
-                                <label class="form-label">Categories</label>
+                            <div class="form-group  col-md-3">
+                                <label class="form-label mr-1">Categories: </label>
                                 <div class="form-line">
-                                    <select class="form-control" name="category_id" id="category_id" >
-                                        <option value="">All</option>
+                                    <select class="form-control col-md-9" name="category_id" id="category_id" >
+                                        <option value="">All Categories</option>
                                      @if (!empty($categories))
                                          @foreach ($categories as $cat)
                                          <option value={{$cat->id}}>{{$cat->name}}</option>  
                                          @endforeach
                                      @endif
+                                        <option value="Deleted">Deleted</option>
+                                        <option value="Inactive">Rejected</option>
                                     </select> 
                                 </div>
+                            </div>
+                            <div class="form-group col-md-3 " >
+                                <label class="form-label"></label> 
+                                <button class="btn btn-danger mt-3"  id="clear_style">Clear Filter</button>
                             </div>
                         </div>
 
@@ -192,6 +203,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Post Status</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="card-body">
 
@@ -244,6 +256,13 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 @section('scripts')
 <script src="https://cdn.ckeditor.com/4.14.1/standard/ckeditor.js"></script>
     <script> 
+
+            $('#clear_style').on('click', function () {
+                $('.card-header').find('input').val('');
+                $('.card-header').find('select').val('');
+                filterposts();
+            }); 
+            
         function deleteactivity(id){
             $('#filter_pagename').val($('#pagename').val());
             swal({
@@ -256,7 +275,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                     confirmButtonText: "Yes!",
                     cancelButtonText: "No",
                     closeOnConfirm: false,
-                    closeOnCancel: false
+                    closeOnCancel: true
                     
                     
                    
@@ -341,12 +360,19 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
 
             filterProducts();
         }
+ 
 
-
-        function updatestatus(obj, id) {
-            var status = $(obj).val();
+        //function updatestatus(obj, id) {
+        function confirmactivity(id, status) {
+            var str = "Are you sure you want to change?";
+            if(status == "ACTIVE") {
+                str = "Are you sure to Confirm?";
+            } else {
+                str = "Are you sure to Reject?";
+            }
+            //var status = $(obj).val();
             swal({
-                    title: "Are you sure you want to change?",
+                    title: str,
                     text: "",
                     type: "warning",
                     showCancelButton: true,
@@ -355,7 +381,7 @@ $session_module = session()->get('module'); //echo "<pre>"; print_r($session_mod
                     confirmButtonText: "Yes!",
                     cancelButtonText: "No",
                     closeOnConfirm: false,
-                    closeOnCancel: false
+                    closeOnCancel: true
                     
                     
                    

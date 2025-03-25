@@ -12,7 +12,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size: 20px;" class="card-title">Fee Pending Report  </h4>
+                        <h4 style="font-size: 20px;" class="card-title"><!-- Fee Pending Report  --> </h4>
                         <div class="row">   
 
                             <div class="col-md-3">
@@ -88,17 +88,17 @@
                                                   <th>Paid Fees</th>
                                                   <th>Balance Fees</th> 
                                                   <th>Deleted Fees</th>  
-                                                  <th>Action</th>   
+                                                  <th class="no-sort">Action</th>   
                                             </tr>
                                         </thead>
-                                        <tfoot>
+                                        <!-- <tfoot>
                                             <tr>
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th><th></th>
                                                 <th></th><th></th>  
                                             </tr>
-                                        </tfoot>
+                                        </tfoot> -->
                                         <tbody>
 
                                         </tbody>
@@ -243,7 +243,7 @@
 
             table.on( 'xhr', function () {
                 var json = table.ajax.json(); 
-                 $("#collected_amount").html(json.total_concession); 
+                 $("#collected_amount").html(json.overall_fee_pending); 
             } );
 
 
@@ -309,7 +309,7 @@
             }
 
             // Apply the search
-            table.columns().every(function() {
+            /*table.columns().every(function() {
                 var that = this;
 
                 $('input', this.footer()).on('keyup change', function() {
@@ -319,7 +319,7 @@
                             .draw();
                     }
                 });
-            }); 
+            }); */
 
             $('#clear_style').on('click', function () {
                 $('.card-header').find('input').val('');

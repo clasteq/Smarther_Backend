@@ -5,9 +5,11 @@
 <?php use App\Http\Controllers\AdminController;
 $slug_name = (new AdminController())->school; ?>
 <?php
+$user_type = Auth::User()->user_type;
 $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], ['url' => '#', 'name' => 'Blood Groups', 'active' => 'active']];
 ?>
 @section('content')
+@if($user_type == "SUPER_ADMIN")
     <meta name="csrf-token" content="{{ csrf_token() }}"> 
      
     <section class="content">
@@ -16,25 +18,24 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 style="font-size:20px;" class="card-title">Blood Group
-                            <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn"
-                                    class="btn btn-primary" style="float: right;">Add</button></a>
-                        </h4>
-                        <div class="row">
+                        <h4 style="font-size:20px;" class="card-title"><!-- Blood Group -->
                             <div class="row col-md-12">
-                                <div class="form-group col-md-3 ">
-                                    <label class="form-label">Is Display</label>
+                                <div class="form-inline col-md-3 " >
+                                    <label class="form-label mr-1">Is Display</label>
                                     <select class="form-control" name="status_id" id="status_id">
-                                        <option value="">All</option>
+                                        <option value="" >All</option>
                                         <option value="YES" selected>YES</option>
                                         <option value="NO">NO</option>
                                     </select>
                                 </div>
-                            </div>
-
-                        </div>
-
-
+                                <div class="form-inline col-md-8 float-right " ></div>
+                                <div class="form-inline col-md-1 float-right " >
+                                @if($user_type == 'SUPER_ADMIN')
+                                <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                                @endif
+                                </div>
+                            </div>  
+                        </h4>  
                     </div>
                     <div class="card-content collapse show">
                         <div class="card-body card-dashboard">
@@ -49,11 +50,11 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
                                             </tr>
                                         </thead>
-                                        <tfoot>
+                                        <!-- <tfoot>
                                             <tr>
                                                 <th></th><th></th><th></th> 
                                             </tr>
-                                        </tfoot>
+                                        </tfoot> -->
                                         <tbody>
 
                                         </tbody>
@@ -71,6 +72,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add Blood Group</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data" action="{{ url('/admin/save/bloodgroups') }}"
@@ -114,6 +116,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Edit Blood Group</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
                 <form id="edit-style-form" enctype="multipart/form-data" action="{{ url('/admin/save/bloodgroups') }}"
                     method="post">
@@ -148,6 +151,11 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
             </div>
         </div>
     </div>
+@else 
+<section class="content">
+    @include('admin.notavailable')
+</section>
+@endif
 
 @endsection
 
@@ -161,10 +169,9 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
 
             var table = $('#example1').DataTable({
 
-                processing: false,
+                processing: true,
                 serverSide: true,
-                responsive: true,
-                "lengthChange": false,
+                responsive: false, 
                 "ajax": {
                     "url": "{{ URL('/') }}/admin/bloodgroups/datatables/",
                     data: function(data) {
@@ -207,7 +214,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                 //  "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
 
             });
-            $('#example1 tfoot').insertAfter('#example1 thead');
+            /*$('#example1 tfoot').insertAfter('#example1 thead');
             $('#example1 tfoot th').each(function() {
                 var title = $(this).text();
 
@@ -230,8 +237,7 @@ $breadcrumb = [['url' => URL('/admin/home'), 'name' => 'Home', 'active' => ''], 
                             .draw();
                     }
                 });
-            });
-
+            }); */
             $('#status_id').on('change', function() {
                 table.draw();
             });

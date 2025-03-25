@@ -1,7 +1,7 @@
 @extends('layouts.admin_master')
-@section('rolesettings', 'active')
+@section('mapsettings', 'active')
 @section('masterrole_class_mapping', 'active')
-@section('menuopenur', 'active menu-is-opening menu-open')
+@section('menuopenmap', 'active menu-is-opening menu-open')
 <?php
 $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'=>'#', 'name'=>'Role Class Mapping', 'active'=>'active']];
 ?>
@@ -72,9 +72,7 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                  <h4 class="card-title" style="font-size: 20px;">Role Class Mapping
-                    <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn" class="btn btn-primary" style="float: right;">Add</button></a>
-                  </h4>
+                  <h4 class="card-title" style="font-size: 20px;"><!-- Role Class Mapping -->
                     <div class="row"> 
                         <div class=" col-md-3">
                             <label class="form-label" >Class </label>
@@ -112,7 +110,12 @@ $breadcrumb = [['url'=>URL('/admin/home'), 'name'=>'Home', 'active'=>''], ['url'
                                 </select> 
                             </div>
                         </div> 
+                        <div class=" col-md-3"> 
+                        <a href="#" data-toggle="modal" data-target="#smallModal"><button id="addbtn" class="btn btn-primary" style="float: right;">Add</button></a>
+                        </div>
                     </div>
+                  </h4>
+                    
                 </div>
                 <div class="card-content collapse show">
                   <div class="card-body card-dashboard">

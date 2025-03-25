@@ -17,24 +17,8 @@
             <input type="hidden" name="loadsection" id="loadsection" value=".posts .pagination_section">
             @foreach($posts_arr as $ak => $post)
             @php($id = $post['id'])
-            <div class="col-md-12 post mt-4 ms-md-5 ms-sm-2 ">
-                <div class="d-flex activity activityimage">
-                    <img src="{{$post['posted_user']->is_profile_image}}" class="img-responsive img-circle">
-                    <?php 
-                        $namecode = $post['posted_user']->name_code;
-                        if(empty($namecode)) {
-                            $namecode = $post['posted_user']->name;
-                            $v = '';
-                            if(preg_match_all('/\b(\w)/',strtoupper($namecode),$m)) {
-                                $v = implode('',$m[1]); 
-                            }
-                            if(!empty($v)) {
-                                $namecode = $v;
-                            }
-                        }
-                    ?>
-                    <p class="mt-2 ms-3">  {{$namecode}}</p> 
-                </div>
+            <div class="col-md-12 post mt-1 p-3 ms-md-5 ms-sm-2 elevation-5 br-10"  style="    background: #fff;">
+                
 
                 @if(!empty($post['homeworks_list']))
                     <table class="table table-striped table-bordered">
@@ -42,9 +26,45 @@
                     @foreach($post['homeworks_list'] as $hk=>$hw)
                         @if($hk == 0)
                         <thead>
-                            <tr><th colspan="2"><b>{{$hw['is_class_name']}} - {{$hw['is_section_name']}}</b> <br> 
-                                    Date : {{date('d M, Y h:i A', strtotime($hw['hw_date']))}}
-                            </th></tr>
+                            <tr>
+                                <th colspan="2">
+                                <div class="d-flex activity activityimage">
+                                    <?php //$post['posted_user']['profile_image'] = '';    ?>
+                                    @if(empty($post['posted_user']->profile_image))
+                                    <?php $shortcode = $post['posted_user']->is_shortname; ?>
+                                    <svg class="col-md-2" height="100" width="100">
+                                      <defs>
+                                        <linearGradient id="grad1">
+                                          <stop offset="0%" stop-color="#FF6F61" />
+                                          <stop offset="100%" stop-color="#FF6F61" />
+                                        </linearGradient>
+                                      </defs>
+                                      <ellipse cx="60" cy="40" rx="40" ry="40" fill="url(#grad1)" />
+                                      <text fill="#ffffff" font-size="35" font-family="Verdana" x="35" y="55">{{$shortcode}}</text>
+                                      Sorry, your browser does not support inline SVG.
+                                    </svg>
+                                    @else 
+                                    <img src="{{$post['posted_user']->is_profile_image}}" class="img-responsive img-circle">
+                                    @endif
+                                    <?php 
+                                        $namecode = $post['posted_user']->name_code;
+                                        if(empty($namecode)) {
+                                            $namecode = $post['posted_user']->name;
+                                            $v = '';
+                                            if(preg_match_all('/\b(\w)/',strtoupper($namecode),$m)) {
+                                                $v = implode('',$m[1]); 
+                                            }
+                                            if(!empty($v)) {
+                                                $namecode = $v;
+                                            }
+                                        }
+                                    ?>
+                                    <p class="mt-2 ml-3 col-md-4 text-left"><b>{{$hw['is_class_name']}} - {{$hw['is_section_name']}}</b> <br> 
+                                    Date : {{date('d M, Y h:i A', strtotime($hw['hw_date']))}} <br> {{$namecode}}</p>   
+                                </div>  
+
+                                </th>
+                            </tr>
                         </thead>
                         @endif  
                         <tr><td style="width: 20%">{{$hw['is_subject_name']}}</td>
@@ -52,6 +72,29 @@
                         </tr> 
                     @endforeach
                     </table>
+
+                        @if(!empty($hw['is_file_attachments']))
+                            <div class="col-md-12 justify-content-between likeicon mt-3 ms-4">
+                             @foreach($hw['is_file_attachments'] as $imga)
+                                <?php $extension = pathinfo($imga['img'], PATHINFO_EXTENSION); 
+                                $extension = trim(strtolower($extension));
+                                $iurl = asset('/public/images/file.png');
+                                if($extension == 'pdf')  {
+                                    $iurl = asset('/public/images/pdf2.png');
+                                } else if($extension == 'ppt' || $extension == 'pptx') {
+                                    $iurl = asset('/public/images/ppt.png');
+                                } else if($extension == 'doc' || $extension == 'docx') {
+                                    $iurl = asset('/public/images/doc.png');
+                                } else if($extension == 'xls' || $extension == 'xlsx') {
+                                    $iurl = asset('/public/images/xls.png');
+                                } else {
+                                    $iurl = asset('/public/images/file.png');
+                                }
+                                ?><!-- asset('/public/images/freefile.png') -->
+                                <a href="{{$imga['img']}}" target="_blank"><img src="{{$iurl}}" height="40" width="40"></a>
+                             @endforeach
+                            </div>
+                        @endif
 
                         @if(!empty($hw['is_hw_attachment']))
                             <div class="col-md-12 justify-content-between likeicon mt-3 ms-4"> 
@@ -70,6 +113,7 @@
 
                 <div class="col-md-12 justify-content-between likeicon mt-3 ms-4">
                     <div class=" "> 
+
                         <div class="  col-md-3 float-right"> {{$post['is_created_ago']}}</div>
 
                         <?php if($post['approve_status'] == 'UNAPPROVED') {  ?> 

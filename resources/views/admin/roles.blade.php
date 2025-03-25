@@ -1,7 +1,7 @@
 @extends('layouts.admin_master')
-@section('rolesettings', 'active')
+@section('stasettings', 'active')
 @section('master_userroles', 'active')
-@section('menuopenur', 'active menu-is-opening menu-open')
+@section('menuopensta', 'active menu-is-opening menu-open')
 
 @section('content')
 
@@ -19,10 +19,23 @@ $rights = AdminRoleController::getRights();
             <div class="col-12">
               <div class="card">
                 <div class="card-header">
-                    <h4 class="card-title">User Roles 
-                        @if($rights['rights']['add'] == 1)
-                        <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" style="float: right;">Add</button></a> 
-                        @endif
+                    <h4 class="card-title"><!-- User Roles  -->
+                        <div class="row col-md-12">
+                            <div class="form-inline col-md-3 " >
+                                <label class="form-label mr-1">Status</label>
+                                <select class="form-control" name="status_id" id="status_id">
+                                    <option value="" >All</option>
+                                    <option value="ACTIVE">ACTIVE</option>
+                                    <option value="INACTIVE">INACTIVE</option>
+                                </select>
+                            </div>
+                            <div class="form-inline col-md-8 float-right " ></div>
+                            <div class="form-inline col-md-1 float-right " >
+                            @if($rights['rights']['add'] == 1)
+                            <a href="#" data-toggle="modal" data-target="#smallModal"><button class="btn btn-primary" id="addbtn" style="float: right;">Add</button></a>
+                            @endif
+                            </div>
+                        </div>  
                     </h4>        
                           
                 </div>
@@ -37,13 +50,13 @@ $rights = AdminRoleController::getRights();
                           <th class="no-sort">Action</th>
                         </tr>
                       </thead>
-                      <tfoot>
+                      <!-- <tfoot>
                           <tr> 
                               <th></th>
                               <th></th>
                               <th></th>
                             </tr>
-                      </tfoot>
+                      </tfoot> -->
                       <tbody>
                         
                       </tbody>
@@ -61,6 +74,7 @@ $rights = AdminRoleController::getRights();
             <div class="modal-content">
                 <div class="modal-header">
                     <h4 class="modal-title" id="smallModalLabel">Add User Role</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
 
                 <form id="style-form" enctype="multipart/form-data"
@@ -103,7 +117,9 @@ $rights = AdminRoleController::getRights();
 @section('scripts')
 
     <script>
-
+        $('#addbtn').on('click', function () {
+                $('#style-form')[0].reset();
+            });
         $(function() {
             @if($rights['rights']['list'] == 1)
             var table = $('.tblcategory').DataTable({
@@ -112,6 +128,11 @@ $rights = AdminRoleController::getRights();
                 responsive: false,
                 "ajax": {
                     "url": "{{URL('/')}}/admin/userroles/datatables/", 
+                    data: function ( d ) {
+                        var status  = $('#status_id').val();
+                        $.extend(d, {status:status});
+
+                    }
                 },
                 columns: [
                     { data: 'user_role'},
@@ -140,7 +161,7 @@ $rights = AdminRoleController::getRights();
 
             });
 
-            $('.tblcategory tfoot th').each( function (index) {
+            /*$('.tblcategory tfoot th').each( function (index) {
                 var title = $(this).text();
                 if(index != 2) {
                     $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
@@ -158,7 +179,12 @@ $rights = AdminRoleController::getRights();
                                 .draw();
                     }
                 } );
-            } );
+            } );*/
+
+            $('#status_id').on('change', function() {
+                table.draw();
+            });
+            
             @endif
             $('#add_style').on('click', function () {
 
@@ -177,7 +203,7 @@ $rights = AdminRoleController::getRights();
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         if (response.status == "SUCCESS") {
 
@@ -201,7 +227,7 @@ $rights = AdminRoleController::getRights();
 
                         $("#add_style").prop('disabled', false);
 
-                        $("#add_style").text('SUBMIT');
+                        $("#add_style").text('SAVE');
 
                         swal('Oops','Something went to wrong.','error');
 
