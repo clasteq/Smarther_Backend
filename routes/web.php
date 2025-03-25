@@ -36,7 +36,7 @@ Route::get('/{slugname}/page/privacypolicy', 'App\Http\Controllers\AdminControll
 
 Route::get('/delete_account','App\Http\Controllers\AdminController@deleteAccountUrl');
 
-Route::group(['prefix' => '{slugname}/admin'], function () {
+Route::group(['prefix' => '/admin'], function () {
 
     Route::get('/', 'App\Http\Controllers\AdminController@index');
 
@@ -44,7 +44,23 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
     Route::post('/login', 'App\Http\Controllers\AdminController@postLogin');
 
+    Route::get('/forgotpwd','App\Http\Controllers\AdminController@viewForgotPwd');
+
+    Route::post('/forgotpwd','App\Http\Controllers\AdminController@putForgotPwd');
+
+    Route::get('/resetpwd','App\Http\Controllers\AdminController@viewResetPwd');
+
+    Route::post('/resetpwd','App\Http\Controllers\AdminController@putResetPwd');
+
+    
+
     Route::group(['middleware' => 'preventBackHistory'],function(){
+
+        Route::get('/homechk', 'App\Http\Controllers\AdminController@homePageChk');
+
+        Route::get('/profile', 'App\Http\Controllers\AdminController@viewSchoolProfile');
+
+        Route::get('/notifychk', 'App\Http\Controllers\NotifyController@sendPushNotification');
 
         Route::get('/home', 'App\Http\Controllers\AdminController@homePage');
 
@@ -52,9 +68,29 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/load/attendancestatus', 'App\Http\Controllers\AdminController@loadAttendanceStatus');
 
+        Route::post('/load/modulestatus', 'App\Http\Controllers\AdminController@loadModuleStatus');
+
+        Route::post('/load/moduleupdatedstatus', 'App\Http\Controllers\AdminController@loadModuleUpdatedStatus');
+
         Route::get('/logout', 'App\Http\Controllers\AdminController@logout'); 
 
-        Route::post('/checkSetAdminCountry', 'App\Http\Controllers\AdminController@checkSetAdminCountry');
+        Route::post('/checkSetAdminCountry', 'App\Http\Controllers\AdminController@checkSetAdminCountry'); 
+        
+        Route::get('/changepwd','App\Http\Controllers\AdminController@changePassword');
+
+        Route::post('/change_password','App\Http\Controllers\AdminController@updatePassword');
+
+        Route::get('/users/profile','App\Http\Controllers\AdminController@viewProfile'); 
+
+        Route::post('/fetch-notifications','App\Http\Controllers\AdminController@fetchNotifications');
+
+        Route::get('/notifications','App\Http\Controllers\AdminController@viewNotifications');
+
+        // Admin Settings
+
+        Route::get('/generalsettings', 'App\Http\Controllers\AdminController@adminsettings');
+
+        Route::post('/save/adminsettings', 'App\Http\Controllers\AdminController@saveAdminSettings');
 
         // Settings
 
@@ -83,6 +119,18 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::post('/save/faq', 'App\Http\Controllers\AdminController@postFAQ');
 
         Route::post('/edit/faq', 'App\Http\Controllers\AdminController@editFAQ');
+
+        // SMS Templates
+
+        Route::get('/smstemplates', 'App\Http\Controllers\AdminController@viewSMSTemplates');
+
+        Route::get('/smstemplates/datatables', ['as' => 'smstemplates.data', 'uses' => 'App\Http\Controllers\AdminController@getSMSTemplates']);
+
+        Route::post('/save/smstemplates', 'App\Http\Controllers\AdminController@postSMSTemplates');
+
+        Route::post('/edit/smstemplates', 'App\Http\Controllers\AdminController@editSMSTemplates');
+
+        Route::post('/delete/smstemplates', 'App\Http\Controllers\AdminController@deleteSMSTemplates');
 
         //Countries
 
@@ -127,6 +175,8 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/delete/schools', 'App\Http\Controllers\InstituteController@deleteSchools');
 
+        Route::post('/loginschool', 'App\Http\Controllers\AdminController@loginSchools');
+
         //Master Classes
         Route::get('/mclasses', 'App\Http\Controllers\AdminController@viewMasterClasses');
 
@@ -135,6 +185,15 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::get('/mclasses/datatables', ['as' => 'mclasses.data', 'uses' => 'App\Http\Controllers\AdminController@getMasterClasses']);
 
         Route::post('/edit/mclasses', 'App\Http\Controllers\AdminController@editMasterClasses');
+
+        // Departments
+        Route::get('/departments', 'App\Http\Controllers\AdminController@viewDepartments');
+
+        Route::post('/save/departments', 'App\Http\Controllers\AdminController@postDepartments');
+
+        Route::get('/departments/datatables', ['as' => 'departments.data','uses' => 'App\Http\Controllers\AdminController@getDepartments']);
+
+        Route::post('/edit/departments', 'App\Http\Controllers\AdminController@editDepartments');
 
         // Blood Groups
 
@@ -171,6 +230,14 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/save/student_details', 'App\Http\Controllers\AdminController@postStudentAdditional');
 
+        Route::post('/edit/student_siblingstaffs', 'App\Http\Controllers\AdminController@editStudentSiblingstaffs');
+
+        Route::post('/save/scholarsiblingstaff', 'App\Http\Controllers\AdminController@postStudentSiblingstaffs');
+
+        Route::post('/save/scholarreward', 'App\Http\Controllers\AdminController@postStudentScholarReward');
+
+        Route::get('/filter_examresults', 'App\Http\Controllers\AdminController@filterExamResults');
+
         // Import student
         Route::get('/import_students', 'App\Http\Controllers\AdminController@viewImportStudents');   
 
@@ -192,7 +259,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
 
         // Import Teachers
-        Route::get('/import_teachers', 'App\Http\Controllers\AdminController@viewImportTeachers');   
+        Route::get('/import_staffs', 'App\Http\Controllers\AdminController@viewImportTeachers');   
 
         Route::post('/import/staffslist', ['uses' => 'App\Http\Controllers\ImportExportController@importStaffslistExcel']);
 
@@ -212,6 +279,8 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/edit/categories', 'App\Http\Controllers\AdminController@editCategories');
 
+        Route::post('/delete/categories', 'App\Http\Controllers\AdminController@deleteCategories');
+
         // Background Themes
         Route::get('/bthemes', 'App\Http\Controllers\AdminController@viewBackgroundThemes');
 
@@ -220,6 +289,8 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::get('/bthemes/datatables', ['as' => 'bthemes.data', 'uses' => 'App\Http\Controllers\AdminController@getBackgroundThemes']);
 
         Route::post('/edit/bthemes', 'App\Http\Controllers\AdminController@editBackgroundThemes');
+
+        Route::post('/delete/bthemes', 'App\Http\Controllers\AdminController@deleteBackgroundThemes');
 
         // Group
         Route::get('/group', 'App\Http\Controllers\AdminController@viewGroup');
@@ -230,18 +301,44 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/edit/group', 'App\Http\Controllers\AdminController@editGroup');
 
-        Route::post('/view/group', 'App\Http\Controllers\AdminController@viewGroupMembers'); 
+        Route::post('/view/group', 'App\Http\Controllers\AdminController@viewGroupMembers');  
 
         // Survey
         Route::get('/survey', 'App\Http\Controllers\AdminController@viewSurvey');
+
+        Route::get('/addsurvey', 'App\Http\Controllers\AdminController@viewAddSurvey');
 
         Route::post('/save/survey', 'App\Http\Controllers\AdminController@postSurvey');
 
         Route::get('/survey/datatables', ['as' => 'survey.data', 'uses' => 'App\Http\Controllers\AdminController@getSurvey']);
 
-        Route::post('/edit/survey', 'App\Http\Controllers\AdminController@editSurvey');
+        Route::get('/editsurvey', 'App\Http\Controllers\AdminController@editSurvey');
 
-        Route::post('/delete/survey', 'App\Http\Controllers\AdminController@deleteSurvey');
+        Route::post('/delete/survey', 'App\Http\Controllers\AdminController@deleteSurvey'); 
+
+        Route::post('/update/surveypost', 'App\Http\Controllers\AdminController@updateSurveyPost');
+
+        Route::post('/update/survey', 'App\Http\Controllers\AdminController@updateStaffSurvey');
+
+        // Reward / Remarks
+
+        Route::get('/remarks', 'App\Http\Controllers\AdminController@viewRemarks');
+
+        Route::get('/remarks/datatables', ['as' => 'smscredits.data', 'uses' => 'App\Http\Controllers\AdminController@getRemarks']);
+
+        Route::post('/delete/remarks', 'App\Http\Controllers\AdminController@deleteRemarks');  
+
+        Route::get('/remarks_excel',['as'=>'remarks_excel.data','uses'=>'App\Http\Controllers\AdminController@getRemarksExcel']);  
+
+        Route::get('/rewards', 'App\Http\Controllers\AdminController@viewRewards');
+
+        Route::get('/rewards/datatables', ['as' => 'smscredits.data', 'uses' => 'App\Http\Controllers\AdminController@getRewards']);
+
+        Route::get('/rewards_excel',['as'=>'rewards_excel.data','uses'=>'App\Http\Controllers\AdminController@getRewardsExcel']);  
+
+        Route::post('/delete/rewards', 'App\Http\Controllers\AdminController@deleteRewards');  
+
+         
 
         // SMS Credits
         Route::get('/smscredits', 'App\Http\Controllers\AdminController@viewSMSCredits');
@@ -251,6 +348,29 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::get('/smscredits/datatables', ['as' => 'smscredits.data', 'uses' => 'App\Http\Controllers\AdminController@getSMSCredits']);
 
         Route::post('/delete/smscredits', 'App\Http\Controllers\AdminController@deleteSMSCredits');
+
+        // SMS Credits Consolidated
+        Route::get('/smsschoolcredits', 'App\Http\Controllers\AdminController@viewSMSSchoolCredits'); 
+
+        Route::get('/smsschoolcredits/datatables', ['as' => 'smsschoolcredits.data', 'uses' => 'App\Http\Controllers\AdminController@getSMSSchoolCredits']); 
+
+        // Communication posts Staffs
+
+        Route::get('/posts_staff', 'App\Http\Controllers\AdminController@viewPostsStaffs');
+
+        Route::post('/delete/posts_staff', 'App\Http\Controllers\AdminController@deletePostsStaffs');
+
+        Route::post('/update/posts_staff', 'App\Http\Controllers\AdminController@updatePostsStaffs');
+
+        Route::get('/posts_staff_status/datatables', ['as' => 'posts_staff_status.data', 'uses' => 'App\Http\Controllers\AdminController@getPostStatus']); 
+
+        Route::get('/posts_staff_status_excel',['as'=>'posts_staff_status_excel.data','uses'=>'App\Http\Controllers\AdminController@getPostStatusExcel']);
+
+        Route::get('/addpoststaff', 'App\Http\Controllers\AdminController@addPostsStaff');
+
+        Route::post('/post_load_content_staffs', 'App\Http\Controllers\AdminController@postLoadModalContentStaffs'); 
+
+        Route::post('/post_staff_message', 'App\Http\Controllers\AdminController@postCommunicationStaff');
 
         // Communication posts
 
@@ -276,7 +396,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::get('/communication', 'App\Http\Controllers\AdminController@viewCommunications');
         Route::post('/post_new_message', 'App\Http\Controllers\AdminController@postCommunication');
-        Route::post('/post_update_message', 'App\Http\Controllers\AdminController@postCommunication');
+        Route::post('/post_update_message', 'App\Http\Controllers\AdminController@postCommunicationUpdate');
 
         //communication sms
 
@@ -287,6 +407,8 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::get('/editpostsms', 'App\Http\Controllers\AdminController@editPostSms');
         
         Route::post('/post_new_sms_scholar', 'App\Http\Controllers\AdminController@postCommunicationSmsScholar');
+
+        Route::post('/post_update_sms_scholar', 'App\Http\Controllers\AdminController@postCommunicationUpdateSmsScholar');
          
         Route::post('/delete/postsms', 'App\Http\Controllers\AdminController@deletePostSms'); 
 
@@ -304,7 +426,11 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/update/posthomeworks', 'App\Http\Controllers\AdminController@updatePostHomeworks');
 
-        Route::post('/delete/posthomeworks', 'App\Http\Controllers\AdminController@deletePostHomeworks'); 
+        Route::post('/delete/posthomeworks', 'App\Http\Controllers\AdminController@deletePostHomeworks');  
+
+        Route::get('/posthomeworkstatus/datatables', ['as' => 'posthomeworkstatus.data', 'uses' => 'App\Http\Controllers\AdminController@getPostHomeworkStatus']); 
+
+        Route::get('/posthomeworksstatus_excel',['as'=>'posthomeworksstatus_excel.data','uses'=>'App\Http\Controllers\AdminController@getPostHomeworkStatusExcel']);
 
         //fetch state
 
@@ -323,13 +449,13 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::post('/fetch-questions-type', 'App\Http\Controllers\AdminController@fetchQuestionType');
 
         //Teachers
-        Route::get('/teachers', 'App\Http\Controllers\AdminController@viewTeachers');
+        Route::get('/staffs', 'App\Http\Controllers\AdminController@viewTeachers');
 
-        Route::get('/teachers/datatables', ['as' => 'teachers.data', 'uses' => 'App\Http\Controllers\AdminController@getTeachers']);
+        Route::get('/staffs/datatables', ['as' => 'staffs.data', 'uses' => 'App\Http\Controllers\AdminController@getTeachers']);
 
-        Route::post('/save/teachers', 'App\Http\Controllers\AdminController@postTeachers');
+        Route::post('/save/staffs', 'App\Http\Controllers\AdminController@postTeachers');
 
-        Route::post('/edit/teachers', 'App\Http\Controllers\AdminController@editTeachers');
+        Route::post('/edit/staffs', 'App\Http\Controllers\AdminController@editTeachers');
 
         Route::get('/view_staff', 'App\Http\Controllers\AdminController@viewStaffProfile');
 
@@ -340,13 +466,13 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         //Class Teacher Mapping
 
-        Route::get('/class_teachers', 'App\Http\Controllers\AdminController@viewClassTeacherMapping');
+        Route::get('/ctutors', 'App\Http\Controllers\AdminController@viewClassTeacherMapping');
 
-        Route::post('/save/class_teacher_mapping', 'App\Http\Controllers\AdminController@postClassTeacherMapping');
+        Route::post('/save/ctutors_mapping', 'App\Http\Controllers\AdminController@postClassTeacherMapping');
 
-        Route::post('/save/class_teachers', 'App\Http\Controllers\AdminController@postClassTeachers');
+        Route::post('/save/ctutors', 'App\Http\Controllers\AdminController@postClassTeachers');
 
-        Route::post('/edit/class_teachers', 'App\Http\Controllers\AdminController@editClassTeachers');
+        Route::post('/edit/ctutors', 'App\Http\Controllers\AdminController@editClassTeachers');
 
         //Subject Mapping to Teachers
         Route::get('/subject_mapping', 'App\Http\Controllers\AdminController@viewMappingSubject');
@@ -391,6 +517,8 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::post('/save/homework', 'App\Http\Controllers\AdminController@postHomework');
 
         Route::post('/edit/homework', 'App\Http\Controllers\AdminController@editHomework');
+
+        Route::post('/update/homework', 'App\Http\Controllers\AdminController@updateHomework');
 
         Route::post('/edit/homeworkgrp', 'App\Http\Controllers\AdminController@editHomeworkGroup');
 
@@ -518,9 +646,9 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         
 
         //Teacher leave
-        Route::get('/teacherleavelist', 'App\Http\Controllers\AdminController@viewTeacherLeave');
+        Route::get('/staff_leavelist', 'App\Http\Controllers\AdminController@viewTeacherLeave');
 
-        Route::get('/teacherleavelist/datatables', ['as' => 'teacherleavelist.data', 'uses' => 'App\Http\Controllers\AdminController@getTeacherLeave']);
+        Route::get('/staff_leavelist/datatables', ['as' => 'staff_leavelist.data', 'uses' => 'App\Http\Controllers\AdminController@getTeacherLeave']);
 
         Route::get('/edit_teacherleave/{id}', 'App\Http\Controllers\AdminController@editTeacherLeave');
 
@@ -537,6 +665,13 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::post('/delcircularimage','App\Http\Controllers\AdminController@deleteEventCircular');
         Route::post('/load/gallery','App\Http\Controllers\AdminController@loadGallery');
 
+        // Gallery
+        Route::get('/gallery', 'App\Http\Controllers\AdminController@viewGallery');
+        Route::get('/gallery/datatables', ['as' => 'adminevents.data', 'uses' => 'App\Http\Controllers\AdminController@getGallery']);
+        Route::post('/save/gallery', 'App\Http\Controllers\AdminController@postGallery');
+        Route::post('/edit/gallery', 'App\Http\Controllers\AdminController@editGallery');
+        Route::post('/delgalleryimage','App\Http\Controllers\AdminController@deleteGalleryAttachment');
+
         // Holidays
         Route::get('/holidays', 'App\Http\Controllers\AdminController@viewHolidays');
         Route::get('/holidays/datatables', ['as' => 'holidays.data', 'uses' => 'App\Http\Controllers\AdminController@getHolidays']);
@@ -547,6 +682,15 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::get('/changeholidays', 'App\Http\Controllers\AdminController@viewChangeHolidays');
         Route::post('/load/holidays', 'App\Http\Controllers\AdminController@loadChangeHolidays');
         Route::post('/save/changeholidays', 'App\Http\Controllers\AdminController@saveChangeHolidays');
+
+
+
+        // Mark Attendance 
+
+        Route::get('/mark_attendance', 'App\Http\Controllers\AdminController@viewMarkAttendance');
+        Route::post('/load/scholar_daily_attendance', 'App\Http\Controllers\AdminController@loadScholarDailyAttendancePage');
+        Route::get('/load/scholar_marked_attendance', 'App\Http\Controllers\AdminController@getScholarMarkedAttendance'); 
+        Route::post('/addabsentstudent', 'App\Http\Controllers\AdminController@addScholarMarkedAbsent'); 
 
         //Attendance Approval Overall
 
@@ -586,7 +730,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
 
         
-        Route::get('/teacher_dailyattendance', 'App\Http\Controllers\AdminController@viewTeacherDailyAttendance');
+        Route::get('/staff_dailyattendance', 'App\Http\Controllers\AdminController@viewTeacherDailyAttendance');
         Route::post('/load/dailyteacherattendance', 'App\Http\Controllers\AdminController@loadTeacherDailyAttendance');
         Route::post('/update/teacherattendance','App\Http\Controllers\AdminController@updateTeacherDailyAttendance');
         Route::get('/tattendencereport/excel', ['as' => 'teacherattendence.excel', 'uses' => 'App\Http\Controllers\AdminController@getTeacherAttendenceExcel']);
@@ -654,6 +798,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         // Exam results
         Route::get('/exam_results', 'App\Http\Controllers\AdminController@viewExamResults');
         Route::post('/load/exam_results', 'App\Http\Controllers\AdminController@loadExamResults');
+        Route::get('/load/exam_results_pdf', 'App\Http\Controllers\AdminController@loadExamResultsPdf');
 
         // Question Banks
         Route::get('/questionbank', 'App\Http\Controllers\AdminController@viewQuestionbank');
@@ -712,7 +857,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
         Route::post('/load/studentattendancerep', 'App\Http\Controllers\AdminController@loadStudentAttendanceRep');
         Route::post('/update/studentattendancerep','App\Http\Controllers\AdminController@updateStudentAttendanceRep');
 
-        Route::get('/teacherattendancerep','App\Http\Controllers\AdminController@viewTeacherAttendanceRep');
+        Route::get('/staff_attendancerep','App\Http\Controllers\AdminController@viewTeacherAttendanceRep');
         Route::post('/load/teacherattendancerep', 'App\Http\Controllers\AdminController@loadTeacherAttendanceRep');
         Route::post('/update/teacherattendancerep','App\Http\Controllers\AdminController@updateTeacherAttendanceRep');
 
@@ -855,9 +1000,13 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::post('/save/feeconcession', 'App\Http\Controllers\AdminController@postPayFeesConcession');
 
+        Route::post('/save/feewaiver', 'App\Http\Controllers\AdminController@postPayFeesWaiver');
+
         Route::get('/feesummary', 'App\Http\Controllers\AdminController@feeSummaryPage');
 
         Route::get('/feesummary/datatables', ['as' => 'feesummary.data', 'uses' => 'App\Http\Controllers\AdminController@getFeeSummaryLists']);
+
+        Route::get('/feesummarydeleted/datatables', ['as' => 'feesummary.data', 'uses' => 'App\Http\Controllers\AdminController@getFeeSummaryDeletedLists']);
 
         Route::get('/feeconcessions', 'App\Http\Controllers\AdminController@feeConcessionsPage');
 
@@ -889,6 +1038,8 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::get('/scholar_fee_summary_excel',['as'=>'scholar_fee_summary_excel.data','uses'=>'App\Http\Controllers\AdminController@getScholarFeeFummaryExcel']);
 
+        Route::get('/scholar_fee_summary_deleted_excel',['as'=>'scholar_fee_summary_deleted_excel.data','uses'=>'App\Http\Controllers\AdminController@getScholarFeeSummaryDeletedExcel']);
+
         //Fees Receipts
 
         Route::post('/load/openfeereceipts', 'App\Http\Controllers\AdminController@loadFeeReceiptData');
@@ -916,6 +1067,38 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
         Route::get('/fee_report/collection_excel',['as'=>'fee_report_collection_excel.data','uses'=>'App\Http\Controllers\AdminController@getCollectionFeesReportExcel']);
 
+        // Consolidated Fee Report
+        Route::get('/fees_report', 'App\Http\Controllers\AdminController@viewFeesReport');
+
+        Route::get('/fees_report/datatables', ['as' => 'fees_report.data', 'uses' => 'App\Http\Controllers\AdminController@getFeesReport']);
+
+        Route::get('/fees_report_excel',['as'=>'fees_report_excel.data','uses'=>'App\Http\Controllers\AdminController@getFeesReportExcel']);
+
+        // Summary Fee Report
+        Route::get('/fees_summary_report', 'App\Http\Controllers\AdminController@viewFeeSummaryReport');
+
+        Route::get('/fees_summary_report/datatables', ['as' => 'fees_summary_report.data', 'uses' => 'App\Http\Controllers\AdminController@getFeeSummaryReport']);
+
+        Route::get('/fees_summary_report_excel',['as'=>'fees_report_excel.data','uses'=>'App\Http\Controllers\AdminController@getFeesSummaryReportExcel']);
+
+        // Receipts Fee Report
+        Route::get('/fees_receipts_report', 'App\Http\Controllers\AdminController@viewFeeReceiptsReport');
+
+        Route::get('/fees_receipts_report/datatables', ['as' => 'fees_receipts_report.data', 'uses' => 'App\Http\Controllers\AdminController@getFeeReceiptsReport']);
+
+        Route::get('/fees_receipts_report_excel',['as'=>'fees_receipts_report_excel.data','uses'=>'App\Http\Controllers\AdminController@getFeesReceiptsReportExcel']);
+
+        // Receipts Cancelled Fee Report
+        Route::get('/fees_receipts_cancelled_report', 'App\Http\Controllers\AdminController@viewFeeReceiptsCancelledReport');
+
+        Route::get('/fees_receipts_cancelled_report/datatables', ['as' => 'fees_receipts_cancelled_report.data', 'uses' => 'App\Http\Controllers\AdminController@getFeeReceiptsCancelledReport']);
+
+        Route::get('/fees_receipts_cancelled_report_excel',['as'=>'fees_report_excel.data','uses'=>'App\Http\Controllers\AdminController@getFeesCancelledReportExcel']);
+
+        // Overall Fee Report
+        Route::get('/fees_overall_report', 'App\Http\Controllers\AdminController@viewFeeOverallReport');
+        Route::get('/fees_overall_report/datatables', ['as' => 'fees_overall_report.data', 'uses' => 'App\Http\Controllers\AdminController@loadFeeOverallReport']);
+        
         // Concession Report 
         Route::get('/conwai_fee_report/collection', 'App\Http\Controllers\AdminController@viewConWaiFeesReport');
 
@@ -1015,7 +1198,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
            
         Route::get('get_modules','App\Http\Controllers\AdminRoleController@getModule');
 
-        Route::get('/teacher_module_mapping','App\Http\Controllers\AdminRoleController@ViewTeacherRoleAccess');
+        Route::get('/staff_module_mapping','App\Http\Controllers\AdminRoleController@ViewTeacherRoleAccess');
 
         // Role Class Mapping
     
@@ -1032,7 +1215,7 @@ Route::group(['prefix' => '{slugname}/admin'], function () {
 
 
 
-Route::group(['prefix' => '{slugname}/teacher'], function () {
+Route::group(['prefix' => '/teachersold'], function () {
 
     Route::get('/', 'App\Http\Controllers\TeacherController@index');
 
@@ -1093,7 +1276,7 @@ Route::group(['prefix' => '{slugname}/teacher'], function () {
 
     Route::post('/save/homework', 'App\Http\Controllers\TeacherController@postHomework');
 
-    Route::post('/edit/homework', 'App\Http\Controllers\TeacherController@editHomework');
+    Route::post('/edit/homework', 'App\Http\Controllers\TeacherController@editHomework'); 
 
     Route::post('/fetch-student-name', 'App\Http\Controllers\TeacherController@fetchStudents');
 
@@ -1299,4 +1482,12 @@ Route::group(['prefix' => '{slugname}/teacher'], function () {
     Route::get('/postsmsstatus', 'App\Http\Controllers\TeacherController@viewPostSmsStatus');
 
     Route::get('/postsmsstatus/datatables', ['as' => 'postsmsstatus.data', 'uses' => 'App\Http\Controllers\TeacherController@getPostSmsStatus']);
+});
+
+Route::group(['prefix' => '/*'], function () {
+    Route::get('/*', 'App\Http\Controllers\AdminController@page404');
+});
+
+Route::group(['prefix' => '{slugname}/*'], function () {
+    Route::get('/*', 'App\Http\Controllers\AdminController@page404');
 });
