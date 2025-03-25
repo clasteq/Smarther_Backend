@@ -23,7 +23,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::post('login','App\Http\Controllers\ApiController@postUserLogin');
 
-Route::post('logout','App\Http\Controllers\ApiController@userLogout');
+Route::post('logout','App\Http\Controllers\ApiController@userLogout'); 
 
 // Student Functionalities
 
@@ -48,6 +48,10 @@ Route::post('circulars','App\Http\Controllers\ApiController@getCirculars');
 Route::post('homeworks','App\Http\Controllers\ApiController@getHomeworks');
 
 Route::post('homeworkswithdate','App\Http\Controllers\ApiController@getHomeworksDate');
+
+Route::post('posthomeworkacknowledge','App\Http\Controllers\ApiController@acknowledgePostHomeworks');
+
+Route::post('homework_submit','App\Http\Controllers\ApiController@postHomeworkSubmit');
 
 Route::post('attendance','App\Http\Controllers\ApiController@getAttendance');
 
@@ -141,7 +145,13 @@ Route::post('getcontactslist','App\Http\Controllers\ApiController@getContactsLis
 
 Route::post('getbankslist','App\Http\Controllers\ApiController@getBanksList');
 
+Route::post('postsurveys','App\Http\Controllers\ApiController@getPostSurveys');
 
+Route::post('postsurveyrespond','App\Http\Controllers\ApiController@respondPostSurvey');
+
+Route::post('getgallerylist','App\Http\Controllers\ApiController@getGalleyList');
+
+Route::post('getrewardslist','App\Http\Controllers\ApiController@getRewardsList');
 
 // Admin panel apis
 
@@ -158,6 +168,16 @@ Route::group(['prefix' => 'admin'], function () {
     Route::post('gcontent','App\Http\Controllers\ApiAdminController@getContent');
 
     Route::post('savegcontent','App\Http\Controllers\ApiAdminController@postContent');
+
+    //Contacts For
+    Route::post('/contactsfor', 'App\Http\Controllers\ApiAdminController@getContactsFor');
+
+    Route::post('/save/contactsfor', 'App\Http\Controllers\ApiAdminController@postContactsFor'); 
+
+    //Contacts List
+    Route::post('/contactslist', 'App\Http\Controllers\ApiAdminController@getContactsList');
+
+    Route::post('/save/contactslist', 'App\Http\Controllers\ApiAdminController@postContactsList'); 
 
     //Master 
 
@@ -233,6 +253,10 @@ Route::group(['prefix' => 'admin'], function () {
     //Communication POST
     Route::post('/commn_selects', 'App\Http\Controllers\ApiAdminController@getCommnSelects');
 
+    Route::post('/commn_cc_staffs', 'App\Http\Controllers\ApiAdminController@getCommnCCStaffs');
+
+    Route::post('/commn_staff_selects', 'App\Http\Controllers\ApiAdminController@getCommnStaffSelects');
+
     Route::post('/class_sections', 'App\Http\Controllers\ApiAdminController@getCommnClassSections');
 
     Route::post('/class_section_scholars', 'App\Http\Controllers\ApiAdminController@getCommnClassSectionScholars');
@@ -241,9 +265,13 @@ Route::group(['prefix' => 'admin'], function () {
 
     Route::post('/save/communication_post', 'App\Http\Controllers\ApiAdminController@postCommunicationPost'); 
 
+    Route::post('/update/communication_post', 'App\Http\Controllers\ApiAdminController@updateCommunicationPost'); 
+
     Route::post('/save/communication_sms', 'App\Http\Controllers\ApiAdminController@postCommunicationSms'); 
 
-    Route::post('/save/communication_hws', 'App\Http\Controllers\ApiAdminController@postCommunicationHws'); 
+    Route::post('/save/communication_post_staff', 'App\Http\Controllers\ApiAdminController@postCommunicationPostStaff'); 
+
+    Route::post('/save/communication_hws', 'App\Http\Controllers\ApiAdminController@postCommunicationHws');  
 
     Route::post('/commn_post_list', 'App\Http\Controllers\ApiAdminController@getCommnPostList');
 
@@ -253,19 +281,51 @@ Route::group(['prefix' => 'admin'], function () {
 
     Route::post('/commn_post_status_list', 'App\Http\Controllers\ApiAdminController@getCommnPostStatusList');
 
+    Route::post('/commn_post_staff_list', 'App\Http\Controllers\ApiAdminController@getCommnPostStaffList');
+
+    Route::post('/delete/communication_post', 'App\Http\Controllers\ApiAdminController@deleteCommunicationPost'); 
+
+    Route::post('/delete/communication_post_staff', 'App\Http\Controllers\ApiAdminController@deleteCommunicationPostStaff'); 
+
     Route::post('/fetch_section', 'App\Http\Controllers\ApiAdminController@getClassSections');
 
     Route::post('/fetch_subject', 'App\Http\Controllers\ApiAdminController@getClassSecSubjects');
 
+    // Survey
+
+    Route::post('/commn_survey_list', 'App\Http\Controllers\ApiAdminController@getCommnSurveyList');
+
+    Route::post('/save/communication_survey', 'App\Http\Controllers\ApiAdminController@postCommunicationSurvey'); 
+
+    Route::post('/delete/communication_survey', 'App\Http\Controllers\ApiAdminController@deleteCommunicationSurvey');
+
+    Route::post('/update/communication_survey', 'App\Http\Controllers\ApiAdminController@updateCommunicationSurvey');  
+
+    // Scholar Remarks / Rewards List
+
+    Route::post('/commn_remark_rewards_list', 'App\Http\Controllers\ApiAdminController@getCommnRemarkRewardsList');
+
     // Scholars
-    Route::post('/scholars_list', 'App\Http\Controllers\ApiAdminController@getScholarsList');
+    Route::post('/scholars_list', 'App\Http\Controllers\ApiAdminController@getScholarsList'); 
+
+    Route::post('/scholars_add', 'App\Http\Controllers\ApiAdminController@postScholarsadd');
+
+    Route::post('/scholars_additional', 'App\Http\Controllers\ApiAdminController@postScholarsadditional');
 
     Route::post('/preadmin_scholars_list', 'App\Http\Controllers\ApiAdminController@getPreScholarsList');
 
     Route::post('/alumni_scholars_list', 'App\Http\Controllers\ApiAdminController@getAlumniScholarsList');
 
+    Route::post('/scholars_details', 'App\Http\Controllers\ApiAdminController@getScholarsDetails');
+
     // Staffs
     Route::post('/staffs_list', 'App\Http\Controllers\ApiAdminController@getStaffsList');
+
+    Route::post('/ctutors_list', 'App\Http\Controllers\ApiAdminController@getClassTutorsList');
+
+    Route::post('/save/ctutors', 'App\Http\Controllers\ApiAdminController@postClassTutor');
+
+    Route::post('/subject_staffs_list', 'App\Http\Controllers\ApiAdminController@getSubjectStaffsList');
 
     // Fees
     Route::post('/school_banks_list', 'App\Http\Controllers\ApiAdminController@getSchoolBanksList');
@@ -288,19 +348,29 @@ Route::group(['prefix' => 'admin'], function () {
 
     Route::post('/fee_items_list', 'App\Http\Controllers\ApiAdminController@getFeeItemsList');
 
-    Route::post('/fee_structure_list', 'App\Http\Controllers\ApiAdminController@getFeeStructuresList');
-
-    Route::post('/fee_collection_report', 'App\Http\Controllers\ApiAdminController@getFeeCollectionReport');
+    Route::post('/fee_structure_list', 'App\Http\Controllers\ApiAdminController@getFeeStructuresList'); 
 
     // Attendance
 
     Route::post('/oa_student_attendance', 'App\Http\Controllers\ApiAdminController@getOAStudentAttendance');
+
+    Route::post('/student_daily_attendance', 'App\Http\Controllers\ApiAdminController@getStudentDailyAttendance');
+
+    Route::post('/save_student_daily_attendace','App\Http\Controllers\ApiAdminController@saveStudentDailyAttendance');
 
     Route::post('/student_leave_reports', 'App\Http\Controllers\ApiAdminController@getStudentLeaveReports');
 
     Route::post('/student_attendance_report', 'App\Http\Controllers\ApiAdminController@getStudentattendanceReports');
 
     Route::post('/students_leave_list', 'App\Http\Controllers\ApiAdminController@getStudentsLeaveList');
+
+    // Staff Attendance
+
+    Route::post('/staff_dailyattendance', 'App\Http\Controllers\ApiAdminController@getStaffDailyAttendance'); 
+
+    Route::post('/staff_leavelist', 'App\Http\Controllers\ApiAdminController@getStaffLeaveList'); 
+
+    Route::post('/staff_attendancerep', 'App\Http\Controllers\ApiAdminController@getStaffAttendanceReport'); 
 
     // User Roles 
     
@@ -327,4 +397,48 @@ Route::group(['prefix' => 'admin'], function () {
     Route::post('/role_module_mapping',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getRoleModuleMappingList']);
 
     Route::post('/save/role_module_mapping','App\Http\Controllers\ApiAdminController@postRoleModuleMapping');
+
+    //  Staff Module Mapping
+    
+    Route::post('/staff_module_mapping',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getStaffModuleMappingList']);
+
+    Route::post('/save/staff_module_mapping','App\Http\Controllers\ApiAdminController@postStaffModuleMapping');
+
+    // Gallery 
+
+    Route::post('/gallery_list',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getGallery']);
+
+    Route::post('/save/gallery_list','App\Http\Controllers\ApiAdminController@postGallery'); 
+
+    // Examinations
+
+    Route::post('/examinations',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getExaminations']);
+
+    Route::post('/examination_settings',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getExaminationSettings']);
+
+    Route::post('/exam_terms',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getExamTerms']);
+
+    Route::post('/exam_results',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getExamResults']);
+
+    Route::post('save/mark_entry',[ 'uses'=>'App\Http\Controllers\ApiAdminController@saveMarkEntry']);
+
+    Route::post('/fetch_examinations',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFetchExaminations']);
+
+    // Fees
+
+    Route::post('/fee_collection_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeCollectionReport']);
+
+    Route::post('/fee_pending_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeePendingReport']);
+
+    Route::post('/fee_waiver_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeWaiverReport']);
+
+    Route::post('/fee_concession_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeConcessionReport']);
+
+    Route::post('/fee_overall_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeOverallReport']);
+
+    Route::post('/fees_receipts_cancelled_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeReceiptsCancelledReport']);
+
+    Route::post('/fees_receipts_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeReceiptsReport']);
+
+    Route::post('/fees_summary_report',[ 'uses'=>'App\Http\Controllers\ApiAdminController@getFeeSummaryReport']);
 });

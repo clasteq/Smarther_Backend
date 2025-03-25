@@ -49,14 +49,21 @@ class sendPostSMSNotification extends Command
             ->select('communication_sms.id', 'communication_sms.template_id as sms_template_id', 'communication_sms.content', 
                 'communication_sms.content_vars', 'communication_sms.category_id', 'communication_sms.batch', 
                 'communication_sms.post_type',  'receiver_end', 'notify_datetime', 'communication_sms.posted_by', 
-                'smart_sms', 'categories.name as category_name',
+                'smart_sms', 'categories.name as category_name', 'communication_sms.is_homework', 'communication_sms.main_ref_no',
                 'dlt_templates.template_id', 'dlt_templates.content as dlt_content', 'dlt_templates.no_of_variables')
             ->orderby('communication_sms.id', 'desc')
             ->skip(0)->take(1)
             ->get(); 
-        if($posts->isNotEmpty()) {
 
+        $type_no = 5;
+        \Log::info("test type no");  \Log::info(print_r($posts, true));
+        if($posts->isNotEmpty()) {
+            
             foreach($posts as $post) {   
+                $main_ref_no = '';
+                if($post->is_homework == 1 ) {
+                    $type_no = 7; $main_ref_no = $post->main_ref_no;
+                }
 
                 DB::table('communication_sms')->where('id', $post->id)->update(['is_mail_sent'=>1]);
 
@@ -68,6 +75,75 @@ class sendPostSMSNotification extends Command
                     $is_name_replace = $tplate->is_name_replace;
                     $is_name_replace_var = $tplate->is_name_replace_var; 
                 }
+ 
+                $title = $post->category_name;
+                $message = $post->content; 
+
+                if($is_name_replace == 1) {
+                    $str = $is_name_replace_var;
+                    $re = '/'.$str.'/mi';  
+                    $subst = 'Parent';
+                    $message = preg_replace($re, $subst, $message);
+                }
+
+                $fcmMsg = array("fcm" => array("notification" => array(
+                    "title" => $title,
+                    "body" => $message,
+                    "type" => $type_no,
+                  ))); 
+
+                /*  Firebase Topic Push */
+                if($post->post_type == 1) { // section ids
+                    $section_ids = $post->receiver_end;
+                    if(!empty($section_ids)) {
+                        $section_ids = explode(',', $section_ids);
+                        $section_ids = array_unique($section_ids);
+                        $section_ids = array_filter($section_ids);
+                        if(count($section_ids) > 0) {
+                            foreach($section_ids as $sid) {
+                                $topicname = CommonController::$topic_section.$sid;
+                                CommonController::push_notification_topic($topicname, $type_no, $post->id, $fcmMsg, 0, '', $post->id, $post->notify_datetime); 
+                            }
+                        }
+                    }
+                }   else if($post->post_type == 2) { // user ids
+                    $user_ids = $post->receiver_end;
+                    if(!empty($user_ids)) {
+                        $user_ids = explode(',', $user_ids);
+                        $user_ids = array_unique($user_ids);
+                        $user_ids = array_filter($user_ids);
+                        if(count($user_ids) > 0) {
+                            foreach($user_ids as $uid) {
+                                $topicname = CommonController::$topic_scholar.$uid;
+                                CommonController::push_notification_topic($topicname, $type_no, $post->id, $fcmMsg, 0, '', $post->id, $post->notify_datetime); 
+                            }
+                        }
+                    }
+                }   else if($post->post_type == 3) { // all user ids 
+                    $school_id = $post->posted_by;
+                    if($school_id > 0) { 
+                        $topicname = CommonController::$topic_school_scholars.$school_id;
+                        CommonController::push_notification_topic($topicname, $type_no, $post->id, $fcmMsg, 0, '', $post->id, $post->notify_datetime); 
+                         
+                    }
+                }   else if($post->post_type == 4) { // group ids 
+                    $group_ids = $post->receiver_end;
+                    if(!empty($group_ids)) {
+                        $user_ids = [];
+                        $group_ids = explode(',', $group_ids);
+                        $group_ids = array_unique($group_ids);
+                        $group_ids = array_filter($group_ids);
+                        if(count($group_ids) > 0) {
+                            if(count($group_ids) > 0) {
+                                foreach($group_ids as $gid) {
+                                    $topicname = CommonController::$topic_group.$gid;
+                                    CommonController::push_notification_topic($topicname, $type_no, $post->id, $fcmMsg, 0, '', $post->id, $post->notify_datetime); 
+                                }
+                            } 
+                        } 
+                    }
+                }
+                /*  Firebase Topic Push */
 
                 $users = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
                     ->where('users.user_type', 'STUDENT')
@@ -139,19 +215,19 @@ class sendPostSMSNotification extends Command
 
                     foreach($users as $user) {  $pk = $pk + 1;
                         $subst = 'Parent';
-                        if(!empty($user->father_name)) {
-                            $subst = $user->father_name;
-                        } elseif(!empty($user->name)) {
+                        if(!empty($user->name)) {
                             $subst = $user->name;
                         } else {
                             $subst = $user->admission_no;
                         } 
+                        /*elseif(!empty($user->name)) {
+                            $subst = $user->name;
+                        } */
 
-                        $ex = DB::table('notifications')->where(['post_id' => $post->id, 'user_id' => $user->id, 'type_no' => 5])->first();
+                        $ex = DB::table('notifications')->where(['post_id' => $post->id, 'user_id' => $user->id, 'type_no' => $type_no])->first();
                         if(empty($ex)) {
                             //$pk = $pk + 1;
-
-                            $type_no = 5;
+ 
                             $title = $post->category_name;
                             $message = $post->content;  
 
@@ -168,7 +244,7 @@ class sendPostSMSNotification extends Command
                                 "type" => $type_no,
                               )));
 
-                            CommonController::push_notification($user->id, $type_no, $post->id, $fcmMsg, 0, '', $post->id, $post->notify_datetime);  
+                            CommonController::push_notification_table($user->id, $type_no, $post->id, $fcmMsg, 0, '', $post->id, $post->notify_datetime, $main_ref_no);  
 
                             if($post->smart_sms == 1) { 
 
@@ -291,7 +367,7 @@ class sendPostSMSNotification extends Command
                     }
                     if($pk == 0 || $pk == $users_count) {
                         $exp_count = 0;
-                        $exp = DB::table('notifications')->where(['post_id' => $post->id, 'type_no' => 5])->select('id')->get();
+                        $exp = DB::table('notifications')->where(['post_id' => $post->id, 'type_no' => $type_no])->select('id')->get();
                         if($exp->isNotEmpty()) {
                             $exp_count = count($exp);
                         }
@@ -303,7 +379,7 @@ class sendPostSMSNotification extends Command
                     }
                 } else {
                     $exp_count = 0;
-                    $exp = DB::table('notifications')->where(['post_id' => $post->id, 'type_no' => 5])->select('id')->get();
+                    $exp = DB::table('notifications')->where(['post_id' => $post->id, 'type_no' => $type_no])->select('id')->get();
                     if($exp->isNotEmpty()) {
                         $exp_count = count($exp);
                     }

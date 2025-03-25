@@ -13,11 +13,15 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        /*Commands\sendAttendanceNotification::class,
+        Commands\sendAttendanceNotification::class,
         Commands\sendAttendanceSMSNotification::class,
-        Commands\sendPostNotification::class,*/
+        Commands\sendPostNotification::class,
         Commands\sendPostSMSNotification::class,
-        //Commands\updateFeesValues::class,
+        Commands\sendPostStaffNotification::class,
+        Commands\sendPostSurveyNotification::class,
+        Commands\updateFeesValues::class, 
+
+        /*Commands\sendPostSurveyNotification::class,*/
     ];
     
     /**
@@ -29,11 +33,15 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // $schedule->command('inspire')->hourly();
-        /*$schedule->command('send:attendanceNotification')->everyMinute();
+        $schedule->command('send:attendanceNotification')->everyMinute();
         $schedule->command('send:attendancesmsNotification')->everyMinute();
-        $schedule->command('send:postNotification')->everyMinute();*/
+        $schedule->command('send:postNotification')->everyMinute();
         $schedule->command('send:postsmsNotification')->everyMinute(); 
-        //$schedule->command('update:feesvalues')->everyMinute(); 
+        $schedule->command('send:postStaffNotification')->everyMinute(); 
+        $schedule->command('send:postSurveyNotification')->everyMinute();  
+        $schedule->command('update:feesvalues')->everyMinute();    
+
+        /*$schedule->command('send:postSurveyNotification')->everyMinute();*/  
     }
 
     /**
