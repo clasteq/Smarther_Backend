@@ -50,6 +50,7 @@ use App\Models\Category;
 use App\Models\CommunicationPost;
 use App\Models\CommunicationGroup; 
 use App\Models\CommunicationSms;
+use App\Models\CommunicationPostStaff;
 use App\Models\PostHomeworks;
 use App\Models\PreAdmissionStudent;
 use App\Models\Periodtiming;
@@ -63,6 +64,19 @@ use App\Models\Teacher;
 use App\Models\RoleClasses;
 use App\Models\Module;
 use App\Models\RoleModuleMapping;
+use App\Models\ContactsFor;
+use App\Models\ClassTeacher;
+use App\Models\SubjectMapping;
+use App\Models\Gallery;
+use App\Models\Departments;
+use App\Models\Survey;
+use App\Models\UserRemarks;
+use App\Models\Examinations;
+use App\Models\OAFeesSections;
+use App\Models\FeesReceiptDetail;
+use App\Models\TeachersDailyAttendance;
+use App\Models\Teacherleave;
+use App\Models\StudentsDailyAttendance;
 
 use Response;
 use Log;
@@ -100,7 +114,7 @@ class ApiAdminController extends Controller
 
             $input = json_decode($inputJSON, TRUE);
 
-            $requiredParams = ['email','password', 'fcm_token', 'device_id', 'device_type', 'school_id']; 
+            $requiredParams = ['email','password', 'fcm_token', 'device_id', 'device_type'];  //, 'school_id'
 
             $error = (new ApiController())->checkParams($input, $requiredParams, $request);
 
@@ -115,20 +129,55 @@ class ApiAdminController extends Controller
 
                 $device_type = $input['device_type'];  
 
-                $school_id = $input['school_id']; 
+                //$school_id = $input['school_id']; 
 
-                if($school_id > 0)   {} else {
+                /*if($school_id > 0)   {} else {
                     return response()->json(['status' => 0, 'message' => 'Invalid School']);
-                }
+                }*/
 
                 $user_type = 'SCHOOL';
 
-                if (Auth::attempt(['email' => $email, 'password' => $password, 'user_type' => $user_type, 'id' =>$school_id])) {
+                if (Auth::attempt(['email' => $email, 'password' => $password, 'user_type' => $user_type, 'status' => 'ACTIVE', 'delete_status' => 0])) { //, 'id' =>$school_id
                     $user = User::where('email', $email)->where('user_type', $user_type)->where('status', 'ACTIVE')
-                        ->where('id', $school_id)->first();
+                        ->where('delete_status', 0)->first();
+                        //->where('id', $school_id)
                     if(empty($user)) {
                         return response()->json(['status' => 0, 'message' => 'Invalid Login']);
                     } 
+                } else if (Auth::attempt(['mobile' => $email, 'password' => $password, 'user_type' => $user_type, 'status' => 'ACTIVE', 'delete_status' => 0])) { //, 'id' =>$school_id
+                    $user = User::where('mobile', $email)->where('user_type', $user_type)->where('status', 'ACTIVE')
+                        ->where('delete_status', 0)->first();
+                        //->where('id', $school_id)
+                    if(empty($user)) {
+                        return response()->json(['status' => 0, 'message' => 'Invalid Login']);
+                    } 
+                } else if(Auth::attempt(['email' => $email, 'password' => $password, 'status' => 'ACTIVE', 'delete_status' => 0, 
+                        'user_type' => function ($query) {
+                        $query->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL']);
+                    }])) {
+                    $user = User::where('email', $email)->where('status', 'ACTIVE')->where('delete_status', 0)
+                        //->where('school_college_id', $school_id)
+                        ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])->first();
+
+                    if(empty($user)) {
+                        return response()->json(['status' => 0, 'message' => 'Invalid Login']);
+                    }
+
+                } else if(Auth::attempt(['mobile' => $email, 'password' => $password, 'school_college_id' => $school_id, 'status' => 'ACTIVE', 'delete_status' => 0, 'user_type' => function ($query) {
+                        $query->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL']);
+                    }])) {
+                    $user = User::where('mobile', $email)->where('status', 'ACTIVE')->where('delete_status', 0)
+                        //->where('school_college_id', $school_id)
+                        ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])->first();
+         
+                    if(empty($user)) {
+                        return response()->json(['status' => 0, 'message' => 'Invalid Login']);
+                    }
+
+                } else { 
+                    return response()->json(['status' => 0, 'message' => 'Invalid Login Credential']);
+
+                }
                     $user->fcm_id = $fcmtoken; 
                     $date = date('Y-m-d H:i:s'); 
                     $def_expiry_after =  CommonController::getDefExpiry();
@@ -158,11 +207,7 @@ class ApiAdminController extends Controller
                     $user = CommonController::getUserDetails($user->id);  
                     return response()->json(['status' => 1, 'message' => 'Login Success', 'data' => $user]);
 
-                } else {
-
-                    return response()->json(['status' => 0, 'message' => 'Invalid Login Credential']);
-
-                }
+                
             }    else {
                 return response()->json([ 'status' => 0, 'message' => $error]);
             }
@@ -198,7 +243,53 @@ class ApiAdminController extends Controller
                 else {
                     if($userid > 0 && $school_id > 0) { 
                         $limit = 5;
-                        $content = (new AdminController())->getHomeContents($school_id, $limit);
+                        $content = (new AdminController())->getHomeContents($school_id, $limit, $school_id);
+
+                        /* Push notification Topics name */
+
+                        $topics = [];  
+                        $user = DB::table('users')->where('id', $userid)->select('id', 'mobile', 'school_college_id', 'user_type')->first();
+                        if(!empty($user)) { 
+                            $top_arr = [];
+                            
+                            if($user->user_type == 'SCHOOL') {
+                                $topics[]['topic_name'] = CommonController::$topic_school_Admin.$user->school_college_id;
+                                $top_arr[] = CommonController::$topic_school_Admin.$user->school_college_id;  
+                            } else {
+                                $topics[]['topic_name'] = CommonController::$topic_school_staffs.$user->school_college_id;
+                                $top_arr[] = CommonController::$topic_school_staffs.$user->school_college_id;
+                            }
+
+                            $topics[]['topic_name'] = CommonController::$topic_staffs.$user->id; 
+                            $top_arr[] = CommonController::$topic_staffs.$user->id;  
+                        
+                            $cgroups = DB::table('communication_groups')->where('school_id', $user->school_college_id)
+                                ->where('status', 'ACTIVE')
+                                ->whereRaw('FIND_IN_SET('.$user->id.', staff_members)')
+                                ->select('id')->get(); 
+                            if($cgroups->isNotEmpty()) {
+                                foreach($cgroups as $cg) {
+                                    $topics[]['topic_name'] = CommonController::$topic_group_staffs.$cg->id; 
+                                    $top_arr[] = CommonController::$topic_group_staffs.$cg->id; 
+                                }
+                            }
+
+                            $department_id = DB::table('teachers')->where('user_id', $user->id)->value('department_id'); 
+                            if($department_id > 0) {  
+                                $topics[]['topic_name'] = CommonController::$topic_department_staffs.$department_id; 
+                                $top_arr[] = CommonController::$topic_department_staffs.$department_id;  
+                            } 
+
+                            if(count($top_arr)>0) {
+                                $top_arr = array_unique($top_arr);
+                                $top_arr = array_filter($top_arr);
+                                $top_str = implode(',', $top_arr);
+                                DB::table('users')->where('id', $user->id)->update(['topics_subscribed' => $top_str]); 
+                            } 
+                        } 
+                        $content['topics'] = $topics;
+                        /* Push notification Topics name */
+
                         return response()->json([ 'status' => 1, 'message' => 'Home Contents', 'data'=>$content]);
                     }   else {
                         return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
@@ -433,8 +524,8 @@ class ApiAdminController extends Controller
 
     }
 
-    // Classes
-    public function getClasses(Request $request) {
+    // Contacts For
+    public function getContactsFor(Request $request) {
         try {   
             $inputJSON = file_get_contents('php://input');
 
@@ -461,8 +552,242 @@ class ApiAdminController extends Controller
                 else {
                     if($userid > 0 && $school_id > 0) { 
 
-                        $classes = DB::table('classes')->where('id', '>', 0)->where('school_id', $school_id) 
+                        $contacts_for = DB::table('contacts_for')->where('id', '>', 0)->where('school_id', $school_id) 
                             ->orderby('position', 'asc')->get();  
+                        if($contacts_for->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Contacts For', 'data'=>$contacts_for]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function postContactsFor(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'contacts_for_name', 'contacts_for_status' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $contacts_for_name = ((isset($input) && isset($input['contacts_for_name']))) ? $input['contacts_for_name'] : ''; 
+                $contacts_for_status = ((isset($input) && isset($input['contacts_for_status']))) ? $input['contacts_for_status'] : 'ACTIVE';  
+                $position = ((isset($input) && isset($input['position']))) ? $input['position'] : 99;  
+
+                $contacts_for_id = ((isset($input) && isset($input['contacts_for_id']))) ? $input['contacts_for_id'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        if ($contacts_for_id > 0) {
+                            $exists = DB::table('contacts_for')->where('name', $contacts_for_name)->where('school_id', $school_id)
+                                ->whereNotIn('id', [$contacts_for_id])->first();
+                        } else {
+                            $exists = DB::table('contacts_for')->where('name', $contacts_for_name)->where('school_id', $school_id)->first();
+                        }
+
+                        if (!empty($exists)) {
+                            return response()->json(['status' => 0, 'message' => 'Name Already Exists'], 201);
+                        }
+
+                        if ($contacts_for_id > 0) {
+                            $class = ContactsFor::find($contacts_for_id);
+                        } else {
+                            $class = new ContactsFor();
+                        }
+                        $class->school_id = $school_id;
+                        $class->name = $contacts_for_name;
+                        $class->position = $position;
+                        $class->status = $contacts_for_status;
+
+                        $class->save(); 
+                        
+                        return response()->json([ 'status' => 1, 'message' => 'Contacts For Details saved successfully' ]);
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    // Contacts List
+    public function getContactsList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        $contacts_list = ContactsList::where('id', '>', 0)->where('school_id', $school_id) 
+                            ->orderby('id', 'desc')->get();  
+                        if($contacts_list->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Contacts List', 'data'=>$contacts_list]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function postContactsList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'contact_for', 'contact_name', 'contact_mobile', 'contact_email' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $contact_for = ((isset($input) && isset($input['contact_for']))) ? $input['contact_for'] : ''; 
+                $contact_name = ((isset($input) && isset($input['contact_name']))) ? $input['contact_name'] : '';  
+                $contact_mobile = ((isset($input) && isset($input['contact_mobile']))) ? $input['contact_mobile'] : ''; 
+                $contact_email = ((isset($input) && isset($input['contact_email']))) ? $input['contact_email'] : '';
+                $contact_info = ((isset($input) && isset($input['contact_info']))) ? $input['contact_info'] : ''; 
+                $contacts_status = ((isset($input) && isset($input['contacts_status']))) ? $input['contacts_status'] : 'ACTIVE'; 
+
+                $contacts_id = ((isset($input) && isset($input['contacts_id']))) ? $input['contacts_id'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {  
+
+                        if ($contacts_id > 0) {
+                            $class = ContactsList::find($contacts_id);
+                        } else {
+                            $class = new ContactsList();
+                        }
+                        $class->school_id = $school_id;
+                        $class->contact_for = $contact_for;
+                        $class->contact_name = $contact_name;
+                        $class->contact_mobile = $contact_mobile;
+                        $class->contact_email = $contact_email;
+                        $class->contact_info = $contact_info;
+                        $class->status = $contacts_status;
+
+                        $class->save(); 
+                        
+                        return response()->json([ 'status' => 1, 'message' => 'Contacts Details saved successfully' ]);
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    // Classes
+    public function getClasses(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $status_id = ((isset($input) && isset($input['status_id']))) ? $input['status_id'] : '';  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        $classes = DB::table('classes')->where('id', '>', 0)->where('school_id', $school_id);
+                        if(!empty($status_id)) {
+                            $classes->where('status', $status_id);
+                        }
+
+                        $classes = $classes->orderby('position', 'asc')->get();  
                         if($classes->isNotEmpty()) { 
                             return response()->json([ 'status' => 1, 'message' => 'Classes', 'data'=>$classes]);
                         } else {
@@ -1155,7 +1480,9 @@ class ApiAdminController extends Controller
                 $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
                 $name = ((isset($input) && isset($input['name']))) ? $input['name'] : '';  
                 $position = ((isset($input) && isset($input['position']))) ? $input['position'] : 99;  
-                $cat_status = ((isset($input) && isset($input['cat_status']))) ? $input['cat_status'] : 'ACTIVE';  
+                $cat_status = ((isset($input) && isset($input['cat_status']))) ? $input['cat_status'] : 'ACTIVE'; 
+                $background_theme_id   = ((isset($input) && isset($input['background_theme_id']))) ? $input['background_theme_id'] : 0; 
+                $text_color   = ((isset($input) && isset($input['text_color']))) ? $input['text_color'] : ''; 
 
                 $cat_id = ((isset($input) && isset($input['cat_id']))) ? $input['cat_id'] : 0;  
 
@@ -1188,6 +1515,8 @@ class ApiAdminController extends Controller
                         }
                         $class->school_id = $school_id;
                         $class->name = $name;
+                        $class->background_theme_id = $background_theme_id;
+                        $class->text_color = $text_color;
                         $class->position = $position;
                         $class->status = $cat_status; 
 
@@ -1382,6 +1711,123 @@ class ApiAdminController extends Controller
 
     }
 
+    public function getCommnCCStaffs(Request $request) {
+        try {    
+
+            $inputJSON = file_get_contents('php://input');   
+
+            $input = json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $get_staff = Teacher::leftjoin('users', 'users.id', 'teachers.user_id')
+                            ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                            ->where('users.user_type','TEACHER')->where('users.school_college_id', $school_id)
+                            ->select('users.id', 'users.name', 'users.mobile', 'users.email')->get(); 
+
+                        if($get_staff->isNotEmpty()) {
+                            return response()->json([ 'status' => 1, 'message' => 'Staffs List', 'data' => $get_staff ]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Staffs List']);
+                        } 
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getCommnStaffSelects(Request $request) {
+        try {    
+
+            $inputJSON = file_get_contents('php://input');   
+
+            $input = json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
+                            ->whereRAW('(staff_members != "" OR staff_members != NULL)') 
+                            ->select('id','group_name')->get(); 
+
+                        $teacher_role = UserRoles::where('school_id', $school_id)->where('user_role', 'TEACHER')->select('id','user_role'); 
+                        $get_roles= UserRoles::where('status','ACTIVE')->where('school_id', $school_id)
+                            ->select('id','user_role')
+                            ->union($teacher_role)
+                            ->get();
+
+                        $get_departments = Departments::where('status','ACTIVE')->where('school_id', $school_id)
+                            ->select('id','department_name')->get();
+
+                        $acadamic_year = date('Y');
+                        $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                        if(!empty($settings)) {
+                            $acadamic_year = trim($settings->acadamic_year);
+                        }
+                        if(empty($acadamic_year)) {  $acadamic_year = date('Y'); }
+
+                        $data = [];  
+                        $data['departments'] = $get_departments;
+                        $data['roles'] = $get_roles;
+                        $data['groups'] = $get_groups;
+                        $data['acadamic_year'] = $acadamic_year;
+
+                        return response()->json([ 'status' => 1, 'message' => 'Lists', 'data' => $data ]);
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
     // Communication Classes Sections
     public function getCommnClassSections(Request $request) {
         try {   
@@ -1474,10 +1920,12 @@ class ApiAdminController extends Controller
                 $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0; 
                 $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
                 $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
-                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
-                if(empty($batch))   {
-                    $acadamic_year = $batch = date('Y');
-
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : ''; 
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
                 }
                 $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
 
@@ -1636,6 +2084,90 @@ class ApiAdminController extends Controller
         } 
     } 
 
+    // Update Post Communication
+    public function updateCommunicationPost(Request $request) {
+        try {    
+
+            $inputJSON = file_get_contents('php://input');   
+
+            $input = json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'post_id',  'title', 'message', 
+                'title_push', 'message_push',  'category', 'bg_color', 'req_ack', 'youtube_link', 'schedule_date' ];   
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;    
+                $post_id = ((isset($input) && isset($input['post_id']))) ? $input['post_id'] : 0; 
+
+                $title = ((isset($input) && isset($input['title']))) ? $input['title'] : '';
+                $message = ((isset($input) && isset($input['message']))) ? $input['message'] : '';
+                $title_push = ((isset($input) && isset($input['title_push']))) ? $input['title_push'] : '';
+                $message_push = ((isset($input) && isset($input['message_push']))) ? $input['message_push'] : '';
+                $category = ((isset($input) && isset($input['category']))) ? $input['category'] : 0;
+                $bg_color = ((isset($input) && isset($input['bg_color']))) ? $input['bg_color'] : 0;
+                $req_ack = ((isset($input) && isset($input['req_ack']))) ? $input['req_ack'] : 0;
+                $youtube_link = ((isset($input) && isset($input['youtube_link']))) ? $input['youtube_link'] : '';
+                $schedule_date = ((isset($input) && isset($input['schedule_date']))) ? $input['schedule_date'] : date('Y-m-d H:i:s');
+                
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $post_id > 0) {  
+                        $post_new = DB::table('communication_posts')->where('id', $post_id)->where('posted_by', $school_id)->first();
+
+                        if(!empty($post_new)) { 
+
+                            $schedule_date = $post_new->notify_datetime; 
+
+                            if(!empty($schedule_date)) { 
+                                if(strtotime($schedule_date) < strtotime(date('Y-m-d H:i:s'))) {
+                                    $schedule_date = date('Y-m-d H:i:s');
+                                }
+                            }
+                            $data = [
+                                'title' => $title,
+                                'message' => $message,
+                                'title_push' => $title_push,
+                                'message_push' => $message_push,
+                                'category_id' => $category,
+                                'background_id' => $bg_color,
+                                'request_acknowledge' => $req_ack,
+                                'youtube_link' => $youtube_link,
+                                'notify_datetime' => $schedule_date,
+                                'updated_by' => $userid,
+                                'updated_at' => date('Y-m-d H:i:s')
+                            ]; 
+
+                            DB::table('communication_posts')->where('id', $post_id)->where('posted_by', $school_id)
+                                ->update($data);
+
+                            return  response()->json(['status'=>1,'message'=>'Post updated Successfully']);
+
+                        } else {
+                            return response()->json(['status'=>0,'message'=>'Invalid Post']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+    } 
+
     // SMS Communication
     public function postCommunicationSms(Request $request) {
         try {    
@@ -1691,6 +2223,156 @@ class ApiAdminController extends Controller
         } 
     } 
 
+    // POST Communication Post
+    public function deleteCommunicationPost(Request $request) {
+        try {    
+
+            //$inputJSON = file_get_contents('php://input');   
+
+            $input = $request->all(); //json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'post_id' ];    
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;     
+                $post_id = ((isset($input) && isset($input['post_id']))) ? $input['post_id'] : 0;     
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $post_id > 0) {  
+
+                        $inarr = [];    
+                        $inarr["user_id"] = $userid;
+                        $inarr["x-api-key"] = $api_token;    
+  
+                        DB::table('communication_posts')->where('id', $post_id)
+                            ->update(['status' => 'DELETED', 'delete_status'=>1, 'updated_by'=>$userid, 'updated_at'=>date('Y-m-d H:i:s')]);
+
+                        return response()->json([ 'status' => 1, 'message' => 'Post deleted successfully']); 
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+    } 
+
+    // Delete Communication Staff
+    public function deleteCommunicationPostStaff(Request $request) {
+        try {    
+
+            $input = $request->all(); //json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'post_id' ];    
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;     
+                $post_id = ((isset($input) && isset($input['post_id']))) ? $input['post_id'] : 0;     
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $post_id > 0) {  
+
+                        $inarr = [];    
+                        $inarr["user_id"] = $userid;
+                        $inarr["x-api-key"] = $api_token;    
+  
+                        DB::table('communication_posts_staff')->where('id', $post_id)
+                            ->update(['status' => 'INACTIVE', 'delete_status'=>1, 'updated_by'=>$userid, 'updated_at'=>date('Y-m-d H:i:s')]);
+
+                        return response()->json([ 'status' => 1, 'message' => 'Post deleted successfully']); 
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+    } 
+
+    // Delete Communication Staff
+    public function postCommunicationPostStaff(Request $request) {
+        try {    
+
+            //$inputJSON = file_get_contents('php://input');   
+
+            $input = $request->all(); //json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'title',  'message', 'title_push', 'message_push', 'category', 
+                'batch', 'post_type' ];   //, 'bg_color', 'req_ack', 'schedule_date', 'youtube_link'
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;    
+
+                $schedule_date = ((isset($input) && isset($input['schedule_date']))) ? $input['schedule_date'] : ''; 
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {  
+
+                        $inarr = [];    
+                        $inarr["user_id"] = $userid;
+                        $inarr["x-api-key"] = $api_token;   
+                        if(empty(trim($schedule_date))) {
+                            $inarr["schedule_date"] = date('Y-m-d H:i:s');
+                        }
+                        $inarr = array_merge($inarr, $input);  //  echo "<pre>"; print_r($inarr); print_r($input); exit;
+                        $ret = (new AdminController())->createPostStaff($request, $inarr); 
+  
+                        return $ret;
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+    } 
+
     // Homework Communication
     public function postCommunicationHws(Request $request) {
         //try {    
@@ -1727,7 +2409,12 @@ class ApiAdminController extends Controller
                         $input =  $request->all(); 
                         $inarr["id"] = $homework_id;
                         $inarr = array_merge($inarr, $input);  
-                        $ret = (new AdminController())->createPostHWs($request, $inarr); 
+
+                        if($homework_id > 0) {
+                            $ret = (new AdminController())->updatePostHWs($request, $inarr); 
+                        }   else {
+                            $ret = (new AdminController())->createPostHWs($request, $inarr); 
+                        } 
   
                         return $ret;
                          
@@ -1765,8 +2452,11 @@ class ApiAdminController extends Controller
                 $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
                 $from_date = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';
                 $to_date = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';
-                if(empty($batch))   {
-                    $acadamic_year = $batch = date('Y'); 
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
                 }
                 $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
 
@@ -1806,6 +2496,86 @@ class ApiAdminController extends Controller
                             return response()->json([ 'status' => 1, 'message' => 'Communication Posts', 'data' => $posts]); 
                         } else {
                             return response()->json([ 'status' => 0, 'message' => 'No Communication Posts']); 
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    // Communication Posts List
+    public function getCommnPostStaffList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0; 
+                $category_id = ((isset($input) && isset($input['category_id']))) ? $input['category_id'] : 0; 
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0; 
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
+                $from_date = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';
+                $to_date = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
+                }
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {   
+                        $posts = CommunicationPostStaff::where('delete_status', 0)
+                            ->whereIn('status', ['PENDING', "ACTIVE"])->where('posted_by', $school_id)
+                            ->orderby('id', 'desc');  
+
+                        if(!empty(trim($from_date))) {
+                            $from_date = date('Y-m-d', strtotime($from_date));
+                            $posts->whereRaw('communication_posts_staff.notify_datetime >= ?', [$from_date]); 
+                
+                        }
+                        if(!empty(trim($to_date))) {
+                            $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
+                            $posts->whereRaw('communication_posts_staff.notify_datetime <= ?', [$to_date]); 
+                        }
+                        if($category_id > 0) { 
+                            $posts->where('communication_posts_staff.category_id', $category_id); 
+                        } 
+                        if(!empty(trim($search))) { 
+                            $posts->whereRaw(' ( title like "%'.$search.'%" or message like "%'.$search.'%" ) '); 
+                        }
+
+                        $posts = $posts->skip($page_no)->take($limit)->get(); 
+
+                        if($posts->isNotEmpty()) {
+                            return response()->json([ 'status' => 1, 'message' => 'Communication Staff Posts', 'data' => $posts]); 
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Communication Staff Posts']); 
                         }
                     }   else {
                         return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
@@ -1961,8 +2731,11 @@ class ApiAdminController extends Controller
                 $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
                 $from_date = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';
                 $to_date = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';
-                if(empty($batch))   {
-                    $acadamic_year = $batch = date('Y'); 
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
                 }
                 $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
 
@@ -2038,8 +2811,11 @@ class ApiAdminController extends Controller
                 $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
                 $from_date = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';
                 $to_date = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';
-                if(empty($batch))   {
-                    $acadamic_year = $batch = date('Y'); 
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
                 }
                 $is_attachment = ((isset($input) && isset($input['is_attachment']))) ? $input['is_attachment'] : 0;  
                 $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
@@ -2096,6 +2872,373 @@ class ApiAdminController extends Controller
                         } else {
                             return response()->json([ 'status' => 0, 'message' => 'No Homeworks']); 
                         }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    // Communication Survey List
+    public function getCommnSurveyList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
+                $from_date = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';
+                $to_date = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';
+
+                $survey_id = ((isset($input) && isset($input['survey_id']))) ? $input['survey_id'] : 0;
+
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
+                }
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {   
+                        $posts = Survey::where('status','!=', 'DELETED')->where('school_id', $school_id)
+                            ->orderby('id', 'desc');  
+
+                        if(!empty(trim($from_date))) {
+                            $from_date = date('Y-m-d', strtotime($from_date));
+                            $posts->whereRaw('survey.expiry_date >= ?', [$from_date]); 
+                
+                        }
+                        if(!empty(trim($to_date))) {
+                            $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
+                            $posts->whereRaw('survey.expiry_date <= ?', [$to_date]); 
+                        } 
+                        if(!empty(trim($search))) { 
+                            $posts->whereRaw(' ( survey_question like "%'.$search.'%" or survey_option1 like "%'.$search.'%" or survey_option2 like "%'.$search.'%" ) '); 
+                        }
+
+                        if($survey_id > 0) {
+                            $posts = $posts->where('id', $survey_id)->get(); 
+
+                            if($posts->isNotEmpty()) {
+                                return response()->json([ 'status' => 1, 'message' => 'Survey Details', 'data' => $posts[0]]); 
+                            } else {
+                                return response()->json([ 'status' => 0, 'message' => 'No Survey Details']); 
+                            }
+                        }   else {
+                            $posts = $posts->skip($page_no)->take($limit)->get(); 
+
+                            if($posts->isNotEmpty()) {
+                                return response()->json([ 'status' => 1, 'message' => 'Survey List', 'data' => $posts]); 
+                            } else {
+                                return response()->json([ 'status' => 0, 'message' => 'No Survey List']); 
+                            }
+                        } 
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    // POST Communication Survey
+    public function postCommunicationSurvey(Request $request) {
+        try {    
+
+            $inputJSON = file_get_contents('php://input');   
+
+            $input = json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'survey_question',  'survey_option1', 'survey_option2', 'expiry_date' ];    
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;     
+                $survey_id  = ((isset($input) && isset($input['survey_id']))) ? $input['survey_id'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {  
+
+                        $inarr = [];    
+                        $inarr["user_id"] = $userid;
+                        $inarr["x-api-key"] = $api_token;  
+                        $inarr["survey_id"] = $survey_id;   
+                        $inarr = array_merge($inarr, $input);  // echo "<pre>"; print_r($inarr); print_r($input); exit;
+                        $ret = (new AdminController())->createSurvey($request, $inarr); 
+  
+                        return $ret;
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+    }  
+
+    // Communication Survey Delete
+    public function deleteCommunicationSurvey(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'survey_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $survey_id = ((isset($input) && isset($input['survey_id']))) ? $input['survey_id'] : 0;    
+
+                $api_token = $request->header('x-api-key'); 
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $survey_id > 0) {   
+
+                        $get_data = Survey::where('id', $survey_id)->where('school_id', $school_id)->get();
+                        if ($get_data->isNotEmpty()) { 
+                            Survey::where('id', $survey_id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
+                                return response()->json(['status' => 1, 'message' => 'Survey Deleted Successfully']); 
+                        } else {
+                             return response()->json(['status' => 0, 'data' => [], 'message' => 'No Survey']);
+                        } 
+
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    } 
+    
+    public function updateCommunicationSurvey(Request $request) {
+        try {    
+
+            $inputJSON = file_get_contents('php://input');   
+
+            $input = json_decode($inputJSON, TRUE); 
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'survey_question',  'survey_option1', 'survey_option2', 'expiry_date', "survey_id" ];    
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;     
+                $survey_id  = ((isset($input) && isset($input['survey_id']))) ? $input['survey_id'] : 0;  
+
+                $survey_question  = ((isset($input) && isset($input['survey_question']))) ? $input['survey_question'] : '';  
+                $survey_option1  = ((isset($input) && isset($input['survey_option1']))) ? $input['survey_option1'] : '';    
+                $survey_option2  = ((isset($input) && isset($input['survey_option2']))) ? $input['survey_option2'] : '';   
+                $survey_option3  = ((isset($input) && isset($input['survey_option3']))) ? $input['survey_option3'] : '';    
+                $survey_option4  = ((isset($input) && isset($input['survey_option4']))) ? $input['survey_option4'] : '';  
+                $expiry_date  = ((isset($input) && isset($input['expiry_date']))) ? $input['expiry_date'] : '';    
+
+                if(empty($expiry_date)) {
+                    $expiry_date = date('Y-m-d');
+                }
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {   
+
+                        if ($survey_id > 0) {
+                            $survey = Survey::find($survey_id);
+                            $survey->updated_at = date('Y-m-d H:i:s');
+                            $survey->updated_by = $userid;
+
+                            $survey->school_id = $school_id; 
+                            $survey->survey_question = $survey_question; 
+                            $survey->survey_option1 = $survey_option1;
+                            $survey->survey_option2 = $survey_option2;
+                            $survey->survey_option3 = $survey_option3;
+                            $survey->survey_option4 = $survey_option4;
+                            $survey->expiry_date = $expiry_date; 
+
+                            $user_type = DB::table('users')->where('id', $userid)->value('user_type');
+                            if($user_type == "SCHOOL" ) {
+                                $survey->status='ACTIVE';
+                            }   else {
+                                $survey->status='PENDING';
+                            } 
+
+                            $survey->save(); 
+
+                            return response()->json(['status'=>1,'message'=>'Survey Saved Successfully']);
+                        }   else {
+                            return response()->json([ 'status' => 0, 'message' => 'Invalid Survey']);
+                        }
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+    }
+
+    // Communication Remarks / Rewards List
+    public function getCommnRemarkRewardsList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';
+                $mindate = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';
+                $maxdate = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';
+
+                $type = ((isset($input) && isset($input['type']))) ? $input['type'] : "REMARK"; // / REWARD
+                if(empty($type)) {
+                    $type = "REMARK";
+                }
+                if(empty($batch)) { 
+                    $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                    if(!empty($settings)) {
+                        $acadamic_year = $batch = trim($settings->acadamic_year);
+                    } 
+                }
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {   
+                        $remarksqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                            ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                            ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                            ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                            ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', $type)
+                            ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                                    'classes.class_name', 'sections.section_name'); 
+ 
+
+                        if (!empty($search)) { 
+                            $remarksqry->whereRaw('( users.name like "%'.$search . '%" OR users.mobile like "%'.$search . '%" OR users.email like "%'.$search . '%" OR users.name_code like "%'.$search . '%"  OR user_remarks.remark_description like "%'.$search . '%" OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" ) '); 
+                        } 
+
+                        if($class_id > 0){
+                            $remarksqry->where('students.class_id',$class_id);  
+                        }
+                        if($section_id > 0){
+                            $remarksqry->where('students.section_id',$section_id);  
+                        }
+                        if($student_id > 0) {
+                            $remarksqry->where('students.user_id',$student_id);  
+                        }
+                        if(!empty(trim($mindate))) {
+                            $mindate = date('Y-m-d', strtotime($mindate));
+                            $remarksqry->where('user_remarks.created_at', '>=', $mindate); 
+                
+                        }
+                        if(!empty(trim($maxdate))) {
+                            $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                            $remarksqry->where('user_remarks.created_at', '<=', $maxdate);  
+                        }
+
+                        if(!empty($status)){
+                            $remarksqry->where('user_remarks.status',$status); 
+                        } 
+                        
+                        $orderby = 'user_remarks.id'; 
+                        $dir = 'DESC'; 
+
+                        $remarks = $remarksqry->skip($page_no)->take($limit)->orderby($orderby, $dir)->get();
+
+                        if($remarks->isNotEmpty()) {
+                            return response()->json([ 'status' => 1, 'message' => 'Remarks List', 'data' => $remarks]); 
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Remarks List']); 
+                        }
+
                     }   else {
                         return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
                     }
@@ -2191,6 +3334,98 @@ class ApiAdminController extends Controller
         }   catch(\Throwable $th) {
             return response()->json(['status' => 0, 'message' => $th->getMessage()]);
         } 
+
+    }
+
+    // Scholars Add
+    public function postScholarsadd(Request $request) {
+        //try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'name', 'password', 'admission_no', 'class_id', 'section_id', 
+                'mobile', 'gender', 'dob', 'status' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0; 
+
+                $api_token = $request->header('x-api-key'); 
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {  
+
+                        $status = ((isset($input) && isset($input['status']))) ? $input['status'] : '';   
+
+                        $request->request->add($input);
+                           
+                        $ret = (new AdminController())->postStudent($request); 
+
+                        return $ret;
+                    }   else {
+                        return response()->json([ 'status' => "FAILED", 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => "FAILED", 'message' => $error]);
+            }
+        /*}   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } */
+
+    }
+
+    // Scholars additional
+    public function postScholarsadditional(Request $request) {
+        //try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0; 
+                $id = ((isset($input) && isset($input['id']))) ? $input['id'] : 0; 
+
+                $api_token = $request->header('x-api-key'); 
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $id > 0) {   
+                        
+                        $request->request->add($input);
+                           
+                        $ret = (new AdminController())->postStudentAdditional($request); 
+
+                        return $ret;
+                    }   else {
+                        return response()->json([ 'status' => "FAILED", 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => "FAILED", 'message' => $error]);
+            }
+        /*}   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } */
 
     }
 
@@ -2353,6 +3588,164 @@ class ApiAdminController extends Controller
 
     }
 
+    // Scholar Details
+    public function getScholarsDetails(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'scholar_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;    
+                $scholar_id = ((isset($input) && isset($input['scholar_id']))) ? $input['scholar_id'] : 0;   
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';   
+
+                $api_token = $request->header('x-api-key'); 
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $scholar_id>0) {  
+                        $user = User::with('userdetails')->where('id', $scholar_id)
+                            ->select('id', 'school_college_id', 'reg_no', 'user_type',  'state_id', 'city_id', 'country',
+                                'admission_no','name', 'last_name', 'email', 'gender', 'dob', 'country_code', 
+                                'mobile','code_mobile',  'mobile1','codemobile1', 'emergency_contact_no', 'last_login_date', 
+                                'last_app_opened_date', 'user_source_from', 'api_token', 'api_token_expiry', 'is_password_changed',
+                                'notification_status', 'joined_date', 'profile_image', 'status', 'alumni_status')->first(); 
+
+                        if(!empty($user)) {
+                            if(empty($batch)) {
+                                $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+                            }
+                            if($user->user_type == 'SCHOOL') {
+                                $user->is_school_college_id = $user->id;
+                            } else {
+                                $user->is_school_college_id = $user->school_college_id;
+                            }
+
+                            $user_remarks = UserRemarks::where('user_id', $scholar_id)->where('remark_type', 'REMARK')
+                                ->where('status', 'ACTIVE')->orderby('id', 'desc')->get();
+                            if($user_remarks->isNotEmpty()) {} else { $user_remarks = []; }
+
+                            $user_rewards = UserRemarks::where('user_id', $scholar_id)->where('remark_type', 'REWARD')
+                                ->where('status', 'ACTIVE')->orderby('id', 'desc')->get();
+                            if($user_rewards->isNotEmpty()) {} else { $user_rewards = []; }
+
+                            $user->user_remarks = $user_remarks;
+                            $user->user_rewards = $user_rewards;
+
+                            $user->fee_details = '';
+                            $user->feedata = '';
+
+                            $request->request->add(['school_id' => $school_id, 'student_id' => $scholar_id, 'batch' => $batch ]);
+                           
+                            $ret = (new AdminController())->filterFeeCollections($request);
+ 
+                            if(!empty($ret)) { 
+                                $return  = $ret->getOriginalContent(); 
+                                if(isset($return['student']) && !empty($return['student'])) {
+                                    $fee_details = $return['student'];  
+                                    $user->fee_details = $fee_details;
+                                } 
+                                if(isset($return['feedata']) && !empty($return['feedata'])) {
+                                    $feedata = $return['feedata'];  
+                                    $user->feedata = $feedata;
+                                }  
+                            } 
+
+                            $user->exam_details = []; $class_id =  $section_id = 0;
+
+                            /*  EXAMS */
+                            $user_details_get = DB::table('students')
+                                ->leftjoin('sections', 'sections.id', 'students.section_id')
+                                ->select('sections.mapped_subjects', 'students.class_id', 'students.section_id')
+                                ->where('students.user_id', $scholar_id)->first();  
+                           
+                            if(!empty($user_details_get)) {
+                                $class_id = $user_details_get->class_id; 
+                                $section_id = $user_details_get->section_id; 
+                            } 
+                            if($class_id > 0 && $section_id > 0) {
+                                $exams = DB::table('exams')
+                                    ->leftjoin('examinations', 'examinations.id', 'exams.examination_id')
+                                    ->leftjoin('exam_sessions', 'exams.id', 'exam_sessions.exam_id')
+                                    ->leftjoin('classes', 'classes.id', 'exam_sessions.class_id')
+                                    ->where('examinations.batch', $batch)
+                                    ->where('exams.class_ids', $class_id)->where('exams.examination_id', '>',0)
+                                    ->whereIn('exams.section_ids', [0, $section_id]);
+                                
+                                $exams = $exams->where('exam_sessions.status', 'ACTIVE')
+                                    ->select("examinations.exam_name", "exams.exam_name as exname", "exams.id", "exam_startdate", 
+                                        DB::RAW(' DATE_FORMAT(exam_startdate, "%Y-%m") as monthyear'), 'class_id', 'section_id')
+                                    ->groupby('exams.id')->orderby('exams.id', 'asc')->get();
+
+                                if($exams->isNotEmpty()) {
+                                    foreach($exams as $ek => $ev) {
+
+                                        $exam_id = $ev->id;
+                                        MarksEntry::$exam_id = $exam_id;
+                                        MarksEntry::$class_id = $class_id;
+
+                                        User::$monthyear = $ev->monthyear;
+                                        User::$class_id = $class_id;
+                                        User::$section_id = $section_id;
+                                        User::$exam_id = $exam_id;
+
+                                        $section_id1 = DB::table('exams')->where('id', $exam_id)->value('section_ids');
+
+                                        MarksEntry::$section_id = $section_id;
+                                        $students = User::with('marksentry')
+                                            ->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                                            ->leftjoin('students', 'students.user_id', 'users.id')
+                                            //->whereRaw( "'".$monthyear."' BETWEEN from_month and to_month ")
+                                            ->where('student_class_mappings.class_id', $class_id);
+                 
+                                        $students->where('student_class_mappings.section_id', $section_id);  
+                                        $students->where('student_class_mappings.user_id',$scholar_id); 
+
+                                        $students = $students->where('student_class_mappings.status', 'ACTIVE')
+                                            ->where('user_type', 'STUDENT')
+                                            ->where('student_class_mappings.user_id', '>', 0)
+                                            ->select('users.id', 'name', 'email', 'mobile', 'students.admission_no')
+                                            ->orderby('name')->get();
+                                        if($students->isNotEmpty()) {
+                                            $exams[$ek]->exam_result = $students->toArray();
+                                        }   else {
+                                            $exams[$ek]->exam_result = [];
+                                        }
+                                    }  
+                                    $exams = $exams->toArray();
+
+                                    $user->exam_details = $exams; 
+                                }
+                            }
+                            /*  EXAMS */
+
+                            return response()->json([ 'status' => 1, 'message' => 'Scholar Details', 'data' => $user]);
+                            //echo "<pre>"; print_r($ret); exit;
+                        }   
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
     // Staffs List
     public function getStaffsList(Request $request) {
         try {   
@@ -2421,6 +3814,236 @@ class ApiAdminController extends Controller
                             return response()->json([ 'status' => 1, 'message' => 'Staffs List', 'data' => $users]); 
                         } else {
                             return response()->json([ 'status' => 0, 'message' => 'No Staffs List']); 
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    // Staffs List
+    public function getClassTutorsList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;    
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
+                $status_id = ((isset($input) && isset($input['status_id']))) ? $input['status_id'] : ''; 
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0; 
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $subject_id = ((isset($input) && isset($input['subject_id']))) ? $input['subject_id'] : 0;  
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {   
+
+                        $sections = Sections::leftjoin('classes', 'sections.class_id', 'classes.id')
+                            ->where('classes.school_id',$school_id)->where('classes.school_id',$school_id)
+                            ->where('classes.status','=','ACTIVE')->where('sections.status','=','ACTIVE')
+                            ->select('sections.*', 'classes.class_name')->orderby('classes.position', 'Asc')
+                            ->orderby('sections.position', 'Asc')->get();
+
+                        if($sections->isNotEmpty()) {
+                            foreach($sections as $sk=>$sv) {
+                                $teacher_id = DB::table('class_teachers')->leftjoin('users', 'class_teachers.teacher_id', 'users.id')
+                                    ->where('class_id', $sv->class_id)
+                                    ->where('section_id', $sv->id)->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                                    ->where('users.school_college_id',$school_id)->value('teacher_id');
+                                $sections[$sk]->teacher_id = $teacher_id;
+                            }
+                        }
+
+                        $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')
+                            ->where('users.user_type','TEACHER')->where('users.status','ACTIVE')->where('users.delete_status',0)
+                            ->where('users.school_college_id',$school_id)
+                            ->orderby('users.name', 'asc')->get();  
+
+                        if($sections->isNotEmpty()) {
+                            return response()->json([ 'status' => 1, 'message' => 'Staffs List', 'data' => $sections, 'teachers' => $teacher]); 
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Staffs List']); 
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    // Update Class teacher List
+    public function postClassTutor(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'teacher_id', 'section_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;    
+                $teacher_id = ((isset($input) && isset($input['teacher_id']))) ? $input['teacher_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {  
+
+                        /*if($teacher_id > 0)  {} else {
+                            return response()->json([ 'status' => 0,  'message' => 'Please select the Teacher']);
+                        }*/
+
+                        if($section_id > 0)  {} else {
+                            return response()->json([ 'status' => 0, 'message' => 'Please select the Section']);
+                        }
+
+                        if($teacher_id > 0) {
+                             $teacher_chk = DB::table('class_teachers')->where('teacher_id', $teacher_id)
+                                ->where('status', 'ACTIVE')->first(); 
+                             if(!empty($teacher_chk)) {
+                                if($teacher_chk->section_id != $section_id) {
+                                    return response()->json(['status' => 0, 'message' => 'Class Already Assigned for this Teacher']);
+                                }
+                             } 
+                             $status = 'ACTIVE';
+                         } else {
+                            $teacher_id = 0;
+                            $status = 'INACTIVE';
+                         } 
+
+                         $teachers = ClassTeacher::where('section_id', $section_id)->first();
+                         if(empty($teachers)) {
+                             $teachers = new ClassTeacher();
+                         } else {
+                             $teachers = ClassTeacher::find($teachers->id);
+                         }
+
+                         $teachers->teacher_id = $teacher_id;
+                         $teachers->class_id = DB::table('sections')->where('id', $section_id)->value('class_id');
+                         $teachers->section_id = $section_id;
+                         $teachers->status = $status;
+                         $teachers->save();
+
+                        return response()->json(['status' => 1, 'message' => 'Class Teachers Saved Successfully']);
+
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    // subject staffs List
+    public function getSubjectStaffsList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;    
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
+                $status_id = ((isset($input) && isset($input['status_id']))) ? $input['status_id'] : ''; 
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0; 
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $subject_id = ((isset($input) && isset($input['subject_id']))) ? $input['subject_id'] : 0;  
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {   
+
+                        $users_qry = DB::table('users')->where('user_type', 'TEACHER')->where('users.status', 'ACTIVE')
+                            ->where('users.school_college_id', $school_id)
+                            ->select('users.id', 'name', 'mobile');   
+
+                        if($class_id > 0 || $section_id > 0 || $subject_id > 0){
+                            $users_qry->leftjoin('subject_mapping', 'users.id', 'subject_mapping.teacher_id');
+                            if($class_id > 0){
+                                $users_qry->where('subject_mapping.class_id',$class_id);
+                            }
+                            if($section_id > 0){
+                                $users_qry->where('subject_mapping.section_id',$section_id);
+                            }
+                            $users_qry->where('subject_mapping.status', 'ACTIVE')
+                                ->groupby('subject_mapping.teacher_id');
+ 
+                            if($subject_id > 0){
+                                $users_qry->where('subject_mapping.subject_id',$subject_id); 
+                            }
+                        } 
+
+                        $users = $users_qry->orderBy('users.name', 'ASC')->skip($page_no)->take($limit)->get(); 
+
+                        if($users->isNotEmpty()) {
+                            foreach($users as $uk=>$user) {
+                                $users[$uk]->handling_classes = SubjectMapping::getHandlingClasses($user->id);
+                            }
+
+                            return response()->json([ 'status' => 1, 'message' => 'Subject Teachers List', 'data' => $users]); 
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Subject Teachers Mapped']); 
                         }
                     }   else {
                         return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
@@ -3866,7 +5489,7 @@ class ApiAdminController extends Controller
                 $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
                 $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;     
                 $status_id = ((isset($input) && isset($input['status_id']))) ? $input['status_id'] : '';     
-
+                $category_id = ((isset($input) && isset($input['category_id']))) ? $input['category_id'] : 0;   
                 $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
 
                 $api_token = $request->header('x-api-key');
@@ -3883,6 +5506,10 @@ class ApiAdminController extends Controller
  
                         if(!empty($status_id)){
                             $feeitems->where('status',$status_id); 
+                        }  
+
+                        if($category_id > 0){
+                            $feeitems->where('category_id',$category_id); 
                         }  
 
                         $feeitems = $feeitems->orderBy('id', 'deSC')->skip($page_no)->take($limit)->get(); 
@@ -4444,6 +6071,338 @@ class ApiAdminController extends Controller
         }   catch(\Throwable $th) {
             return response()->json(['status' => 0, 'message' => $th->getMessage()]);
         } 
+
+    }
+
+    // Student Daily Attendance
+    public function getStudentDailyAttendance(Request $request) {
+        //try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'cdate', 'class_id', 'section_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;   
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;     
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;   
+                $cdate = ((isset($input) && isset($input['cdate']))) ? $input['cdate'] : '';   
+                if(empty($cdate)) {
+                    $cdate = date('Y-m-d');
+                } else {
+                    $cdate = date('Y-m-d', strtotime($cdate));
+                }
+                $monthyear = date('Y-m', strtotime($cdate));
+                $lastdate = date('t', strtotime($monthyear));
+
+                $api_token = $request->header('x-api-key'); 
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {    
+
+                        $orderdate = explode('-', $cdate);
+                        $year = $orderdate[0];
+                        $month   = $orderdate[1];
+                        $day  = $orderdate[2];
+                        $day = $day * 1;          
+                        if($class_id > 0) {} else { $class_id = 0; }
+                        if($section_id > 0) {} else { $section_id = 0; }
+
+                        if($class_id == 0) {
+                            return response()->json(['status' => 0, 'data' => [], 'message' => 'Please select the Class']);
+                        }
+                        if($section_id == 0) {
+                            return response()->json(['status' => 0, 'data' => [], 'message' => 'Please select the Section']);
+                        }
+
+                        User::$monthyear = $monthyear;
+                        User::$class_id = $class_id;
+                        User::$section_id = $section_id;
+                        $new_date = $cdate;
+                        $academic_year = date('Y');
+                        $final_year = date('Y') + 1;
+                        $cur_month = date('m');
+                        $from_month =  $academic_year.'-06';
+                        $to_month = $final_year.'-04';
+                        $check_month =  $academic_year.'-'.$cur_month;
+                        $userids = []; $students = '';
+
+                        $orderdate = explode('-', $monthyear);
+                        $year = $orderdate[0];
+                        $month   = $orderdate[1];
+                        $fin_month = $year.'-'.$month;
+                        
+                        $users = User::leftjoin('students', 'students.user_id', 'users.id')
+                        //->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                        ->where('user_type', 'STUDENT')->where('students.delete_status', 0)
+                        ->where('users.status','ACTIVE')
+                        // ->whereRaw("'".$check_month."' BETWEEN from_month and to_month")
+                        ->where('students.class_id', $class_id)
+                        ->where('students.section_id', $section_id)
+                        ->select('students.*','users.id', 'name', 'email', 'mobile','profile_image', 'students.class_id', 'students.section_id', 'students.admission_no')
+                        ->orderby('name')
+                        ->get();
+
+
+                        // $users = DB::select("select student_class_mappings.*, `users`.`id`, `name`, `email`, `mobile`, `students`.`class_id`, `students`.`section_id`, `students`.`admission_no` from `student_class_mappings` left join `users` on `student_class_mappings`.`user_id` = `users`.`id` left join `students` on `students`.`user_id` = `users`.`id` where `users `.`user_type` = 'STUDENT' and `student_class_mappings`.`class_id` = '".$class_id."' and `student_class_mappings`.`section_id` = '".$section_id."'");
+
+                        $appstatus = 0;
+                        $app = DB::table('attendance_approval')->where('class_id', $class_id)
+                                ->where('section_id', $section_id)->where('date', $cdate)->where('admin_status', 1)->get();
+                        if($app->isNotEmpty()) {
+                            $appstatus = 1;
+                        }
+                        if(!empty($users)) {
+                            foreach($users as $user) {
+                                $userids[] = $user->user_id;
+                            }
+                            $userids = array_unique($userids);
+                            list($year, $month) = explode('-', $monthyear);
+
+                             $students = User::with('dailyattendance')
+                                ->leftjoin('students', 'students.user_id', 'users.id')
+                                //->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                                ->where('user_type', 'STUDENT')->where('students.delete_status', 0)
+                                ->where('users.status','ACTIVE')
+                                ->whereIn('users.id', $userids)
+                               //->whereRaw("'".$fin_month."' BETWEEN from_month and to_month")
+                                /* ->where('student_class_mappings.class_id', $class_id)
+                                ->where('student_class_mappings.section_id', $section_id)*/
+                                 ->where('students.class_id', $class_id)
+                                ->where('students.section_id', $section_id)
+                                ->select('users.id', 'name', 'email', 'mobile','profile_image', 'students.class_id', 'students.section_id', 'students.admission_no')
+                                ->orderby('users.name', 'asc')
+                                ->get();
+
+
+
+                                $total_boys = User::with('dailyattendance')
+                                ->leftjoin('students', 'students.user_id', 'users.id')
+                                //->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                                ->where('user_type', 'STUDENT')->where('students.delete_status', 0)
+                                ->where('users.status','ACTIVE')
+                                ->where('users.gender','MALE')
+                                ->whereIn('users.id', $userids)
+                               //->whereRaw("'".$fin_month."' BETWEEN from_month and to_month")
+                                 ->where('students.class_id', $class_id)
+                                ->where('students.section_id', $section_id)
+                                ->select('users.id', 'name', 'email', 'mobile','profile_image', 'students.class_id', 'students.section_id', 'students.admission_no')
+                                ->get()->count();
+
+                                $total_girls = User::with('dailyattendance')
+                                ->leftjoin('students', 'students.user_id', 'users.id')
+                                //->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                                ->where('user_type', 'STUDENT')->where('students.delete_status', 0)
+                                ->where('users.status','ACTIVE')
+                                ->where('users.gender','FEMALE')
+                                ->whereIn('users.id', $userids)
+                               //->whereRaw("'".$fin_month."' BETWEEN from_month and to_month")
+                                 ->where('students.class_id', $class_id)
+                                ->where('students.section_id', $section_id)
+                                ->select('users.id', 'name', 'email', 'mobile','profile_image', 'students.class_id', 'students.section_id', 'students.admission_no')
+                                ->get()->count();
+
+                                $date = 'day_'.$day;
+                                $fn_chk = StudentsDailyAttendance::whereIn('user_id', $userids)->where($date,1)->where('monthyear', $monthyear)->select('id')->get()->count();
+                                $date2 = 'day_'.$day.'_an';
+                                $an_chk = StudentsDailyAttendance::whereIn('user_id', $userids)->where($date2,1)->where('monthyear', $monthyear)->select('id')->get()->count();
+                               
+                               list($year, $month) = explode('-', $monthyear);
+                               $sundays = CommonController::getSundays($year, $month); 
+                               $saturdays = CommonController::getSaturdays($year, $month); 
+                               $holidays = DB::table('holidays')->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
+                                    ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')->where('school_college_id', $school_id)
+                                    ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
+                                    if($holidays->isNotEmpty()){
+                                        $holidays = $holidays->toArray();
+                                    }
+
+                            // Morning Session
+                            $total_boys_present_fn = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)->where('attendance_approval.fn_status',1)
+                                //->where('attendance_approval.an_status',1)
+                                ->where('users.gender','MALE')
+                                        ->where('students.delete_status', 0)
+                                        ->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)->get()->count();
+
+                            $total_boys_absent_fn = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)->where('attendance_approval.fn_status',2)
+                                //->where('attendance_approval.an_status',2)
+                                ->where('users.gender','MALE')->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+                            $total_girls_present_fn = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)->where('attendance_approval.fn_status',1)
+                                //->where('attendance_approval.an_status',1)
+                                ->where('users.gender','FEMALE')->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+                            $total_girls_absent_fn = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)->where('attendance_approval.fn_status',2)
+                                //->where('attendance_approval.an_status',2)
+                                ->where('users.gender','FEMALE')->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+
+                            // Afternoon Session
+                            $total_boys_present_an = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)//->where('attendance_approval.fn_status',1)
+                                ->where('attendance_approval.an_status',1)->where('users.gender','MALE')
+                                        ->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+                            $total_boys_absent_an = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)//->where('attendance_approval.fn_status',2)
+                                ->where('attendance_approval.an_status',2)->where('users.gender','MALE')->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+                            $total_girls_present_an = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)//->where('attendance_approval.fn_status',1)
+                                ->where('attendance_approval.an_status',1)->where('users.gender','FEMALE')->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+                            $total_girls_absent_an = User::leftjoin('attendance_approval','attendance_approval.user_id','users.id')->leftjoin('students', 'students.user_id', 'users.id')->where('attendance_approval.date',$new_date)//->where('attendance_approval.fn_status',2)
+                                ->where('attendance_approval.an_status',2)->where('users.gender','FEMALE')->where('students.class_id', $class_id)
+                                        ->where('students.section_id', $section_id)
+                                        ->where('students.delete_status', 0)->get()->count();
+
+                            if($students->isNotEmpty()) {
+                                $students = $students->toArray();
+
+                                foreach($students as $sk=>$stud) {
+                                    if(isset($stud['dailyattendance']) && is_array($stud['dailyattendance']) && count($stud['dailyattendance'])>0) {
+                                        $students[$sk]['dayfn'] = $stud['dailyattendance'][$date];
+                                        $students[$sk]['dayan'] = $stud['dailyattendance'][$date2];
+                                    }
+                                    //echo "<pre>";print_r($date);print_r($date2);print_r($stud['dailyattendance']);exit;
+                                }
+                                //
+
+                                $data = ['monthyear'=>$monthyear, 'class_id'=>$class_id, 'section_id'=>$section_id, 
+                                'students'=>$students, 'lastdate'=>$lastdate, 'fn_chk'=>$fn_chk, 'an_chk'=>$an_chk,
+                                'new_date'=>$new_date, 'sundays'=>$sundays, 'saturdays'=>$saturdays, 'holidays'=>$holidays,
+                                'total_boys'=>$total_boys, 'total_girls'=>$total_girls, 
+                                'total_boys_present_fn'=>$total_boys_present_fn,
+                                'total_boys_absent_fn'=>$total_boys_absent_fn,
+                                'total_girls_present_fn'=>$total_girls_present_fn,
+                                'total_girls_absent_fn'=>$total_girls_absent_fn,
+                                'total_boys_present_an'=>$total_boys_present_an,
+                                'total_boys_absent_an'=>$total_boys_absent_an,
+                                'total_girls_present_an'=>$total_girls_present_an,
+                                'total_girls_absent_an'=>$total_girls_absent_an,
+                                'appstatus'=>$appstatus
+                                ]; 
+
+                                return response()->json(['status' => 1, 'data' => $data, 'message' => 'Students attendance Detail']);
+
+                            }   else {
+                                return response()->json(['status' => 0, 'data' => [], 'message' => 'No Students attendance Detail']);
+                            }
+
+                            return response()->json(['status' => 0, 'data' => [], 'message' => 'No Students attendance Detail']);
+                        }
+                        
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        /*}   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } */
+
+    }
+
+    // Save Student Daily Attendance
+    public function saveStudentDailyAttendance(Request $request) {
+        //try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'cdate', 'class_id', 'section_id', 'att_chk'  ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;   
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;     
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;   
+                $cdate = ((isset($input) && isset($input['cdate']))) ? $input['cdate'] : '';   
+                $att_chk = ((isset($input) && isset($input['att_chk']))) ? $input['att_chk'] : '';   
+                $present_students = ((isset($input) && isset($input['present_students']))) ? $input['present_students'] : '';  
+                $absent_students = ((isset($input) && isset($input['absent_students']))) ? $input['absent_students'] : '';  
+
+                if($att_chk > 0) {} else {
+                    return response()->json(['status' => 0, 'message' => 'Please select the mode of Attendance']);
+                }
+
+                if(empty($present_students) && empty($absent_students)) { 
+                    return response()->json(['status' => 0, 'message' => 'Please select the Scholars']);
+                } 
+
+                if(empty($cdate)) {
+                    $cdate = date('Y-m-d');
+                } else {
+                    $cdate = date('Y-m-d', strtotime($cdate));
+                } 
+
+                $api_token = $request->header('x-api-key'); 
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) {    
+                        $attendance_type = [];
+                        if(!empty($present_students)) {
+                            $present_students_arr = explode(',', $present_students);
+                            if(count($present_students_arr)>0) {
+                                foreach($present_students_arr as $stud) {
+                                    $attendance_type[$stud] = 'p';
+                                } 
+                            }
+                        }
+                        if(!empty($absent_students)) {
+                            $absent_students_arr = explode(',', $absent_students);
+                            if(count($absent_students_arr)>0) {
+                                foreach($absent_students_arr as $stud) {
+                                    $attendance_type[$stud] = 'a';
+                                } 
+                            }
+                        }
+
+                        $request->request->add(['new_date' => $cdate, 'tclass_id' => $class_id, 'tsection_id' => $section_id,
+                            'student_id' => [], 'att_chk' => $att_chk, 'attendance_type' => $attendance_type ]);
+                        //echo "<pre>"; print_r($request->all()); exit;
+                        $ret = (new AdminController())->postDailyAttendancePage($request);
+                        return $ret;
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        /*}   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } */
 
     }
 
@@ -5076,7 +7035,8 @@ class ApiAdminController extends Controller
 
                             $index = 0;
                             $update_id = $role_id;
-                            $treeview  = $this->module_tree($index, $update_id); 
+                            //$treeview  = $this->module_tree($index, $update_id); 
+                            $treeview  = $this->module_tree_api($index, $update_id); 
 
                             return response()->json([ 'status' => 1, 'message' => 'Role Modume Mapping', 'data' => $treeview]);
 
@@ -5184,6 +7144,98 @@ class ApiAdminController extends Controller
                 'module_status_update' => $module_status_update, 'apchecked' => $apchecked, 'inner' => $inner
             ];  
             $treeview[] = ['id' => $id, 'treeview-menu' => $treeview_menu];
+             
+        } 
+
+        return $treeview;
+    } 
+
+    public function module_tree_api($index, $update_id) {
+        $module = Module::where("parent_module_fk", $index)->get(); 
+        $treeview = [];
+
+        foreach ($module as $mc) {
+            $id = $mc['id'];
+            $name = $mc['module_name'];
+            $menu_item = $mc['menu_item'];
+            $parent = $mc['parent_module_fk'];
+            $url = $mc['url'];
+
+            $module_add = $mc['module_add'];
+            $module_edit = $mc['module_edit'];
+            $module_delete = $mc['module_delete'];
+            $module_view = $mc['module_view'];
+            $module_list = $mc['module_list'];
+            $module_status_update = $mc['module_status_update'];
+            $module_aadhar_status_update=$mc['module_aadhar_status_update'];
+
+            //$treeview['SysroleModule']['module_fk']['id'][] = $id;
+
+            $class = "";
+            $type = 0;
+            if ($url != "" && $url != "#") {
+                $type = 1;
+                $class = "";
+            }
+            $checked = "";
+            $achecked = "";
+            $echecked = "";
+            $dchecked = "";
+            $vchecked = "";
+            $apchecked = "";
+            $lchecked='';
+            $apaschecked='';
+            if (! empty($update_id)) {
+
+                // $qry = "select `ra_add`,`ra_edit`,`ra_delete`,`ra_view` from role_access where ra_role_fk=$update_id and ra_module_fk=$id ";
+                // $counts_select = mysql_query ( $qry );
+                // $counts = mysql_fetch_array ( $counts_select );
+
+                $role_access = RoleModuleMapping::where("ra_role_fk", $update_id)->where("ra_module_fk", $id)->first();
+                
+
+                if (!empty($role_access)) {
+                    $checked = "checked";
+                    if ($role_access->ra_add == 1) {
+                        $achecked = "checked";
+                    }
+                    if ($role_access->ra_edit == 1) {
+                        $echecked = "checked";
+                    }
+                    if ($role_access->ra_delete == 1) {
+                        $dchecked = "checked";
+                    }
+                    if ($role_access->ra_view == 1) {
+                        $vchecked = "checked";
+                    }
+                    if ($role_access->ra_list == 1) {
+                        $lchecked = "checked";
+                    }
+                    if ($role_access->ra_status_update == 1) {
+                        $apchecked = "checked";
+                    }
+                    if ($role_access->ra_aadhar_status_update == 1) {
+                        $apaschecked = "checked";
+                    }
+                    
+                }
+            }
+            $treeview_menu  = []; 
+            //$treeview['SysroleModule']['module_fk']['treeview_menu'] = [];
+            //$treeview_menu['SysroleModule']  = []; 
+
+
+            $inner = $this->module_tree_api($id, $update_id);
+
+            $treeview_menu[] = ['id' => $id, 'checked' => $checked, 'parent' => $parent, 
+                'name' => $name, 'module_add' => $module_add, 'achecked' => $achecked, 
+                'module_edit' => $module_edit, 'echecked' => $echecked,
+                'module_delete' => $module_delete, 'dchecked' => $dchecked,
+                'module_view' => $module_view, 'vchecked' => $vchecked,
+                'module_list' => $module_list, 'lchecked' => $lchecked,
+                'module_status_update' => $module_status_update, 'apchecked' => $apchecked, 'inner' => $inner
+            ];  
+            $treeview[] = ['id' => $id, 'treeview_menu' => $treeview_menu];
              
         } 
 
@@ -5328,6 +7380,64 @@ class ApiAdminController extends Controller
         }   catch(\Throwable $th) {
             return response()->json(['status' => 0, 'message' => $th->getMessage()]);
         } 
+
+    }
+
+
+
+    // User Role Module Mapping
+    public function getStaffModuleMappingList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id'  ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $role_id = ((isset($input) && isset($input['role_id']))) ? $input['role_id'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $role = UserRoles::find($role_id);
+                        if(!empty($role)) {
+
+                            $index = 0;
+                            $update_id = $role_id;
+                            //$treeview  = $this->module_tree($index, $update_id); 
+                            $treeview  = $this->module_tree_api($index, $update_id); 
+
+                            return response()->json([ 'status' => 1, 'message' => 'Role Modume Mapping', 'data' => $treeview]);
+
+                        }   else {
+                            return response()->json([ 'status' => 0, 'message' => 'Invalid Role']);
+                        }
+
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
 
     }
 
@@ -5562,4 +7672,2998 @@ class ApiAdminController extends Controller
 
     } 
 
+    // Gallery
+    public function getGallery(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $gallery = Gallery::where('school_id', $school_id)->select('gallery.*')
+                            ->where('status', '!=', 'DELETED')
+                            ->orderby('gallery.id', 'desc')->skip($page_no)->take($limit)->get();  
+                        if($gallery->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Gallery', 'data'=>$gallery]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Gallery']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    // save Gallery
+    public function postGallery(Request $request) {
+        try {    
+
+            /*$inputJSON = file_get_contents('php://input');   
+
+            $input = json_decode($inputJSON, TRUE); */
+
+            $input = $request->all();
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'gallery_title',  'gallery_image', 'gallery_status' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request, true);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $gallery_title = ((isset($input) && isset($input['gallery_title']))) ? $input['gallery_title'] : '';  
+                $gallery_status = ((isset($input) && isset($input['gallery_status']))) ? $input['gallery_status'] : 'ACTIVE';   
+
+                $gallery_id = ((isset($input) && isset($input['gallery_id']))) ? $input['gallery_id'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        if ($gallery_id > 0) {
+                            $gallery = Gallery::find($gallery_id);
+                            $gallery->updated_at = date('Y-m-d H:i:s');
+                            $gallery->updated_by = $school_id;
+                        } else {
+                            $gallery = new Gallery();
+                            $gallery->created_by = $school_id;
+                            $gallery->created_at = date('Y-m-d H:i:s');
+                        } 
+
+                        $gallery->school_id = $school_id; 
+                        $gallery->gallery_title = $gallery_title;
+                        $gallery->status = $gallery_status; 
+
+                        $images = $request->file('gallery_image',[]);
+           
+                        if (!empty($images)) {
+                            $arr = []; $str =  '';
+                            if(!empty($gallery->gallery_image)) {
+                                $sarr = explode(';', $gallery->gallery_image);
+                            }   else {
+                                $sarr = [];
+                            } 
+                        
+                            foreach($images as $image) {
+                         
+                                $accepted_formats = ['jpeg', 'jpg', 'png'];
+                                $ext = $image->getClientOriginalExtension();
+                                $ext = strtolower($ext);
+                                if (!in_array($ext, $accepted_formats)) {
+                                    return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload Jepg, jpg, Png Format Files']);
+                                }
+                         
+                                $countryimg = rand() . time() . '.' . $image->getClientOriginalExtension();
+
+                                $destinationPath = public_path('/uploads/gallery/'.$school_id.'/');
+                              
+                                $image->move($destinationPath, $countryimg);
+
+                                $arr[] = $countryimg;
+                            }  
+
+                            if(count($arr)>0) {
+                                $arr = array_merge($sarr, $arr);
+                                $str = implode(';', $arr);
+                            }
+                            $gallery->gallery_image = $str;
+                     
+                        }  
+
+                        $gallery->save();
+                    
+                        return response()->json([ 'status' => 1, 'message' => 'Gallery saved successfully' ]);
+                         
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    // Examinations
+    public function getExaminations(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $examsqry = Examinations::leftjoin('terms', 'terms.id', 'examinations.term_id')
+                            ->leftjoin('exams', 'exams.examination_id', 'examinations.id')
+                            ->select( 'examinations.id as examination_id', 'examinations.school_id', 'examinations.exam_name', 
+                                'exams.schedule_status', 'examinations.status', 'exams.id as exam_id', 'exams.monthyear', 
+                                'exams.class_ids', 'exams.section_ids', 'exams.exam_startdate', 'exams.exam_enddate', 'exams.rank_on_off', 
+                                'exams.grade_on_off', 'exams.result_in', 'exams.rank_settings', 'exams.grade_settings', 'exams.rank_type', 
+                                'exams.rankincludefailures', 'exams.publish_status', 'terms.term_name'  );  
+ 
+                        if($status != '' || $status != 0){
+                            $examsqry->where('examinations.status',$status); 
+                        } 
+
+                        $examsqry->where('examinations.school_id', $school_id); 
+
+                        if($class_id > 0) {
+                            $examsqry->where('exams.class_ids',$class_id); 
+                        }
+
+                        if($section_id > 0) {
+                            $examsqry->whereIn('exams.section_ids', [0, $section_id]); 
+                        } 
+
+                        $orderby = 'examinations.id'; 
+                        $dir = 'ASC'; 
+
+                        $exams = $examsqry->skip($page_no)->take($limit)->orderby($orderby, $dir)->groupby('examinations.id')->get();
+                        if($exams->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Examinations', 'data'=>$exams]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Examinations']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getExaminationSettings(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $schedule_status = ((isset($input) && isset($input['schedule_status']))) ? $input['schedule_status'] : ''; 
+                $publish_status = ((isset($input) && isset($input['publish_status']))) ? $input['publish_status'] : '';  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $examsqry = Examinations::leftjoin('terms', 'terms.id', 'examinations.term_id')
+                            ->leftjoin('exams', 'exams.examination_id', 'examinations.id')
+                            ->select( 'examinations.id as examination_id', 'examinations.school_id', 'examinations.exam_name', 
+                                'exams.schedule_status', 'examinations.status', 'exams.id as exam_id', 'exams.monthyear', 
+                                'exams.class_ids', 'exams.section_ids', 'exams.exam_startdate', 'exams.exam_enddate', 'exams.rank_on_off', 
+                                'exams.grade_on_off', 'exams.result_in', 'exams.rank_settings', 'exams.grade_settings', 'exams.rank_type', 
+                                'exams.rankincludefailures', 'exams.publish_status', 'terms.term_name'  );   
+
+                        if($status != '' || $status != 0){
+                            $examsqry->where('examinations.status',$status); 
+                        }
+
+                        if(!empty(trim($schedule_status))){
+                            $examsqry->where('exams.schedule_status',$schedule_status); 
+                        }
+
+                        if(!empty(trim($publish_status))){
+                            $examsqry->where('exams.publish_status',$publish_status); 
+                        } 
+                            
+                        $examsqry->where('examinations.school_id', $school_id); 
+
+                        if($class_id > 0) {
+                            $examsqry->where('exams.class_ids',$class_id); 
+                        }
+
+                        if($section_id > 0) {
+                            $examsqry->where('exams.section_ids',$section_id); 
+                        }
+  
+                        $orderby = 'examinations.id'; 
+                        $dir = 'ASC'; 
+
+                        $exams = $examsqry->skip($page_no)->take($limit)->orderby($orderby, $dir)->get(); 
+                        if($exams->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Examination Settings', 'data'=>$exams]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Examination Settings']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getExamTerms(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $schedule_status = ((isset($input) && isset($input['schedule_status']))) ? $input['schedule_status'] : ''; 
+                $publish_status = ((isset($input) && isset($input['publish_status']))) ? $input['publish_status'] : '';  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $examsqry = Terms::select('terms.*');   
+
+                        if($status != '' || $status != 0){
+                            $examsqry->where('terms.status',$status); 
+                        } 
+                        $examsqry->where('terms.school_id', $school_id); 
+
+                        if($class_id > 0) {
+                            $examsqry->whereRAW(' FIND_IN_SET('.$class_id.', class_ids) '); 
+                        } 
+  
+                        $orderby = 'terms.id'; 
+                        $dir = 'ASC'; 
+
+                        $exams = $examsqry->skip($page_no)->take($limit)->orderby($orderby, $dir)->get(); 
+                        if($exams->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Terms', 'data'=>$exams]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Terms']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getExamResults(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'class_id', 'section_id', 'exam_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0; 
+                $exam_id = ((isset($input) && isset($input['exam_id']))) ? $input['exam_id'] : 0;  
+                $subject_id = ((isset($input) && isset($input['subject_id']))) ? $input['subject_id'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0 && $exam_id > 0) {  
+
+                        $monthyear = DB::table('exams')->where('id', $exam_id)->value('monthyear');
+                        if(empty($monthyear)) {
+                            $monthyear = date('Y-m');
+                        }
+                        User::$monthyear = $monthyear;
+                        User::$class_id = $class_id;
+                        User::$section_id = $section_id;
+                        User::$exam_id = $exam_id;
+                        if($subject_id  >0){
+                            User::$subject_id = $subject_id;
+                            MarksEntry::$subject_id = $subject_id;
+                        }
+                        // User::$student_id = $student_id;
+                        /*if($subject_id  != '' || $subject_id  != ''){
+                            MarksEntry::$subject_id = $subject_id;
+                        }*/
+                       
+                        MarksEntry::$exam_id = $exam_id;
+                        MarksEntry::$class_id = $class_id; 
+
+                        $section_id1 = DB::table('exams')->where('id', $exam_id)->value('section_ids');
+
+                        MarksEntry::$section_id = $section_id1;
+                        $students = User::with('marksentry')
+                            ->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                            ->leftjoin('students', 'students.user_id', 'users.id')
+                            ->whereRaw( "'".$monthyear."' BETWEEN from_month and to_month ")
+                            ->where('student_class_mappings.class_id', $class_id);
+
+                        if($section_id > 0) {
+                            $students->where('student_class_mappings.section_id', $section_id);
+                        }
+
+                        if($student_id > 0) {
+                            $students->where('student_class_mappings.user_id',$student_id);
+                        }
+
+                        $students = $students->where('student_class_mappings.status', 'ACTIVE')
+                            ->where('user_type', 'STUDENT')
+                            ->where('student_class_mappings.user_id', '>', 0)
+                            ->select('users.id', 'name', 'email', 'mobile', 'students.admission_no')
+                            ->orderby('name')->get();
+             
+                         
+                            /*foreach($students as $k => $v){
+
+                                $get_sub = Sections::where('class_id',$class_id)->where('id',$section_id)->first();
+                                $students[$k]->subject = $get_sub;
+
+                                if($get_sub->isNotEmpty()) {
+                                    foreach($get_sub as $sk=>$sub) {
+                                        $get_sub[$sk]->is_subject_name = $sub->subject_name;
+                                        $get_sub[$sk]->is_subject_id = $sub->subject_id;
+                                    }
+                                }
+                                $students[$k]->subject = $get_sub; 
+
+                            }*/
+                           
+                        if($students->isNotEmpty()) {
+
+                            $subjects = DB::table('exams')->leftjoin('exam_sessions', 'exam_sessions.exam_id', 'exams.id')
+                                    ->leftjoin('subjects', 'subjects.id', 'exam_sessions.subject_id')
+                                    ->where('exams.id',$exam_id)->where('subjects.id','>',0)->where('exam_sessions.status','ACTIVE');
+                            if($subject_id  >0){
+                                $subjects->where('exam_sessions.subject_id',$subject_id);
+                            }
+                            if($class_id  >0){
+                                $subjects->where('exam_sessions.class_id',$class_id);
+                            }
+                            $section_id = DB::table('exams')->where('id', $exam_id)->value('section_ids');
+                            if($section_id  >0){
+                                $subjects->where('exam_sessions.section_id',$section_id);
+                            }
+                            $subjects = $subjects->select('exam_sessions.subject_id as is_subject_id', 'subjects.subject_name as is_subject_name')
+                                    ->get();
+                            $students = $students->toArray();
+                            foreach($students as $k => $v){
+                                $marks = [];
+                                if(isset($v['marksentry']) && !empty($v['marksentry'])) {
+                                    if(isset($v['marksentry']['marksentryitems']) && !empty($v['marksentry']['marksentryitems'])) {
+                                        foreach($v['marksentry']['marksentryitems'] as $k1 => $v1){
+                                            $marks[$v1['subject_id']] = $v1;
+                                        }
+                                    }
+                                }
+                                $students[$k]['marks'] = $marks;
+                            }
+
+                            $c = []; $total_marks = ''; $rank = '-';  $grade = '-';//echo "<pre>"; print_r($students); exit;
+                            if(!empty($subjects)) {
+                                foreach($subjects as $sk => $sv) {
+                                  $c[$sv->is_subject_id] = $sv->is_subject_name;
+                                }
+                            }
+
+                            $table = [];
+                            if(!empty($students) && count($students)>0) {
+                                $thead = [];
+                                $thead['id'] = 0;
+                                $thead['name'] = "Name";
+                                $thead['admission_no'] = "Admission No";
+                                foreach( $c as $key=>$value) {
+                                    $thead['subject_name'][] = ["id"=>"s".$key, "value"=>$value, "subject_id"=> $key];
+                                }
+                                if(isset($in_subject_id) && ($in_subject_id > 0)) {} 
+                                else {
+                                    $thead['total'] = "Total";
+                                } 
+                                $thead['rank'] = "Rank";
+                                $thead['grade'] = "Grade";
+
+                                $tbody = [];
+                                foreach($students as $sk => $student)  {
+                                    $tbody[$sk]['id'] = $student['id'];
+                                    $tbody[$sk]['name'] = $student['name'];
+                                    $tbody[$sk]['admission_no'] = $student['admission_no'];
+                                    foreach( $c as $key=>$value){
+                                        $total_marks = 0;  
+                                        $marks = $remarks = $grade = $checked = ''; $is_absent = $rank = 0; 
+
+                                        if (isset($student['marks']) && isset($student['marks'][$key]) && !empty($student['marks'][$key])) {
+                                            $total_marks = $student['marks'][$key]['marks']; 
+                                            $remarks = $student['marks'][$key]['remarks'];
+                                            $grade = $student['marks'][$key]['grade'];
+
+                                            $is_absent = $student['marks'][$key]['is_absent'];
+                                            $checked = ($is_absent == 1) ? 'checked' : '';
+                                            $marks = ($is_absent == 1) ? 'A' : $student['marks'][$key]['marks']; 
+                                            $rank = ($is_absent == 1) ? '' : $student['marks'][$key]['rank'];
+                                            if($rank > 0) {} else { $rank = 0; }
+                                            if(!empty($grade)) {} else { $grade = '-'; }
+                                        } 
+                                        if(isset($in_subject_id) && ($in_subject_id > 0)) {} else {
+                                            if (isset($student['marksentry']) && isset($student['marksentry']['rank']) && !empty($student['marksentry']['marks'])) {
+                                                $rank = $student['marksentry']['rank'];
+                                                $grade = $student['marksentry']['grade'];
+                                                $total_marks = $student['marksentry']['marks'];
+                                            }
+                                        }
+
+
+                                        if($rank > 0) {} else { $rank = '-'; }
+                                        if(!empty($grade)) {} else { $grade = '-'; }
+                                        if($total_marks > 0) {} else { $total_marks = ''; }
+                                       
+                                        $tbody[$sk]['subject_name'][] = ["id"=>"s".$key, "value"=>$marks, "subject_id"=> $key, "is_absent"=>$is_absent, "remarks"=> $remarks]; 
+
+                                    }  
+
+                                    if(isset($in_subject_id) && ($in_subject_id > 0)) {} else { 
+                                        $tbody[$sk]['total_marks'] = $total_marks;
+                                    } 
+
+                                    $tbody[$sk]['rank'] = $rank;
+                                    $tbody[$sk]['grade'] = $grade;  
+                                    
+                                }
+                            } 
+                             
+                            $table['head'] =  $thead; 
+                            $table['tbody'] =  $tbody;  
+
+                            if(count($table)>0) { 
+                                return response()->json([ 'status' => 1, 'message' => 'Exam Result', 'data'=>$table]);
+                            } else {
+                                return response()->json([ 'status' => 0, 'message' => 'No Exam Result']);
+                            }
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Students']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function saveMarkEntry(Request $request) {
+        //try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = [ 'user_id', 'api_token', 'school_id', 'class_id', "section_id", "exam_id", 
+                "mark"  ]; 
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $page_no = 0;  $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                        $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                        $exam_id = ((isset($input) && isset($input['exam_id']))) ? $input['exam_id'] : 0;   
+                        $mark = ((isset($input) && isset($input['mark']))) ? $input['mark'] : [];     
+
+                        $error = '';
+
+                        $subjects = DB::table('exams')->leftjoin('exam_sessions', 'exam_sessions.exam_id', 'exams.id')
+                                ->leftjoin('subjects', 'subjects.id', 'exam_sessions.subject_id')
+                                ->where('exams.id',$exam_id)->where('exam_sessions.class_id',$class_id)
+                                ->where('subjects.id','>',0)->where('exam_sessions.status','ACTIVE')
+                                ->whereIn('exam_sessions.section_id',[0, $section_id]);
+                        /*if($subject_id  >0){
+                            $subjects->where('exam_sessions.subject_id',$subject_id);
+                        }*/ 
+                        $subjects = $subjects->select('exam_sessions.subject_id as is_subject_id', 'subjects.subject_name as is_subject_name', 'exam_sessions.is_practical', 'exam_sessions.theory_mark', 'exam_sessions.practical_mark')
+                                ->get();
+
+                        $max = [];
+                        if($subjects->isNotEmpty()) {
+                            foreach($subjects as $sk=>$sv) {
+                                $max[$sv->is_subject_id]['theory_mark'] = $sv->theory_mark;
+                                $max[$sv->is_subject_id]['practical_mark'] = $sv->practical_mark;
+                                $max[$sv->is_subject_id]['is_practical'] = $sv->is_practical;
+                            }
+                        }
+
+                        $monthyear = DB::table('exams')->where('id', $exam_id)->value('monthyear');
+
+                        //echo "<pre>"; print_r($mark); print_r($max); exit;
+
+                        if(!empty($mark) && count($mark)>0) {
+                            foreach($mark as $student) {
+                                $student_id = $student['student_id'];
+                                $theory_marks = $mrk = $student['mrk'];
+                                $practical_marks = $pmrk = isset($student['pmrk']) ? $student['pmrk'] : 0;
+                                $remarks = $remark = isset($student['remark']) ? $student['remark'] : '';
+                                $subject = $s_id = $student['s_id'];
+                                $is_absent = $student['is_ab'];
+
+                                $marks = $mrk  + $pmrk;
+                                $grade = '';
+
+                                if($marks > 0) {
+                                    $gr = DB::table('grades')->where('school_id', '<=', $school_id)
+                                        ->where('mark', '<=', $marks)->orderby('mark', 'desc')->first();
+                                    if(!empty($gr)) {
+                                        $grade = $gr->grade;
+                                    }
+                                }
+
+                                $tm = (isset($max[$s_id]) && isset($max[$s_id]['theory_mark'])) ? $max[$s_id]['theory_mark'] : 0;
+                                $pm = (isset($max[$s_id]) && isset($max[$s_id]['practical_mark'])) ? $max[$s_id]['practical_mark'] : 0;
+                                $total_marks = $tm + $pm;
+
+                                $is_practical = (isset($max[$s_id]) && isset($max[$s_id]['is_practical'])) ? $max[$s_id]['is_practical'] : 0;
+                                $theory_mark = (isset($max[$s_id]) && isset($max[$s_id]['theory_mark'])) ? $max[$s_id]['theory_mark'] : 0;
+                                $practical_mark = (isset($max[$s_id]) && isset($max[$s_id]['practical_mark'])) ? $max[$s_id]['practical_mark'] : 0;
+                                //echo $marks ."%%". $total_marks.";";
+                                if($marks <= $total_marks) {
+                                }   else {
+                                    $error =  '  Entered mark should not be greater than Total Marks';
+                                }
+
+                                if($marks > 0 && $is_practical == 1) {
+                                    //echo $theory_marks ."==". $theory_mark.";";
+                                    if($theory_marks <= $theory_mark) {
+                                    }   else {
+                                        $sname = DB::table('users')->where('id', $student_id)->value('name');
+                                        $error =  '  Entered Theory mark should not be greater than Total Theory Marks'.' '. $sname;
+                                    }
+                                    //echo $practical_marks ."==". $practical_mark.";";
+                                    if($practical_marks <= $practical_mark) {
+                                    }   else {
+                                        $sname = DB::table('users')->where('id', $student_id)->value('name');
+                                        $error =  '  Entered Practical mark should not be greater than Total Practical Marks'.' '. $sname;
+                                    }
+                                } 
+
+                                $data = ['subject_id'=>$s_id, 'total_marks'=>$total_marks, 'is_absent' => $is_absent,
+                                        'marks'=>$marks, 'theory_marks'=>$theory_marks, 'practical_marks'=>$practical_marks, 
+                                        'remarks'=>$remarks, 'grade'=>$grade];
+
+                                $ex = DB::table('marks_entry')->where('user_id', $student_id)
+                                    ->where(['class_id'=>$class_id, 'section_id'=>$section_id, 'exam_id'=>$exam_id,
+                                            'monthyear'=>$monthyear])->first();
+
+                                if(!empty($ex)) {
+                                    $data['updated_at'] = date('Y-m-d H:i:s');
+                                    $data['updated_by'] = $userid;
+
+                                    $mark_entry_id = $ex->id;
+
+                                }   else {
+                                    $data['created_at'] = date('Y-m-d H:i:s');
+                                    $data['created_by'] = $userid;
+
+                                    $mark_entry_id = DB::table('marks_entry')->insertGetId([
+                                        'user_id'=>$student_id,  'monthyear'=>$monthyear,
+                                        'class_id'=>$class_id, 'section_id'=>$section_id,
+                                        'exam_id'=>$exam_id,
+                                        'created_at'=>date('Y-m-d H:i:s'),
+                                        'created_by'=>$userid
+                                    ]);
+                                }
+
+                                $exentry = DB::table('marks_entry_items')->where('mark_entry_id', $mark_entry_id)
+                                    ->where('subject_id', $subject)->first();
+
+                                if(empty($error)) {
+                                    if(!empty($exentry)) { 
+                                        DB::table('marks_entry_items')->where('mark_entry_id', $mark_entry_id)->where('subject_id', $subject)->update($data);
+                                    }   else { 
+                                        $data['mark_entry_id'] = $mark_entry_id;
+                                        DB::table('marks_entry_items')->insert($data);
+                                    }
+                                }
+
+
+                                $total_marks = DB::table('marks_entry_items')
+                                    ->leftjoin('exam_sessions', 'exam_sessions.subject_id', 'marks_entry_items.subject_id')
+                                    ->where('exam_sessions.status', 'ACTIVE')->where('exam_sessions.exam_id', $exam_id) 
+                                    ->where('exam_sessions.class_id', $class_id)//->where('exam_sessions.section_id', $section_id) 
+                                    ->where('mark_entry_id', $mark_entry_id)->sum('total_marks');
+                                $marks = DB::table('marks_entry_items')
+                                    ->leftjoin('exam_sessions', 'exam_sessions.subject_id', 'marks_entry_items.subject_id')
+                                    ->where('exam_sessions.status', 'ACTIVE')->where('exam_sessions.exam_id', $exam_id) 
+                                    ->where('exam_sessions.class_id', $class_id)//->where('exam_sessions.section_id', $section_id) 
+                                    ->where('mark_entry_id', $mark_entry_id)->sum('marks');
+                                $cnt = DB::table('marks_entry_items')
+                                    ->leftjoin('exam_sessions', 'exam_sessions.subject_id', 'marks_entry_items.subject_id')
+                                    ->where('exam_sessions.status', 'ACTIVE')->where('exam_sessions.exam_id', $exam_id) 
+                                    ->where('exam_sessions.class_id', $class_id)//->where('exam_sessions.section_id', $section_id) 
+                                    ->where('mark_entry_id', $mark_entry_id)
+                                    ->count('marks_entry_items.id');
+
+                                $remarks = $grade = $pass_type = '';
+                                if($cnt > 0) {
+                                    $avg = ($marks / $total_marks) * 100;
+
+                                    $grade = '';
+                                    $gr = DB::table('grades')->where('school_id', $school_id)->where('mark', '<=', $avg)->orderby('mark', 'desc')->first();
+                                    if(!empty($gr)) {
+                                        $grade = $gr->grade;
+                                        $remarks = $gr->remark;
+                                        if($avg<30) {
+                                            $pass_type = 'Fail';
+                                        }   else {
+                                            $pass_type = 'Pass';
+                                        }
+                                    }
+                                    if(empty($grade)) {
+                                        if($avg>90) {
+                                            $remarks = 'Out Standing'; $grade = 'O'; $pass_type = 'Pass';
+                                        } elseif($avg>75) {
+                                            $remarks = 'Distinction'; $grade = 'D'; $pass_type = 'Pass';
+                                        }  elseif($avg>60) {
+                                            $remarks = 'Very Good'; $grade = 'A+'; $pass_type = 'Pass';
+                                        }  elseif($avg>45) {
+                                            $remarks = 'Good'; $grade = 'A'; $pass_type = 'Pass';
+                                        }  elseif($avg>30) {
+                                            $remarks = 'OK'; $grade = 'B'; $pass_type = 'Pass';
+                                        }   else {
+                                            $remarks = 'Poor'; $grade = 'C'; $pass_type = 'Fail';
+                                        }
+                                    }
+                                }
+
+                                DB::table('marks_entry')->where('id', $mark_entry_id)
+                                    ->update(['total_marks'=>$total_marks, 'marks' => $marks, 'remarks'=>$remarks,
+                                              'grade'=>$grade, 'pass_type'=>$pass_type,
+                                              'updated_at'=>date('Y-m-d H:i:s'), 'updated_by'=>$userid
+                                    ]); 
+                            }
+                        }
+
+                         
+                        if(!empty($error)) {
+                            return response()->json(['status' => 0, 'message' => $error]);
+                        }
+
+                        (new AdminController())->updateRank($school_id, $class_id, $section_id, $exam_id);
+ 
+                        return response()->json([ 'status' => 1, 'message' => 'Saved Successfully' ]);
+                        
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        /*}   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } */ 
+
+    }
+
+    public function getFetchExaminations(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+                        $exams = DB::table('exams')
+                            ->leftjoin('examinations', 'examinations.id', 'exams.examination_id')
+                            ->leftjoin('exam_sessions', 'exams.id', 'exam_sessions.exam_id')
+                            ->leftjoin('classes', 'classes.id', 'exam_sessions.class_id')
+                            ->where('examinations.batch', $batch)
+                            ->where('exams.class_ids', $class_id)->where('exams.examination_id', '>',0);
+                        if($section_id > 0) {
+                            $exams->whereIn('exams.section_ids', [0, $section_id]);
+                        }
+                        $exams = $exams->where('exam_sessions.status', 'ACTIVE')
+                            ->select("examinations.exam_name", "exams.exam_name as exname", "exams.id", "exam_startdate", DB::RAW(' DATE_FORMAT(exam_startdate, "%Y-%m") as monthyear'), 'class_id', 'section_id')
+                            ->groupby('exams.id')->orderby('exams.id', 'asc')->get();
+
+                        if($exams->isNotEmpty()) {
+                            $class_names  = '';
+                            $class_ids = DB::table('classes') 
+                                ->where('id', $class_id)->select('class_name')->groupby('id')->orderby('classes.position', 'asc')->get();
+                               
+                            if($class_ids->isNotEmpty()) {
+                                foreach( $class_ids as $ids){
+                                    $val[] = $ids->class_name;        
+                                }
+                                $class_names  = implode(',', $val);
+                            }   else {
+                                $class_names  = '';
+                            }
+
+                            foreach($exams as $ke=>$kv) { 
+
+                                $section_names  = '';
+                                if($kv->section_id > 0) {
+                                    $section_names = DB::table('sections')->where('id', $kv->section_id)->value('section_name');
+                                } else {
+                                    $section_names  = 'All';
+                                }
+                 
+                                $exams[$ke]->class_name = $class_names;
+                                $exams[$ke]->section_name = $section_names;
+                            }
+                        }
+                        if($exams->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Examinations', 'data'=>$exams]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Examinations']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getFeeCollectionReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;  
+                $fee_category = ((isset($input) && isset($input['fee_category']))) ? $input['fee_category'] : 0;  
+                $fee_item_id = ((isset($input) && isset($input['fee_item_id']))) ? $input['fee_item_id'] : 0;  
+                $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+                $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $overall_fee_collected = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
+                            ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status'); 
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
+                            ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status')
+                            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                                'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name',
+                                'creator.name as creator_name'); 
+
+                            if (!empty($search)) { 
+                                $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                $overall_fee_collected->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")');
+                                
+                            }
+
+                            if($batch > 0){
+                                $fee_summary_list->where('fees_payment_details.batch',$batch); 
+                                $overall_fee_collected->where('fees_payment_details.batch',$batch);
+                            }
+                            if($class_id > 0){
+                                $fee_summary_list->where('fees_payment_details.class_id',$class_id); 
+                                $overall_fee_collected->where('fees_payment_details.class_id',$class_id);
+                            }
+                            if($section_id > 0){
+                                $fee_summary_list->where('fees_payment_details.section_id',$section_id); 
+                                $overall_fee_collected->where('fees_payment_details.section_id',$section_id);
+                            }
+                            if($student_id > 0){
+                                $fee_summary_list->where('fees_payment_details.student_id',$student_id); 
+                                $overall_fee_collected->where('fees_payment_details.student_id',$student_id);
+                            }
+                            if($fee_category > 0){
+                                $fee_summary_list->where('fee_categories.id',$fee_category); 
+                                $overall_fee_collected->where('fee_categories.id',$fee_category);
+                            }
+                            if($fee_item_id > 0){
+                                $fee_summary_list->where('fee_items.id',$fee_item_id); 
+                                $overall_fee_collected->where('fee_items.id',$fee_item_id);
+                            }
+                            if(!empty(trim($mindate))) {
+                                $mindate = date('Y-m-d', strtotime($mindate));
+                                $fee_summary_list->where('fees_payment_details.created_at', '>=', $mindate); 
+                                $overall_fee_collected->where('fees_payment_details.created_at', '>=', $mindate);
+                    
+                            }
+                            if(!empty(trim($maxdate))) {
+                                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                                $fee_summary_list->where('fees_payment_details.created_at', '<=', $maxdate); 
+                                $overall_fee_collected->where('fees_payment_details.created_at', '<=', $maxdate);
+                            }
+
+ 
+                            $orderby = 'fees_payment_details.id';
+                             
+                            $dir = 'DESC';
+                            
+
+                            $overall_fee_collected = $overall_fee_collected->sum('fees_payment_details.amount_paid');
+
+                            $fee_collection = $fee_summary_list->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get();
+
+
+                        if($fee_collection->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$fee_collection, 'overall_fee_collected'=>$overall_fee_collected]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getFeePendingReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;   
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $overall_fee_pending = DB::table('student_class_mappings') 
+                        ->leftjoin('users', 'users.id', 'student_class_mappings.user_id') 
+                        ->leftjoin('classes', 'classes.id', 'student_class_mappings.class_id')
+                        ->leftjoin('sections', 'sections.id', 'student_class_mappings.section_id')
+                        ->where('student_class_mappings.school_id', $school_id)->where('users.school_college_id', $school_id)
+                        ->where('users.delete_status',0)->where('users.status','ACTIVE')//->whereNuLL('users.alumni_status')
+                        ->where('student_class_mappings.balance_fees', '>', 0)
+                        ->orderby('student_class_mappings.id','desc'); 
+
+                        $fee_pending = DB::table('student_class_mappings') 
+                        ->leftjoin('users', 'users.id', 'student_class_mappings.user_id') 
+                        ->leftjoin('classes', 'classes.id', 'student_class_mappings.class_id')
+                        ->leftjoin('sections', 'sections.id', 'student_class_mappings.section_id')
+                        ->where('student_class_mappings.school_id', $school_id)->where('users.school_college_id', $school_id)
+                        ->where('users.delete_status',0)->where('users.status','ACTIVE')//->whereNuLL('users.alumni_status')
+                        ->where('student_class_mappings.balance_fees', '>', 0)
+                        ->select('student_class_mappings.*', 'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name' ); 
+ 
+
+                        if (!empty($search)) { 
+                            $fee_pending->whereRaw('( users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%")'); 
+                            $overall_fee_pending->whereRaw('( users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%")'); 
+                             
+                        }                     
+
+                        if($batch > 0){
+                            $fee_pending->where('student_class_mappings.academic_year',$batch); 
+                            $overall_fee_pending->where('student_class_mappings.academic_year',$batch); 
+                        }
+                        if($class_id > 0){
+                            $fee_pending->where('student_class_mappings.class_id',$class_id); 
+                            $overall_fee_pending->where('student_class_mappings.class_id',$class_id); 
+                        }
+                        if($section_id > 0){
+                            $fee_pending->where('student_class_mappings.section_id',$section_id); 
+                            $overall_fee_pending->where('student_class_mappings.section_id',$section_id); 
+                        }
+                        if($student_id > 0){
+                            $fee_pending->where('student_class_mappings.user_id',$student_id); 
+                            $overall_fee_pending->where('student_class_mappings.user_id',$student_id); 
+                        } 
+
+ 
+                        $orderby = 'student_class_mappings.balance_fees'; 
+                        $dir = 'DESC'; 
+
+                        $overall_fee_pending = $overall_fee_pending->sum('student_class_mappings.balance_fees'); 
+
+                        $fee_pending = $fee_pending->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get();  
+
+
+                        if($fee_pending->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$fee_pending, 'overall_fee_pending'=>$overall_fee_pending]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getFeeWaiverReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;  
+                $fee_category = ((isset($input) && isset($input['fee_category']))) ? $input['fee_category'] : 0;  
+                $fee_item_id = ((isset($input) && isset($input['fee_item_id']))) ? $input['fee_item_id'] : 0;  
+                $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+                $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : ''; 
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $overall_fee_concession = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
+                            ->where('fees_payment_details.cancel_status', '0')
+                            //->whereNuLL('users.alumni_status')
+                            ->orderby('fees_payment_details.id','desc'); 
+
+                            $cancelled_fee_concession = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
+                            ->where('fees_payment_details.cancel_status', '2')
+                            //->whereNuLL('users.alumni_status')
+                            ->orderby('fees_payment_details.id','desc'); 
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
+                            //->where('fees_payment_details.cancel_status', '0')
+                            //->whereNuLL('users.alumni_status') 
+                            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                                'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name',
+                                'creator.name as creator_name');  
+
+                            if (!empty($search)) { 
+                                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                    $overall_fee_concession->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                    $cancelled_fee_concession->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                 
+                            }             
+
+                            if($batch > 0){
+                                $fee_summary_list->where('fees_payment_details.batch',$batch); 
+                                $overall_fee_concession->where('fees_payment_details.batch',$batch);
+                                $cancelled_fee_concession->where('fees_payment_details.batch',$batch);
+                            }
+                            if($class_id > 0){
+                                $fee_summary_list->where('fees_payment_details.class_id',$class_id); 
+                                $overall_fee_concession->where('fees_payment_details.class_id',$class_id);
+                                $cancelled_fee_concession->where('fees_payment_details.class_id',$class_id);
+                            }
+                            if($section_id > 0){
+                                $fee_summary_list->where('fees_payment_details.section_id',$section_id); 
+                                $overall_fee_concession->where('fees_payment_details.section_id',$section_id);
+                                $cancelled_fee_concession->where('fees_payment_details.section_id',$section_id);
+                            }
+                            if($student_id > 0){
+                                $fee_summary_list->where('fees_payment_details.student_id',$student_id); 
+                                $overall_fee_concession->where('fees_payment_details.student_id',$student_id);
+                                $cancelled_fee_concession->where('fees_payment_details.student_id',$student_id);
+                            }
+                            if($fee_category > 0){
+                                $fee_summary_list->where('fee_categories.id',$fee_category); 
+                                $overall_fee_concession->where('fee_categories.id',$fee_category);
+                                $cancelled_fee_concession->where('fee_categories.id',$fee_category);
+                            }
+                            if($fee_item_id > 0){
+                                $fee_summary_list->where('fee_items.id',$fee_item_id); 
+                                $overall_fee_concession->where('fee_items.id',$fee_item_id);
+                                $cancelled_fee_concession->where('fee_items.id',$fee_item_id);
+                            }
+                            if(!empty(trim($mindate))) {
+                                $mindate = date('Y-m-d', strtotime($mindate));
+                                $fee_summary_list->where('fees_payment_details.created_at', '>=', $mindate); 
+                                $overall_fee_concession->where('fees_payment_details.created_at', '>=', $mindate);
+                                $cancelled_fee_concession->where('fees_payment_details.created_at', '>=', $mindate);
+                    
+                            }
+                            if(!empty(trim($maxdate))) {
+                                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                                $fee_summary_list->where('fees_payment_details.created_at', '<=', $maxdate); 
+                                $overall_fee_concession->where('fees_payment_details.created_at', '<=', $maxdate);
+                                $cancelled_fee_concession->where('fees_payment_details.created_at', '<=', $maxdate);
+                            }
+
+ 
+                            $orderby = 'fees_payment_details.id'; 
+                            $dir = 'DESC'; 
+
+                            $overall_fee_concession = $overall_fee_concession->sum('fees_payment_details.concession_amount');
+                            $cancelled_fee_concession  = $cancelled_fee_concession->sum('fees_payment_details.concession_amount');
+
+                            $total_concession = $overall_fee_concession - $cancelled_fee_concession;
+
+                            $fee_collection = $fee_summary_list->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get(); 
+
+
+                        if($fee_collection->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$fee_collection, 'total_concession'=>$total_concession]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getFeeConcessionReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;  
+                $fee_category = ((isset($input) && isset($input['fee_category']))) ? $input['fee_category'] : 0;  
+                $fee_item_id = ((isset($input) && isset($input['fee_item_id']))) ? $input['fee_item_id'] : 0;  
+                $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+                $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : ''; 
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $overall_fee_concession = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
+                            ->where('fees_payment_details.cancel_status', '0')
+                            //->whereNuLL('users.alumni_status')
+                            ->orderby('fees_payment_details.id','desc'); 
+
+                            $cancelled_fee_concession = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
+                            ->where('fees_payment_details.cancel_status', '2')
+                            //->whereNuLL('users.alumni_status')
+                            ->orderby('fees_payment_details.id','desc'); 
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+                            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+                            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+                            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+                            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+                            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+                            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+                            ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
+                            //->where('fees_payment_details.cancel_status', '0')
+                            //->whereNuLL('users.alumni_status') 
+                            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                                'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name',
+                                'creator.name as creator_name');  
+
+                            if (!empty($search)) { 
+                                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                    $overall_fee_concession->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                    $cancelled_fee_concession->whereRaw('( fee_categories.name like "%'.$search . '%" OR fee_items.item_name like "%'.$search . '%" OR fee_items.item_code like "%'.$search . '%" OR users.name like "%'.$search . '%" OR users.admission_no like "%'.$search . '%"  OR classes.class_name like "%'.$search . '%" OR sections.section_name like "%'.$search . '%" OR creator.name like "%'.$search . '%")'); 
+                                 
+                            }             
+
+                            if($batch > 0){
+                                $fee_summary_list->where('fees_payment_details.batch',$batch); 
+                                $overall_fee_concession->where('fees_payment_details.batch',$batch);
+                                $cancelled_fee_concession->where('fees_payment_details.batch',$batch);
+                            }
+                            if($class_id > 0){
+                                $fee_summary_list->where('fees_payment_details.class_id',$class_id); 
+                                $overall_fee_concession->where('fees_payment_details.class_id',$class_id);
+                                $cancelled_fee_concession->where('fees_payment_details.class_id',$class_id);
+                            }
+                            if($section_id > 0){
+                                $fee_summary_list->where('fees_payment_details.section_id',$section_id); 
+                                $overall_fee_concession->where('fees_payment_details.section_id',$section_id);
+                                $cancelled_fee_concession->where('fees_payment_details.section_id',$section_id);
+                            }
+                            if($student_id > 0){
+                                $fee_summary_list->where('fees_payment_details.student_id',$student_id); 
+                                $overall_fee_concession->where('fees_payment_details.student_id',$student_id);
+                                $cancelled_fee_concession->where('fees_payment_details.student_id',$student_id);
+                            }
+                            if($fee_category > 0){
+                                $fee_summary_list->where('fee_categories.id',$fee_category); 
+                                $overall_fee_concession->where('fee_categories.id',$fee_category);
+                                $cancelled_fee_concession->where('fee_categories.id',$fee_category);
+                            }
+                            if($fee_item_id > 0){
+                                $fee_summary_list->where('fee_items.id',$fee_item_id); 
+                                $overall_fee_concession->where('fee_items.id',$fee_item_id);
+                                $cancelled_fee_concession->where('fee_items.id',$fee_item_id);
+                            }
+                            if(!empty(trim($mindate))) {
+                                $mindate = date('Y-m-d', strtotime($mindate));
+                                $fee_summary_list->where('fees_payment_details.created_at', '>=', $mindate); 
+                                $overall_fee_concession->where('fees_payment_details.created_at', '>=', $mindate);
+                                $cancelled_fee_concession->where('fees_payment_details.created_at', '>=', $mindate);
+                    
+                            }
+                            if(!empty(trim($maxdate))) {
+                                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                                $fee_summary_list->where('fees_payment_details.created_at', '<=', $maxdate); 
+                                $overall_fee_concession->where('fees_payment_details.created_at', '<=', $maxdate);
+                                $cancelled_fee_concession->where('fees_payment_details.created_at', '<=', $maxdate);
+                            }
+
+ 
+                            $orderby = 'fees_payment_details.id'; 
+                            $dir = 'DESC'; 
+
+                            $overall_fee_concession = $overall_fee_concession->sum('fees_payment_details.concession_amount');
+                            $cancelled_fee_concession  = $cancelled_fee_concession->sum('fees_payment_details.concession_amount');
+
+                            $total_concession = $overall_fee_concession - $cancelled_fee_concession;
+
+                            $fee_collection = $fee_summary_list->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get(); 
+
+
+                        if($fee_collection->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$fee_collection, 'total_concession'=>$total_concession]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getFeeOverallReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;   
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        $acadamic_year = ''; 
+                        $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                        if(!empty($settings)) {
+                            $acadamic_year = trim($settings->acadamic_year);
+                        }   
+
+                        OAFeesSections::$acadamic_year = $acadamic_year; 
+                        $sectionsqry = OAFeesSections::leftjoin('classes', 'classes.id', 'sections.class_id')
+                            ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                            ->where('sections.status','=','ACTIVE')
+                            ->select('sections.class_id', 'sections.id', 'classes.class_name', 'sections.section_name');
+                        $filteredqry = OAFeesSections::leftjoin('classes', 'classes.id', 'sections.class_id')
+                            ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                            ->where('sections.status','=','ACTIVE')
+                            ->select('sections.class_id', 'sections.id', 'classes.class_name', 'sections.section_name');
+ 
+                        $sectionsqry->where('classes.school_id', $school_id);
+                        $filteredqry->where('classes.school_id', $school_id); 
+
+                        if($class_id>0){
+                            $sectionsqry->where('class_id',$class_id);
+                            $filteredqry->where('class_id',$class_id);
+                        }
+                        if($section_id>0){
+                            $sectionsqry->where('sections.id',$section_id);
+                            $filteredqry->where('sections.id',$section_id);
+                        }
+
+                        if (!empty($order)) {
+                            $orderby = $columns[$order]['name'];
+                        } else {
+                            $orderby = 'classes.position';
+                        }
+                        if (empty($dir)) {
+                            $dir = 'ASC';
+                        } 
+
+                        $sections = $sectionsqry->orderby($orderby, $dir)->get();
+
+
+                        if($sections->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$sections]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }
+
+    public function getFeeReceiptsCancelledReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;  
+                $fee_category = ((isset($input) && isset($input['fee_category']))) ? $input['fee_category'] : 0;  
+                $fee_item_id = ((isset($input) && isset($input['fee_item_id']))) ? $input['fee_item_id'] : 0;  
+                $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+                $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        if(empty($batch)) { 
+                            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                            if(!empty($settings)) {
+                                $batch = trim($settings->acadamic_year);
+                            } 
+                        }
+
+
+                        $feesummary_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+                            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+                            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+                            ->leftjoin('fee_cancel_reasons', 'fee_cancel_reasons.id', 'fees_receipt_details.cancel_reason')
+                            ->leftjoin('users as cancellor', 'cancellor.id', 'fees_receipt_details.canceled_by') 
+                            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by') 
+                            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+                            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+                            ->leftjoin('classes', 'classes.id', 'students.class_id')
+                            ->leftjoin('sections', 'sections.id', 'students.section_id')
+                            ->where('fees_receipt_details.school_id', $school_id)
+                            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 1) 
+                            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                                'receipt_heads.name as receipt_head_name', 'accounts.account_name', 
+                                'fee_cancel_reasons.cancel_reason as fee_cancel_reason', 'cancellor.name as cancellor_name'
+                            );   
+
+                            if (!empty($search)) {
+                                if (isset($search) && !empty($search)) {
+                                    $feesummary_qry->whereRaw('( accounts.account_name like "%'.$search . '%" OR payment_modes.name like "%'.$search . '%" OR scholar.name like "%'.$search . '%" OR scholar.mobile like "%'.$search . '%" OR scholar.admission_no like "%'.$search . '%" )'); 
+                                }
+                            }  
+
+                            if(!empty(trim($mindate))) {
+                                $mindate = date('Y-m-d', strtotime($mindate));
+                                $feesummary_qry->where('fees_receipt_details.created_at', '>=', $mindate); 
+                    
+                            }
+                            if(!empty(trim($maxdate))) {
+                                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                                $feesummary_qry->where('fees_receipt_details.created_at', '<=', $maxdate); 
+                            }
+
+
+                            if($student_id>0) {
+                                $feesummary_qry->where('fees_receipt_details.student_id', $student_id); 
+                            }
+
+                            if($class_id>0) {
+                                $feesummary_qry->where('students.class_id', $class_id); 
+                            }
+
+                            if($section_id>0) {
+                                $feesummary_qry->where('students.section_id', $section_id); 
+                            } 
+                  
+                            $orderby = 'fees_receipt_details.created_at'; 
+                            $dir = 'DESC'; 
+
+                            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get();
+
+
+                        if($feesummary->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$feesummary ]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    } 
+
+    public function getFeeReceiptsReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $batch = ((isset($input) && isset($input['batch']))) ? $input['batch'] : '';  
+                $class_id = ((isset($input) && isset($input['class_id']))) ? $input['class_id'] : 0;  
+                $section_id = ((isset($input) && isset($input['section_id']))) ? $input['section_id'] : 0;  
+                $student_id = ((isset($input) && isset($input['student_id']))) ? $input['student_id'] : 0;  
+                $fee_category = ((isset($input) && isset($input['fee_category']))) ? $input['fee_category'] : 0;  
+                $fee_item_id = ((isset($input) && isset($input['fee_item_id']))) ? $input['fee_item_id'] : 0;  
+                $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+                $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        if(empty($batch)) { 
+                            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+                            if(!empty($settings)) {
+                                $batch = trim($settings->acadamic_year);
+                            } 
+                        }
+
+
+                        $feesummary_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+                            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+                            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+                            ->leftjoin('fee_cancel_reasons', 'fee_cancel_reasons.id', 'fees_receipt_details.cancel_reason')
+                            ->leftjoin('users as cancellor', 'cancellor.id', 'fees_receipt_details.canceled_by') 
+                            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by') 
+                            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+                            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+                            ->leftjoin('classes', 'classes.id', 'students.class_id')
+                            ->leftjoin('sections', 'sections.id', 'students.section_id')
+                            ->where('fees_receipt_details.school_id', $school_id)
+                            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 0) 
+                            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                                'receipt_heads.name as receipt_head_name', 'accounts.account_name', 
+                                'fee_cancel_reasons.cancel_reason as fee_cancel_reason', 'cancellor.name as cancellor_name'
+                            );   
+
+                            if (!empty($search)) {
+                                if (isset($search) && !empty($search)) {
+                                    $feesummary_qry->whereRaw('( accounts.account_name like "%'.$search . '%" OR payment_modes.name like "%'.$search . '%" OR scholar.name like "%'.$search . '%" OR scholar.mobile like "%'.$search . '%" OR scholar.admission_no like "%'.$search . '%" )'); 
+                                }
+                            }  
+
+                            if(!empty(trim($mindate))) {
+                                $mindate = date('Y-m-d', strtotime($mindate));
+                                $feesummary_qry->where('fees_receipt_details.created_at', '>=', $mindate); 
+                    
+                            }
+                            if(!empty(trim($maxdate))) {
+                                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                                $feesummary_qry->where('fees_receipt_details.created_at', '<=', $maxdate); 
+                            }
+
+
+                            if($student_id>0) {
+                                $feesummary_qry->where('fees_receipt_details.student_id', $student_id); 
+                            }
+
+                            if($class_id>0) {
+                                $feesummary_qry->where('students.class_id', $class_id); 
+                            }
+
+                            if($section_id>0) {
+                                $feesummary_qry->where('students.section_id', $section_id); 
+                            } 
+                  
+                            $orderby = 'fees_receipt_details.created_at'; 
+                            $dir = 'DESC'; 
+
+                            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get();
+
+
+                        if($feesummary->isNotEmpty()) { 
+                            return response()->json([ 'status' => 1, 'message' => 'Fee Collection', 'data'=>$feesummary ]);
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'No Collection']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }   
+
+    public function getFeeSummaryReport(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $fee_filter = ((isset($input) && isset($input['fee_filter']))) ? $input['fee_filter'] : '';  
+                $fee_type = ((isset($input) && isset($input['fee_type']))) ? $input['fee_type'] : '';  
+                $dateFilter = ((isset($input) && isset($input['dateFilter']))) ? $input['dateFilter'] : 0;  
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : '';  
+                $order = ((isset($input) && isset($input['order']))) ? $input['order'] : 0;   
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        if(!empty($fee_type)){ 
+                            $types = [$fee_type];
+                        } else {
+                            $types = ['COLLECTED','CONCESSION','WAIVER'];
+                        }
+                        $final_array = ''; $recordsTotal = $total_amount = 0; 
+
+                        if(empty($fee_filter)) {
+                            $fee_filter = 'ACCOUNT';
+                        }
+
+                        if(empty($dateFilter)) {
+                            $dateFilter = date('M d, Y') .' - '. date('M d, Y');
+                        }
+
+                        if(!empty($dateFilter)) {
+                            $dates  = explode(' - ', $dateFilter);
+                            $start = date('Y-m-d', strtotime($dates[0]));
+                            $end = date('Y-m-d', strtotime($dates[1])); 
+                        }
+
+                        if(!empty($fee_filter)){
+
+                            switch($fee_filter) {
+                                case 'ACCOUNT' :   
+
+                                    if(empty($fee_type)){  
+
+                                        $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                            ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $collected_list->whereRaw('( accounts.account_name like "%'.$search . '%"  )'); 
+                                            }
+                                        } 
+
+                                        $collected_list->select('accounts.account_name', DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                            ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $concession_list->whereRaw('( accounts.account_name like "%'.$search . '%"  )'); 
+                                            }
+                                        } 
+
+                                        $concession_list->select('accounts.account_name', DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',1)->groupby('accounts.id')
+                                            ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $waiver_list->whereRaw('( accounts.account_name like "%'.$search . '%"  )'); 
+                                            }
+                                        } 
+
+                                        $waiver_list->select('accounts.account_name', DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $waiver_list = $waiver_list->orderby($orderby, $dir)->orderby('accounts.account_name', 'asc')->get(); 
+
+                                        /*echo "<pre>"; print_r($collected_list->toArray());
+                                        echo "<pre>"; print_r($concession_list->toArray());
+                                        echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                                        $final_array = [];
+
+                                        if($collected_list->isNotEmpty()) {
+                                            $collected_array = $collected_list->toArray();
+                                            $final_array = array_merge($final_array, $collected_array);
+                                        }
+                                        if($concession_list->isNotEmpty()) {
+                                            $concession_array = $concession_list->toArray();
+                                            $final_array = array_merge($final_array, $concession_array);
+                                        }
+                                        if($waiver_list->isNotEmpty()) {
+                                            $waiver_array = $waiver_list->toArray();
+                                            $final_array = array_merge($final_array, $waiver_array);
+                                        }
+                                        //echo "<pre>"; print_r($final_array); 
+             
+
+                                    } else {
+
+                                        $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->groupby('accounts.id'); 
+
+                                        if($fee_type == 'COLLECTED') { 
+                                            $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                                ->select('accounts.account_name', DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                                        } elseif($fee_type == 'CONCESSION') { 
+                                            $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',1)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                                ->select('accounts.account_name', DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } elseif($fee_type == 'WAIVER') { 
+                                            $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',1)->groupby('accounts.id')
+                                                ->select('accounts.account_name', DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } 
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search. '%"  )'); 
+                                            }
+                                        }  
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        }  
+
+                                        $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+             
+                                        $final_array = [];
+
+                                        if($fee_summary_list->isNotEmpty()) {
+                                            $fee_summary_list = $fee_summary_list->toArray();
+                                            $final_array = array_merge($final_array, $fee_summary_list);
+                                        } 
+                                    } 
+                                     
+                                break;
+
+                                case 'CATEGORY' :   
+
+                                    if(empty($fee_type)){  
+
+                                        $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                            ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $collected_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $collected_list->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                            ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $concession_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $concession_list->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',1)->groupby('fee_categories.id')
+                                            ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $waiver_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $waiver_list->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $waiver_list = $waiver_list->orderby($orderby, $dir)->get(); 
+
+                                        /*echo "<pre>"; print_r($collected_list->toArray());
+                                        echo "<pre>"; print_r($concession_list->toArray());
+                                        echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                                        $final_array = [];
+
+                                        if($collected_list->isNotEmpty()) {
+                                            $collected_array = $collected_list->toArray();
+                                            $final_array = array_merge($final_array, $collected_array);
+                                        }
+                                        if($concession_list->isNotEmpty()) {
+                                            $concession_array = $concession_list->toArray();
+                                            $final_array = array_merge($final_array, $concession_array);
+                                        }
+                                        if($waiver_list->isNotEmpty()) {
+                                            $waiver_array = $waiver_list->toArray();
+                                            $final_array = array_merge($final_array, $waiver_array);
+                                        }
+                                        //echo "<pre>"; print_r($final_array); 
+             
+
+                                    } else {
+
+                                        $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE'); 
+
+                                        if($fee_type == 'COLLECTED') { 
+                                            $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                                ->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                                        } elseif($fee_type == 'CONCESSION') { 
+                                            $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',1)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                                ->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } elseif($fee_type == 'WAIVER') { 
+                                            $fee_summary_list->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',1)->groupby('fee_categories.id')
+                                                ->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } 
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search . '%"   OR fee_categories.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        }  
+
+                                        $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+             
+                                        $final_array = [];
+
+                                        if($fee_summary_list->isNotEmpty()) {
+                                            $fee_summary_list = $fee_summary_list->toArray();
+                                            $final_array = array_merge($final_array, $fee_summary_list);
+                                        } 
+                                    } 
+                                     
+                                break;
+
+                                case 'ITEM' :   
+
+                                    if(empty($fee_type)){  
+
+                                        $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id') 
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                            ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $collected_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $collected_list->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                            ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $concession_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $concession_list->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_item_id')
+                                            ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $waiver_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $waiver_list->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $waiver_list = $waiver_list->orderby($orderby, $dir)->get(); 
+
+                                        /*echo "<pre>"; print_r($collected_list->toArray());
+                                        echo "<pre>"; print_r($concession_list->toArray());
+                                        echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                                        $final_array = [];
+
+                                        if($collected_list->isNotEmpty()) {
+                                            $collected_array = $collected_list->toArray();
+                                            $final_array = array_merge($final_array, $collected_array);
+                                        }
+                                        if($concession_list->isNotEmpty()) {
+                                            $concession_array = $concession_list->toArray();
+                                            $final_array = array_merge($final_array, $concession_array);
+                                        }
+                                        if($waiver_list->isNotEmpty()) {
+                                            $waiver_array = $waiver_list->toArray();
+                                            $final_array = array_merge($final_array, $waiver_array);
+                                        }
+                                        //echo "<pre>"; print_r($final_array); 
+             
+
+                                    } else {
+
+                                        $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE'); 
+
+                                        if($fee_type == 'COLLECTED') { 
+                                            $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                                ->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                                        } elseif($fee_type == 'CONCESSION') { 
+                                            $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',1)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                                ->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } elseif($fee_type == 'WAIVER') { 
+                                            $fee_summary_list->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_item_id')
+                                                ->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        }  
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search . '%"   OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%" )'); 
+                                            }
+                                        }  
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        }  
+
+                                        $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+             
+                                        $final_array = [];
+
+                                        if($fee_summary_list->isNotEmpty()) {
+                                            $fee_summary_list = $fee_summary_list->toArray();
+                                            $final_array = array_merge($final_array, $fee_summary_list);
+                                        } 
+                                    } 
+                                     
+                                break;
+
+                                case 'TERM' :   
+
+                                    if(empty($fee_type)){  
+
+                                        $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id') 
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                            ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $collected_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%"  OR fee_terms.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $collected_list->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                            ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $concession_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%"  OR fee_terms.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $concession_list->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_term_id')
+                                            ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $waiver_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%"  OR fee_terms.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $waiver_list->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $waiver_list = $waiver_list->orderby($orderby, $dir)->get(); 
+
+                                        /*echo "<pre>"; print_r($collected_list->toArray());
+                                        echo "<pre>"; print_r($concession_list->toArray());
+                                        echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                                        $final_array = [];
+
+                                        if($collected_list->isNotEmpty()) {
+                                            $collected_array = $collected_list->toArray();
+                                            $final_array = array_merge($final_array, $collected_array);
+                                        }
+                                        if($concession_list->isNotEmpty()) {
+                                            $concession_array = $concession_list->toArray();
+                                            $final_array = array_merge($final_array, $concession_array);
+                                        }
+                                        if($waiver_list->isNotEmpty()) {
+                                            $waiver_array = $waiver_list->toArray();
+                                            $final_array = array_merge($final_array, $waiver_array);
+                                        }
+                                        //echo "<pre>"; print_r($final_array); 
+             
+
+                                    } else {
+
+                                        $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE'); 
+
+                                        if($fee_type == 'COLLECTED') { 
+                                            $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                                ->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                                        } elseif($fee_type == 'CONCESSION') { 
+                                            $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',1)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                                ->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } elseif($fee_type == 'WAIVER') { 
+                                            $fee_summary_list->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_term_id')
+                                                ->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                                        } 
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search . '%"   OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%"  OR fee_terms.name like "%'.$search . '%" )'); 
+                                            }
+                                        }  
+
+                                        if($order == 0) {
+                                            $orderby = 'accounts.account_name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'accounts.account_name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        }  
+
+                                        $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+             
+                                        $final_array = [];
+
+                                        if($fee_summary_list->isNotEmpty()) {
+                                            $fee_summary_list = $fee_summary_list->toArray();
+                                            $final_array = array_merge($final_array, $fee_summary_list);
+                                        } 
+                                    } 
+                                     
+                                break;
+
+                                case 'PAYMENTMODE' :   
+
+                                    if(empty($fee_type)){  
+
+                                        $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id') 
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_payment_details.payment_mode') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                            ->where('fees_payment_details.is_waiver',0)->groupby('fees_payment_details.payment_mode')
+                                            ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                                        if (!empty($search)) {
+                                            if (isset($search) && !empty($search)) {
+                                                $collected_list->whereRaw('( accounts.account_name like "%'.$search . '%"  OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%"  OR payment_modes.name like "%'.$search . '%"  OR payment_modes.name like "%'.$search . '%" )'); 
+                                            }
+                                        } 
+
+                                        $collected_list = $collected_list->select(DB::RAW(' payment_modes.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                                        if($order == 0) {
+                                            $orderby = 'payment_modes.name';
+                                        } elseif($order == 2) {
+                                            $orderby = 'total_amount';
+                                        } else {
+                                            $orderby = 'payment_modes.name';
+                                        }
+
+                                        if (empty($dir)) {
+                                            $dir = 'ASC';
+                                        } 
+
+                                        $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                                        
+                                        $concession_list = '';  // // not applicable
+
+                                        
+                                        $waiver_list = ''; // not applicable
+
+                                        /*echo "<pre>"; print_r($collected_list->toArray());
+                                        echo "<pre>"; print_r($concession_list->toArray());
+                                        echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                                        $final_array = [];
+
+                                        if($collected_list->isNotEmpty()) {
+                                            $collected_array = $collected_list->toArray();
+                                            $final_array = array_merge($final_array, $collected_array);
+                                        } 
+                                        //echo "<pre>"; print_r($final_array); 
+             
+
+                                    } else {
+             
+                                        $final_array = [];
+
+                                        $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_payment_details.payment_mode') 
+                                            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                            ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                            ->where('fees_payment_details.school_id', $school_id) 
+                                            ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                            ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                            ->where('accounts.status','ACTIVE'); 
+
+                                        if($fee_type == 'COLLECTED') { 
+                                            $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                                ->where('fees_payment_details.is_concession',0)
+                                                ->where('fees_payment_details.is_waiver',0)->groupby('fees_payment_details.payment_mode')
+                                                ->select(DB::RAW(' payment_modes.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+
+                                            if (!empty($search)) {
+                                                if (isset($search) && !empty($search)) {
+                                                    $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search . '%"   OR fee_categories.name like "%'.$search . '%"  OR fee_items.item_name like "%'.$search . '%"  OR payment_modes.name like "%'.$search . '%" )'); 
+                                                }
+                                            } 
+
+                                            if($order == 0) {
+                                                $orderby = 'accounts.account_name';
+                                            } elseif($order == 2) {
+                                                $orderby = 'total_amount';
+                                            } else {
+                                                $orderby = 'accounts.account_name';
+                                            }
+
+                                            if (empty($dir)) {
+                                                $dir = 'ASC';
+                                            }  
+
+                                            $fee_summary_list = $fee_summary_list->orderby($orderby,$dir)->get();
+                                            if($fee_summary_list->isNotEmpty()) {
+                                                $fee_summary_list = $fee_summary_list->toArray();
+                                                $final_array = array_merge($final_array, $fee_summary_list);
+                                            } 
+                                        } elseif($fee_type == 'CONCESSION') { // not applicable
+                                        } elseif($fee_type == 'WAIVER') {  // not applicable
+                                        }  
+
+                                        
+                                    } 
+                                     
+                                break;
+                            }
+
+                        } 
+
+                        if (!empty($final_array)) {
+                            foreach ($final_array as $post) {
+                                $data[] = $post;
+                                $total_amount += $post['total_amount'];
+                            }
+                            $recordsTotal = count($final_array);
+                        } 
+  
+                        return response()->json([ 'status' => 1, 'message' => 'Fee Report', 'data' => $final_array, 'total' => $total_amount]);
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }
+
+    } 
+
+    public function getStaffDailyAttendance(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $monthyear = ((isset($input) && isset($input['monthyear']))) ? $input['monthyear'] : date('Y-m');  
+                $new_date = ((isset($input) && isset($input['date']))) ? $input['date'] : date('Y-m-d');   
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+                        if(empty($monthyear)) {
+                            $monthyear = date('Y-m');
+                        }
+
+                        if(empty($date)) {
+                            $date = date('Y-m-d');
+                        }
+
+                        $lastdate = date('t', strtotime($monthyear));
+                        User::$monthyear = $monthyear;
+
+                        $teachers = User::with('teacherdailyattendance')->where('users.school_college_id', $school_id)
+                            ->leftjoin('teachers', 'teachers.user_id', 'users.id')
+                            //->where('user_type', 'TEACHER')
+                            ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                            ->select('users.id', 'name', 'email', 'mobile', 'teachers.emp_no','users.profile_image')
+                            ->orderby('users.name', 'ASC')
+                            ->get();
+                        $userids = array();
+                        foreach($teachers as $k=>$v){
+                        array_push($userids,$v->id);
+                        }
+
+                        list($year, $month) = explode('-', $monthyear);
+
+                        $sundays = CommonController::getSundays($year, $month); 
+                        $saturdays = ''; //CommonController::getSaturdays($year, $month);  
+
+                        $holidays = DB::table('holidays')->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
+                           ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')
+                           ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
+                           // $students[$k]->holidays_list = $holidays;
+                           if($holidays->isNotEmpty()){
+                               $holidays = $holidays->toArray();
+                           }
+
+                        $orderdate = explode('-', $new_date);
+                        $year = $orderdate[0];
+                        $month   = $orderdate[1];
+                        $day  = $orderdate[2];
+                        $day = $day * 1;
+
+                  
+                        $date = 'day_'.$day;
+                        $fn_chk = TeachersDailyAttendance::whereIn('user_id', $userids)->where($date,1)->where('monthyear', $monthyear)->select('id')->get()->count();
+                        $date2 = 'day_'.$day.'_an';
+                        $an_chk = TeachersDailyAttendance::whereIn('user_id', $userids)->where($date2,1)->where('monthyear', $monthyear)->select('id')->get()->count();
+
+                        if($teachers->isNotEmpty()) {
+                            $teachers = $teachers->toArray();
+                            //echo "<pre>"; print_r($teachers);exit;
+                            /*$html = view('admin.loadteachers_dailyattendance')->with(['monthyear'=>$monthyear, 'teachers'=>$teachers, 'lastdate'=>$lastdate])->with('fn_chk',$fn_chk)->with('an_chk',$an_chk)->with('new_date',$new_date)->with('sundays',$sundays)->with('saturdays',$saturdays)->with('holidays',$holidays)->render();*/
+
+                            return response()->json(['status' => 1, 'data' => $teachers, 'message' => 'Teacher attendance Detail']);
+
+                        }   else {
+                            return response()->json(['status' => 0, 'data' => [], 'message' => 'No Teacher attendance Detail']);
+                        }
+ 
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    } 
+
+    public function getStaffLeaveList(Request $request) {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $teacher_id = ((isset($input) && isset($input['teacher_id']))) ? $input['teacher_id'] : 0;  
+                $mindate = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';   
+                $maxdate = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';    
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        $users_qry = Teacherleave::leftjoin('users','users.id','teacher_leave.user_id')->select('teacher_leave.*','users.name')->where('users.school_college_id', $school_id); 
+
+                         if($teacher_id != '' || $teacher_id != 0){
+                            $users_qry->where('user_id',$teacher_id); 
+                         }
+
+                         if(!empty(trim($mindate))) {
+                            $mindate = date('Y-m-d', strtotime($mindate));
+                            $users_qry->whereRaw('from_date >= ?', [$mindate]); 
+                
+                        }
+                        if(!empty(trim($maxdate))) {
+                            $maxdate = date('Y-m-d', strtotime($maxdate));
+                            $users_qry->whereRaw('from_date <= ?', [$maxdate]); 
+                        } 
+
+                        $orderby = 'id';  $dir = 'DESC'; 
+
+                        $teachers = $users_qry->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get();
+
+                        if($teachers->isNotEmpty()) { 
+
+                            return response()->json(['status' => 1, 'data' => $teachers, 'message' => 'Teacher Leave List']);
+
+                        }   else {
+                            return response()->json(['status' => 0, 'data' => [], 'message' => 'No Teacher Leave List']);
+                        }
+ 
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } 
+
+    }
+
+    public function getStaffAttendanceReport(Request $request) {
+        //try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'school_id', 'monthyear' ];
+
+            $error = (new ApiController())->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $school_id = ((isset($input) && isset($input['school_id']))) ? $input['school_id'] : 0;  
+                $monthyear = ((isset($input) && isset($input['monthyear']))) ? $input['monthyear'] : '';  
+                 
+
+                $mindate = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : '';   
+                $maxdate = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';    
+                $search = isset($input['search']) ? $input['search'] : '';
+
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;   
+
+                $api_token = $request->header('x-api-key');
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                } 
+                else {
+                    if($userid > 0 && $school_id > 0) { 
+
+                        $users_qry = Teacherleave::leftjoin('users','users.id','teacher_leave.user_id')->select('teacher_leave.*','users.name')->where('users.school_college_id', $school_id); 
+
+                         if($teacher_id != '' || $teacher_id != 0){
+                            $users_qry->where('user_id',$teacher_id); 
+                         }
+
+                         if(!empty(trim($mindate))) {
+                            $mindate = date('Y-m-d', strtotime($mindate));
+                            $users_qry->whereRaw('from_date >= ?', [$mindate]); 
+                
+                        }
+                        if(!empty(trim($maxdate))) {
+                            $maxdate = date('Y-m-d', strtotime($maxdate));
+                            $users_qry->whereRaw('from_date <= ?', [$maxdate]); 
+                        } 
+
+                        $orderby = 'id';  $dir = 'DESC'; 
+
+                        $teachers = $users_qry->orderBy($orderby, $dir)->offset($page_no)->limit($limit)->get();
+
+                        if($teachers->isNotEmpty()) { 
+
+                            return response()->json(['status' => 1, 'data' => $teachers, 'message' => 'Teacher Leave List']);
+
+                        }   else {
+                            return response()->json(['status' => 0, 'data' => [], 'message' => 'No Teacher Leave List']);
+                        }
+ 
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        /*}   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        } */ 
+
+    }    
 }

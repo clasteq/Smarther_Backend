@@ -22,6 +22,21 @@ class CommonController extends Controller
     public static $prefix = "SP";
     public static $page_limit = 15;   
 
+    public static $topic_school_scholars = "School_Scholars_";
+    public static $topic_section = "Section_";
+    public static $topic_scholar = "Scholar_";
+    public static $topic_group = "Group_";
+
+
+    public static $topic_school_staffs = "School_Staffs_";
+    public static $topic_section_staffs = "Section_Staffs_";
+    public static $topic_staffs = "Staffs_";
+    public static $topic_group_staffs = "Group_Staffs_";
+    public static $topic_department_staffs = "Department_Staffs_";
+    public static $topic_role_staffs = "Role_Staffs_";
+
+    public static $topic_school_Admin = "School_";
+
     public static $SMS_AUTH_KEY = "421723A6qHzgsvk6657134fP1";
 
     public function __construct() {
@@ -94,10 +109,19 @@ class CommonController extends Controller
     }
 
     public static function getUserDetails($user_id) { 
-        $user = User::with('userdetails')->where('id', $user_id)->select('id', 'reg_no', 'user_type', 'state_id', 'city_id', 
-            'country','admission_no','name', 'last_name', 'email', 'gender', 'dob', 'country_code', 'mobile','code_mobile', 
-            'mobile1','codemobile1', 'emergency_contact_no', 'last_login_date', 'last_app_opened_date', 'user_source_from', 'api_token', 'api_token_expiry', 'is_password_changed',
-            'notification_status', 'joined_date', 'profile_image', 'status')->first(); 
+        $user = User::with('userdetails')->where('id', $user_id)->select('id', 'school_college_id', 'reg_no', 'user_type', 
+            'state_id', 'city_id', 'country','admission_no','name', 'last_name', 'email', 'gender', 'dob', 'country_code', 
+            'mobile','code_mobile',  'mobile1','codemobile1', 'emergency_contact_no', 'last_login_date', 
+            'last_app_opened_date', 'user_source_from', 'api_token', 'api_token_expiry', 'is_password_changed',
+            'notification_status', 'joined_date', 'profile_image', 'status', 'alumni_status')->first(); 
+
+        if(!empty($user)) {
+            if($user->user_type == 'SCHOOL') {
+                $user->is_school_college_id = $user->id;
+            } else {
+                $user->is_school_college_id = $user->school_college_id;
+            }
+        }
         
         return $user;
     }
@@ -115,6 +139,9 @@ class CommonController extends Controller
                     3 : Test given
                     4 : post communication
                     5 : post sms communication
+                    6 : Staff post communication
+                    7 : Survey
+                    8 : Fees
         */
 
         $ex_chk = 0;
@@ -186,6 +213,60 @@ class CommonController extends Controller
             ))
         ));
       }*/
+        return true;
+    }
+
+    public static function push_notification_topic($topicname, $type_no, $type_id, $fcmMsg, $no_notify=0, $fcm_id='', $post_id=0, $notify_datetime='')    { 
+
+        $message = $fcmMsg['fcm']['notification']['body'];
+        $title = $fcmMsg['fcm']['notification']['title']; 
+         
+            self::pushSendUserNotificationMessageTopic($topicname,$message,$title,$type_no);
+         
+        return true;
+    }
+
+    public static function push_notification_table($user_id, $type_no, $type_id, $fcmMsg, $no_notify=0, $fcm_id='', $post_id=0, $notify_datetime='', $main_ref_no='')    {
+         
+      $user = User::find($user_id);  
+      if(empty($notify_datetime)) {
+        $notify_datetime = date('Y-m-d H:i:s');
+      }
+        /*$notification_status = $user->notification_status;
+                    
+        $type_no :  1 : Attendance to User 
+                    2 : Homework given
+                    3 : Test given
+                    4 : post communication
+                    5 : post sms communication
+                    6 : Staff post communication
+                    7 : Homework
+        */
+
+        $ex_chk = 0; 
+
+        $ex_chk = DB::table('notifications')->where(['user_id'=>$user_id, 'type_no'=>$type_no, 
+                'type_id'=>$type_id,'post_id'=>$post_id])->get();
+        if($ex_chk->isNotEmpty()) {
+            $ex_chk = 1;
+        } else {
+            $ex_chk = 0;
+        }
+        if($ex_chk == 0) {
+            DB::table('notifications')->insert([
+              'user_id'=>$user_id,
+              'type_no'=>$type_no,
+              'type_id'=>$type_id,
+              'fcm_id'=>$user->fcm_id,
+              'post_id'=>$post_id,
+              'title'=>$fcmMsg['fcm']['notification']['title'],
+              'message'=>$fcmMsg['fcm']['notification']['body'],
+              'created_at'=>date('Y-m-d H:i:s'),
+              'notify_date'=>$notify_datetime,
+              'main_ref_no' => $main_ref_no,
+            ]);
+        } 
+ 
         return true;
     }
 
@@ -915,7 +996,8 @@ class CommonController extends Controller
             ];
 
             // Adjust the path to your service account JSON file
-            $credentialsPath = '/var/www/html/multischool/classtech-72e27-0feb211381de.json';
+            //$credentialsPath = '/var/www/html/multischool/classtech-72e27-0feb211381de.json';
+            $credentialsPath = '/var/www/html/multischool/classtech-72e27-d6eabbe2b41f.json';
 
             // Create a Guzzle HTTP client instance
             $httpClient = new Client();
@@ -968,7 +1050,328 @@ class CommonController extends Controller
         return true;
     }
 
+    public static function pushSendUserNotificationMessageTopic($topicname,$message,$title,$type_no){
 
+        if($topicname){
+            $fcmMsg = [
+              'title' => $title,
+              'body' => $message,
+            ];
+
+            // APNs payload
+            $apnsPayload = [
+              'aps' => [
+                'alert' => [
+                  'title' => $title,
+                  'body' => $message,
+                ],
+                'sound' => 'default',
+                'type' => $type_no,
+              ]
+            ];
+
+            $fcmFields = [
+              'message' => [
+                'topic' => $topicname,
+                'notification' => $fcmMsg,
+                'data' => [
+                    'title' => (string)$title,
+                    'body' => (string)$message,
+                    'type' => (string)$type_no,
+                ],
+                'apns' => [
+                  'payload' => $apnsPayload,
+                  'headers' => [
+                    'apns-priority' => '10', // High priority for APNs
+                  ],
+                ],
+              ],
+            ];
+
+            // Adjust the path to your service account JSON file
+            //$credentialsPath = '/var/www/html/multischool/classtech-72e27-0feb211381de.json';
+            $credentialsPath = '/var/www/html/multischool/classtech-72e27-d6eabbe2b41f.json';
+
+            // Create a Guzzle HTTP client instance
+            $httpClient = new Client();
+
+            // Define a callable HTTP handler using Guzzle
+            $httpHandler = function ($request) use ($httpClient) {
+                return $httpClient->send($request);
+            };
+
+            // Initialize credentials with the service account JSON file path and HTTP handler
+            $credentials = new ServiceAccountCredentials(
+                ['https://www.googleapis.com/auth/firebase.messaging'],
+                $credentialsPath,
+                $httpHandler
+            );
+
+            // Fetch authentication token
+            $token = $credentials->fetchAuthToken();
+
+            if (!isset($token['access_token'])) {
+                throw new \Exception('Failed to fetch access token');
+            }
+
+            $accessToken = $token['access_token'];
+
+            // Prepare headers for FCM request
+            $headers = [
+              'Authorization' => 'Bearer ' . $accessToken,
+              'Content-Type' => 'application/json',
+            ];
+
+            try {
+                \Log::info(print_r($fcmFields, true));
+                // Send notification using Guzzle HTTP client
+                $response = $httpClient->post('https://fcm.googleapis.com/v1/projects/classtech-72e27/messages:send', [
+                    'headers' => $headers,
+                    'json' => $fcmFields,
+                    'verify' => true, // Enable SSL verification in production
+                ]);
+                 \Log::info(print_r($response, true));
+                // Output response
+            } catch (\Exception $e) { \Log::info(print_r($e->getMessage(), true));
+                // Handle Guzzle HTTP client exception
+                //  echo 'Error: ' . $e->getMessage();
+            }
+        }
+
+         
+
+          
+        return true;
+    } 
+
+    public static function pushSendUserNotificationMessageArray_old($fcmidArray,$message,$title,$type_no){
+
+        //if($fcmid){
+        //if(is_array($fcmidArray) && count($fcmidArray)>0) {
+            $fcmMsg = [
+              'title' => $title,
+              'body' => $message,
+            ];
+
+            // APNs payload
+            $apnsPayload = [
+              'aps' => [
+                'alert' => [
+                  'title' => $title,
+                  'body' => $message,
+                ],
+                'sound' => 'default',
+                'type' => $type_no,
+              ]
+            ];
+
+            $fcmFields = [
+              'message' => [
+                'registration_ids' => ['dbNG36-ZQjS2XP4EDUis9j:APA91bFrrHJhOkFNSOQiPv2eszeZHoaQWPzcduLMW3AESQEAITZCameO2Zo67RfU7GDwNdQ4ci54E6iHl7C8vOehv0oQuNRYmiyh5pd4Cx6yN1aENA9ks9Q', 'dStmFmJtQ56azzAn3WPoq3:APA91bFF17mW8QrcDzXlpyrlcgi78TcYzdNcUvldo5Rolzmn4wkZV2bizHjFURsD1080s5dHd0RpgYsA2n7_3CXw2z2i-DMyKWEO9yxd0Oi_DFnAoMeGbSk'],
+                'notification' => $fcmMsg,
+                'data' => [
+                    'title' => (string)$title,
+                    'body' => (string)$message,
+                    'type' => (string)$type_no,
+                ],
+                'apns' => [
+                  'payload' => $apnsPayload,
+                  'headers' => [
+                    'apns-priority' => '10', // High priority for APNs
+                  ],
+                ],
+              ], 
+            ];
+
+            /*  $fcmFields = [
+              'message' => $fcmidArray
+            ];
+            */
+
+            echo "<pre>"; print_r($fcmFields); //exit;
+
+            // Adjust the path to your service account JSON file
+            //$credentialsPath = '/var/www/html/multischool/classtech-72e27-0feb211381de.json';
+            $credentialsPath = '/var/www/html/multischool/classtech-72e27-d6eabbe2b41f.json';
+
+            // Create a Guzzle HTTP client instance
+            $httpClient = new Client();
+
+            // Define a callable HTTP handler using Guzzle
+            $httpHandler = function ($request) use ($httpClient) {
+                return $httpClient->send($request);
+            };
+
+            // Initialize credentials with the service account JSON file path and HTTP handler
+            $credentials = new ServiceAccountCredentials(
+                ['https://www.googleapis.com/auth/firebase.messaging'],
+                $credentialsPath,
+                $httpHandler
+            );
+
+            // Fetch authentication token
+            $token = $credentials->fetchAuthToken();
+
+            if (!isset($token['access_token'])) {
+                throw new \Exception('Failed to fetch access token');
+            }
+
+            $accessToken = $token['access_token'];
+
+            // Prepare headers for FCM request
+            $headers = [
+              'Authorization' => 'Bearer ' . $accessToken,
+              'Content-Type' => 'application/json',
+            ];
+
+            try {
+                // Send notification using Guzzle HTTP client
+                $response = $httpClient->post('https://fcm.googleapis.com/v1/projects/classtech-72e27/messages:send', [
+                    'headers' => $headers,
+                    'json' => $fcmFields,
+                    'verify' => true, // Enable SSL verification in production
+                ]);
+                echo "<pre>"; print_r($response);
+                 \Log::info(print_r($response, true));
+                // Output response
+            } catch (\Exception $e) { echo "<pre>"; print_r($e->getMessage());  \Log::info(print_r($e->getMessage(), true));
+                // Handle Guzzle HTTP client exception
+                //  echo 'Error: ' . $e->getMessage();
+            }
+        //}
+
+         
+
+          
+        return true;
+    }
+
+    public static function pushSendUserNotificationMessageArray_1($fcmidArray=[], $message, $title, $type_no)
+    {
+
+        $fcmidArray = ['dbNG36-ZQjS2XP4EDUis9j:APA91bFrrHJhOkFNSOQiPv2eszeZHoaQWPzcduLMW3AESQEAITZCameO2Zo67RfU7GDwNdQ4ci54E6iHl7C8vOehv0oQuNRYmiyh5pd4Cx6yN1aENA9ks9Q', 'dStmFmJtQ56azzAn3WPoq3:APA91bFF17mW8QrcDzXlpyrlcgi78TcYzdNcUvldo5Rolzmn4wkZV2bizHjFURsD1080s5dHd0RpgYsA2n7_3CXw2z2i-DMyKWEO9yxd0Oi_DFnAoMeGbSk', 'doP-aLp_TbGLvSQfnUvHHi:APA91bHatetYbtkITF7NvElnHAzCAGn-zg9_dLGFXLbyxVAaAFFCKUPiO8MKat44xGLoMaHlm8XcWCeHyyheXDjTseZxWVeWZjSfHv4jmv9HxlzX7WB8AY4'];
+
+        if (!is_array($fcmidArray) || count($fcmidArray) == 0) {
+            return false;
+        }
+        $httpClient = new \GuzzleHttp\Client();
+        $credentialsPath = '/var/www/html/multischool/classtech-72e27-d6eabbe2b41f.json';
+        $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
+            ['https://www.googleapis.com/auth/firebase.messaging'],
+            $credentialsPath
+        );
+        $token = $credentials->fetchAuthToken();
+        if (!isset($token['access_token'])) {
+            throw new \Exception('Failed to fetch access token');
+        }
+        $accessToken = $token['access_token'];
+        $headers = [
+            'Authorization' => 'Bearer ' . $accessToken,
+            'Content-Type' => 'application/json',
+        ];
+        $url = "https://fcm.googleapis.com/v1/projects/classtech-72e27/messages:send";
+        // Initialize cURL multi-handle
+        $multiHandle = curl_multi_init();
+        $curlHandles = [];
+        foreach ($fcmidArray as $deviceToken) {
+            $fcmFields = [
+                'message' => [
+                    'token' => $deviceToken,
+                    'notification' => [
+                        'title' => $title,
+                        'body' => $message,
+                    ],
+                    'data' => [
+                        'title' => (string)$title,
+                        'body' => (string)$message,
+                        'type' => (string)$type_no,
+                    ],
+                ],
+            ];
+            // Initialize individual cURL handle
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $accessToken,
+                "Content-Type: application/json",
+            ]);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fcmFields));
+            curl_multi_add_handle($multiHandle, $ch);
+            $curlHandles[] = $ch;
+        }
+        // Execute multi-handle requests
+        do {  echo "whiledo=================";
+            $status = curl_multi_exec($multiHandle, $active);
+            curl_multi_select($multiHandle);
+        } while ($active && $status == CURLM_OK);
+        // Close cURL handles
+        foreach ($curlHandles as $ch) {  echo "insideloop=============";
+            curl_multi_remove_handle($multiHandle, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($multiHandle);
+        return true;
+    }
+
+    public static function pushSendUserNotificationMessageArray($fcmTokens=[], $message, $title, $type_no)
+    {
+
+        /*$fcmTokens = ['dbNG36-ZQjS2XP4EDUis9j:APA91bFrrHJhOkFNSOQiPv2eszeZHoaQWPzcduLMW3AESQEAITZCameO2Zo67RfU7GDwNdQ4ci54E6iHl7C8vOehv0oQuNRYmiyh5pd4Cx6yN1aENA9ks9Q', 'dStmFmJtQ56azzAn3WPoq3:APA91bFF17mW8QrcDzXlpyrlcgi78TcYzdNcUvldo5Rolzmn4wkZV2bizHjFURsD1080s5dHd0RpgYsA2n7_3CXw2z2i-DMyKWEO9yxd0Oi_DFnAoMeGbSk', 'doP-aLp_TbGLvSQfnUvHHi:APA91bHatetYbtkITF7NvElnHAzCAGn-zg9_dLGFXLbyxVAaAFFCKUPiO8MKat44xGLoMaHlm8XcWCeHyyheXDjTseZxWVeWZjSfHv4jmv9HxlzX7WB8AY4'];*/
+
+        $title = "hi test";  $message = "hi test";  $type_no = 4;
+        $fcmTokens = ['doP-aLp_TbGLvSQfnUvHHi:APA91bHatetYbtkITF7NvElnHAzCAGn-zg9_dLGFXLbyxVAaAFFCKUPiO8MKat44xGLoMaHlm8XcWCeHyyheXDjTseZxWVeWZjSfHv4jmv9HxlzX7WB8AY4'];
+
+        // Ensure $fcmTokens is an array
+        /*if (!is_array($fcmTokens) || count($fcmTokens) == 0) {
+            throw new \Exception('Invalid tokens array');
+        }*/
+        // Firebase credentials and HTTP client setup
+        $httpClient = new \GuzzleHttp\Client();
+        $credentialsPath = '/var/www/html/multischool/classtech-72e27-d6eabbe2b41f.json';
+        $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
+            ['https://www.googleapis.com/auth/firebase.messaging'],
+            $credentialsPath
+        );
+        $token = $credentials->fetchAuthToken();
+        if (!isset($token['access_token'])) {
+            throw new \Exception('Failed to fetch access token');
+        }
+        $accessToken = $token['access_token'];
+        $headers = [
+            'Authorization' => 'Bearer ' . $accessToken,
+            'Content-Type' => 'application/json',
+        ];
+        $url = "https://fcm.googleapis.com/v1/projects/classtech-72e27/messages:send";
+        // Prepare FCM notification payload (Use 'tokens' instead of 'registration_ids')
+        $fcmFields = [
+            'message' => [
+                'fcm_tokens' => $fcmTokens,  // Use 'tokens' to send to multiple device tokens
+                'notification' => [
+                    'title' => $title,
+                    'body' => $message,
+                ],
+                'data' => [
+                    'title' => (string)$title,
+                    'body' => (string)$message,
+                    //'type' => (string)$type_no,
+                ],
+            ],
+        ];
+        try {
+            // Send request to Firebase
+            $response = $httpClient->post($url, [
+                'headers' => $headers,
+                'json' => $fcmFields,
+                'verify' => true,
+            ]);
+            print_r($response->getBody()->getContents());
+            // \Log::info("FCM Response: " . $response->getBody()->getContents());
+        } catch (\Exception $e) {
+            print_r($e->getMessage());
+            \Log::error("FCM Error: " . $e->getMessage());
+        }
+    }
 
     public static function price_format($num,$type = 1){
         $num_full = number_format((float)$num,2,'.','');
@@ -1001,5 +1404,61 @@ class CommonController extends Controller
         }
         return $thecash; // writes the final format where $currency is the currency symbol.
         }
+    }
+
+    public static function push_notification_staff_table($user_id, $type_no, $type_id, $fcmMsg, $no_notify=0, $fcm_id='', $post_id=0, $notify_datetime='',$created_by=0)    {
+         
+      $user = User::find($user_id);  
+      if(empty($notify_datetime)) {
+        $notify_datetime = date('Y-m-d H:i:s');
+      }
+        /*$notification_status = $user->notification_status;
+                    
+        $type_no :  1 : Attendance to User 
+                    2 : Homework given
+                    3 : Test given
+                    4 : post communication
+                    5 : post sms communication
+                    6 : Staff post communication
+        */
+
+        $ex_chk = 0; 
+
+        $ex_chk = DB::table('staff_notifications')->where(['user_id'=>$user_id, 'type_no'=>$type_no, 
+                'type_id'=>$type_id,'post_id'=>$post_id])->get();
+        if($ex_chk->isNotEmpty()) {
+            $ex_chk = 1;
+        } else {
+            $ex_chk = 0;
+        }
+        if($ex_chk == 0) {
+            DB::table('staff_notifications')->insert([
+              'user_id'=>$user_id,
+              'type_no'=>$type_no,
+              'type_id'=>$type_id,
+              'fcm_id'=>$user->fcm_id,
+              'post_id'=>$post_id,
+              'title'=>$fcmMsg['fcm']['notification']['title'],
+              'message'=>$fcmMsg['fcm']['notification']['body'],
+              'created_at'=>date('Y-m-d H:i:s'),
+              'notify_date'=>$notify_datetime,
+              'created_by' => $created_by,
+            ]);
+        }
+         
+        return true;
+    }
+
+    public static function getShortcode($name) {
+        $words = explode(" ", trim($name)); // Split name into words
+        $shortcode = strtoupper(substr($words[0], 0, 1)); // First letter of the first word
+
+        if (count($words) > 1) {
+            $shortcode .= strtoupper(substr($words[1], 0, 1)); // First letter of the second word
+        } else {
+            $shortcode .= strtoupper(substr($words[0], 1, 1)); // Second letter of the first word if no second word
+        }
+
+        return $shortcode;
     }
 }

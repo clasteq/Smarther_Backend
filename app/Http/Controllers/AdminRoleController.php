@@ -55,6 +55,15 @@ class AdminRoleController extends Controller
                     $classids[] = $mc->class_id;
                 }
             }
+
+            $ctutor_section = DB::table('class_teachers')->where('teacher_id', Auth::User()->id)
+                ->where('status', 'ACTIVE')->select('class_id')->groupby('class_id')->get();
+            if($ctutor_section->isNotEmpty()) {
+                foreach($ctutor_section as $mc) {
+                    $classids[] = $mc->class_id;
+                }
+            }
+            
         } else {
             // role mapped classes
             $role_id = DB::table('userroles')->where('ref_code', Auth::User()->user_type)->value('id');
@@ -83,6 +92,14 @@ class AdminRoleController extends Controller
                 ->where('status', 'ACTIVE')->select('section_id')->groupby('section_id')->get();
             if($mapped_section->isNotEmpty()) {
                 foreach($mapped_section as $mc) {
+                    $sectionids[] = $mc->section_id;
+                }
+            }
+
+            $ctutor_section = DB::table('class_teachers')->where('teacher_id', Auth::User()->id)
+                ->where('status', 'ACTIVE')->select('section_id')->groupby('section_id')->get();
+            if($ctutor_section->isNotEmpty()) {
+                foreach($ctutor_section as $mc) {
                     $sectionids[] = $mc->section_id;
                 }
             }
@@ -148,7 +165,11 @@ class AdminRoleController extends Controller
     {
         if (Auth::check()) {
             $school_id = $this->getSchoolId(); 
-            $roles = UserRoles::where('school_id', $school_id)->where('ref_code','!=','TEACHER')->get();
+            $status = $request->input('status');
+            $roles = UserRoles::where('school_id', $school_id)->where('ref_code','!=','TEACHER')
+                ->when(!empty($status), function ($query) use ($status) {
+                    return $query->where('status', $status);
+                })->get();
             return Datatables::of($roles)->make(true);
         } else {
             return redirect('/admin/login');
@@ -877,6 +898,92 @@ class AdminRoleController extends Controller
     public function getModules(Request $request)
     {
         if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+
+            $countriesqry = DB::table('modules as modules')->leftjoin('modules as pf', 'pf.id', 'modules.parent_module_fk')
+                ->where('modules.status', '<>', 0)
+                ->select('modules.*', 'pf.module_name as parent_module_name');
+            $filteredqry = DB::table('modules as modules')->leftjoin('modules as pf', 'pf.id', 'modules.parent_module_fk')
+                ->where('modules.status', '<>', 0)
+                ->select('modules.*', 'pf.module_name as parent_module_name');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $countriesqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $countriesqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if(!empty($status)){
+                $countriesqry->where('modules.status',$status);
+                $filteredqry->where('modules.status',$status);
+            }
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $countriesqry->whereRaw('( modules.module_name like "%'.$search['value'] . '%" )');
+                    
+                    $filteredqry->whereRaw('( modules.module_name like "%'.$search['value'] . '%" )');
+                }
+            } 
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $countries = $countriesqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = Countries::orderby('id', 'asc');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($countries)) {
+                foreach ($countries as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+
+        /*if (Auth::check()) {
             //$modules = Module::where('status', '<>', 0);
             $modules = Module::leftjoin('modules as pf', 'pf.id', 'modules.parent_module_fk')
                 ->where('modules.status', '<>', 0)
@@ -884,7 +991,7 @@ class AdminRoleController extends Controller
             return Datatables::of($modules)->make(true);
         } else {
             return redirect('/admin/login');
-        }
+        }*/
     }
 
     public function getModule(Request $request)

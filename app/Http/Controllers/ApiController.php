@@ -43,7 +43,8 @@ use App\Models\FeesPaymentDetail;
 use App\Models\Account;
 use App\Models\ContactsList;
 use App\Models\CommunicationGroup;
-
+use App\Models\Gallery;
+use App\Models\UserRemarks;
 use Response;
 use Log;
 use Auth;
@@ -362,6 +363,8 @@ class ApiController extends Controller
                 $fcm_token = ((isset($input) && isset($input['fcm_token']))) ? $input['fcm_token'] : '';
                 $device_id = ((isset($input) && isset($input['device_id']))) ? $input['device_id'] : '';
                 $device_type = ((isset($input) && isset($input['device_type']))) ? $input['device_type'] : '';
+
+                $logout_all = ((isset($input) && isset($input['logout_all']))) ? $input['logout_all'] : 0;
                 
                 /*$api_token = $request->header('x-api-key'); 
 
@@ -376,9 +379,13 @@ class ApiController extends Controller
                         $user = DB::table('users')->where('id', $userid)->first();
 
                         if(!empty($user)) { 
-                            $api_token = User::random_strings(30); 
-                            DB::table('users')->where('id', $userid)
-                                ->update(['api_token' => $api_token, 'updated_at' => date('Y-m-d H:i:s')]); 
+                            if($logout_all == 1) {
+
+                                $api_token = User::random_strings(30); 
+                                DB::table('users')->where('id', $userid)
+                                    ->update(['api_token' => $api_token, 'updated_at' => date('Y-m-d H:i:s')]); 
+
+                            }
                             DB::table('users_loginstatus')->insert([
                                 'user_id' => $user->id,
                                 'fcm_id' => $fcm_token,
@@ -686,6 +693,7 @@ class ApiController extends Controller
             if(empty($error)) {
 
                 $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $fcm_token = ((isset($input) && isset($input['fcm_token']))) ? $input['fcm_token'] : '';
 
                 $api_token = $request->header('x-api-key');
                 $page_no = 0;  $limit = CommonController::$page_limit;
@@ -697,6 +705,10 @@ class ApiController extends Controller
                 } 
                else {
                     if($userid > 0) { 
+
+                        if(!empty($fcm_token)) {
+                            DB::table('users')->where('id', $userid)->update(['fcm_id' => $fcm_token]); 
+                        } 
 
                         DB::table('users')->where('id', $userid)->update(['last_app_opened_date' => date('Y-m-d H:i:s'), 
                         'is_app_installed' => 1]); 
@@ -729,7 +741,8 @@ class ApiController extends Controller
                                     $subarr[$sub->id] = $sub->subject_name; 
                                 }
                             }
-
+                            $subjects = [];
+                            
                             $tomorrow = date('N', strtotime('+1 day'));
                             $tom_timetable = DB::table('timetables')->where('class_id', $user_details->class_id)
                                 ->where('section_id', $user_details->section_id)
@@ -896,6 +909,63 @@ class ApiController extends Controller
                         ->where('user_id', $userid)->whereIn('type_no', [4,5]) 
                         ->select('id')->count();  
                         $data['notescount'] = $notescount;
+
+                        $surveycount = Notifications::where('read_status', 0) 
+                        ->where('user_id', $userid)->whereIn('type_no', [7]) 
+                        ->select('id')->count();  
+                        $data['surveycount'] = $surveycount;
+
+                        $hwcount = Notifications::where('read_status', 0) 
+                        ->where('user_id', $userid)->whereIn('type_no', [4,5]) 
+                        ->select('id')->count();  
+                        $data['hwcount'] = $hwcount;
+
+                        /* Push notification Topics name */
+
+                        $topics = [];  
+                        $user = DB::table('users')->where('id', $userid)->select('mobile', 'school_college_id')->first();
+                        if(!empty($user)) {
+
+                            $mobilescholars = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
+                                ->where('users.mobile', $user->mobile)->where('users.user_type', 'STUDENT')
+                                ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                                ->where('users.school_college_id', $user->school_college_id)
+                                ->select('users.id', 'students.class_id', 'students.section_id')->get(); 
+                         
+                            if($mobilescholars->isNotEmpty()) {
+                                foreach($mobilescholars as $muser) {
+                                    $top_arr = [];
+                                    
+                                    $topics[]['topic_name'] = CommonController::$topic_school_scholars.$user->school_college_id;
+                                    $top_arr[] = CommonController::$topic_school_scholars.$user->school_college_id;
+
+                                    $topics[]['topic_name'] = CommonController::$topic_scholar.$muser->id; 
+                                    $top_arr[] = CommonController::$topic_scholar.$muser->id; 
+
+                                    $topics[]['topic_name'] = CommonController::$topic_section.$muser->section_id; 
+                                    $top_arr[] = CommonController::$topic_section.$muser->section_id; 
+                                
+                                    $cgroups = DB::table('communication_groups')->where('school_id', $user->school_college_id)
+                                        ->where('status', 'ACTIVE')
+                                        ->whereRaw('FIND_IN_SET('.$muser->id.', members)')
+                                        ->select('id')->get(); 
+                                    if($cgroups->isNotEmpty()) {
+                                        foreach($cgroups as $cg) {
+                                            $topics[]['topic_name'] = CommonController::$topic_group.$cg->id; 
+                                            $top_arr[] = CommonController::$topic_group.$cg->id; 
+                                        }
+                                    }
+                                    if(count($top_arr)>0) {
+                                        $top_arr = array_unique($top_arr);
+                                        $top_arr = array_filter($top_arr);
+                                        $top_str = implode(',', $top_arr);
+                                        DB::table('users')->where('id', $muser->id)->update(['topics_subscribed' => $top_str]); 
+                                    }
+                                } 
+                            }   
+                        } 
+                        $data['topics'] = $topics;
+                        /* Push notification Topics name */
 
                         if(count($data)>0) {
                             return response()->json(['status' => 1, 'message' => 'Home contents', 'data' => $data]);
@@ -1098,8 +1168,9 @@ class ApiController extends Controller
                             $ids = [];
                             foreach($sms_communications as $k=>$v) {
                                 $ids[] = $v->notification_id;
-                            }
-                            Notifications::whereIn('id', $ids)->update([
+                            } 
+
+                            Notifications::whereIn('id', $ids)->where('read_status', 0)->update([
                                 'read_date' => date('Y-m-d H:i:s'),
                                 'read_status' => 1,
                                 'updated_at' => date('Y-m-d H:i:s')
@@ -1183,7 +1254,148 @@ class ApiController extends Controller
 
     } 
 
-                        
+    /*  Surveys  Post list Details  
+    Fn Name: getPostSurveys
+    Input: user_id   
+    return: Success Message saved / Failure Message
+    */
+    public function getPostSurveys(Request $request)     {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token'];
+
+            $error = $this->checkParams($input, $requiredParams, $request); 
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0; 
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $search = ((isset($input) && isset($input['search']))) ? $input['search'] : ''; 
+                $from_date = ((isset($input) && isset($input['from_date']))) ? $input['from_date'] : ''; 
+                $to_date = ((isset($input) && isset($input['to_date']))) ? $input['to_date'] : '';  
+                $api_token = $request->header('x-api-key'); 
+                $limit = CommonController::$page_limit;
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message']; 
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                }   else { 
+                    if($userid > 0) {    
+
+                        $post_surveys = Notifications::leftjoin('survey', 'survey.id', 'notifications.post_id')
+                            ->where('notifications.user_id', $userid)
+                            ->whereIn('notifications.type_no', [7])
+                            ->where('survey.delete_status', 0)->where('survey.status', 'ACTIVE')
+                            //->where('communication_posts.notify_datetime', '<=', date('Y-m-d H:i:s'))
+                            ->select('survey.id', 'survey.survey_question', 'survey.survey_option1', 
+                                'survey.survey_option2', 'survey.survey_option3',  'survey.survey_option4', 
+                                'survey.expiry_date', 'survey.school_id',   
+                                'notifications.type_no', 'notifications.type_id', 'notifications.id as notification_id', 
+                                'notifications.notify_response');
+
+                        if(!empty(trim($from_date))) {
+                            $from_date = date('Y-m-d', strtotime($from_date));
+                            $post_surveys->whereRaw('survey.expiry_date >= ?', [$from_date]);  
+                        }
+                        if(!empty(trim($to_date))) {
+                            $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
+                            $post_surveys->whereRaw('survey.expiry_date <= ?', [$to_date]); 
+                        } 
+                        if(!empty(trim($search))) { 
+                            $post_surveys->whereRaw(' ( survey.survey_question like "%'.$search.'%" or survey.survey_option1 like "%'.$search.'%"  or survey.survey_option2 like "%'.$search.'%" ) '); 
+                        } 
+
+                        $post_surveys = $post_surveys->orderby('notification_id', 'asc')->skip($page_no)->take($limit)
+                        ->get(); 
+
+                        if($post_surveys->isNotEmpty()) {
+                            $ids = [];
+                            foreach($post_surveys as $k=>$v) {
+                                $ids[] = $v->notification_id;
+                            } 
+
+                            Notifications::whereIn('id', $ids)->where('read_status', 0)->update([
+                                'read_date' => date('Y-m-d H:i:s'),
+                                'read_status' => 1,
+                                'updated_at' => date('Y-m-d H:i:s')
+                            ]);
+
+                            return response()->json(['status' => 1, 'message' => 'Post Surveys', 'data' => $post_surveys]);
+                        }   else {
+                            return response()->json(['status' => 0, 'message' => 'No Surveys']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    } 
+
+    /*  Survey  Post respond Details  
+    Fn Name: respondPostSurvey
+    Input: user_id   
+    return: Success Message saved / Failure Message
+    */
+    public function respondPostSurvey(Request $request)     {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'post_id', 'respond_id'];
+
+            $error = $this->checkParams($input, $requiredParams, $request); 
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0; 
+                $post_id = ((isset($input) && isset($input['post_id']))) ? $input['post_id'] : 0;  
+                $respond_id = ((isset($input) && isset($input['respond_id']))) ? $input['respond_id'] : 0;  
+                $api_token = $request->header('x-api-key');  
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message']; 
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                }   else { 
+                    if($userid > 0 && $post_id > 0 && $respond_id > 0) {  
+
+                        $post_surveys = Notifications::leftjoin('survey', 'survey.id', 'notifications.post_id')
+                            ->where('notifications.user_id', $userid)->where('notifications.type_no', 7)
+                            ->where('survey.delete_status', 0)->where('notifications.id', $post_id)
+                            ->where('survey.expiry_date', '>=', date('Y-m-d'))->get();  
+
+                        if($post_surveys->isNotEmpty()) {
+
+                            Notifications::leftjoin('survey', 'survey.id', 'notifications.post_id')
+                            ->where('notifications.user_id', $userid)->where('notifications.type_no', 7)
+                            ->where('survey.delete_status', 0)->where('notifications.id', $post_id)
+                            ->update(['notify_response'=>$respond_id, 'updated_at'=>date('Y-m-d H:i:s')]); 
+
+                            return response()->json(['status' => 1, 'message' => 'Survey saved successfully']);
+                        }   else {
+                            return response()->json(['status' => 0, 'message' => 'No Posts']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    }                         
 
     /*  states list Details  
     Fn Name: getStates
@@ -1419,6 +1631,19 @@ class ApiController extends Controller
                             $hw = $hw_qry->orderby('id', 'desc')->get();
 
                             if($hw->isNotEmpty()) {
+
+                                // notification read
+                                foreach($hw as $works) {
+                                    $main_ref_no = $works->main_ref_no;
+                                    DB::table('notifications')->where('main_ref_no', $main_ref_no)
+                                        ->where('read_status', 0)->where('user_id', $userid)
+                                        ->update([
+                                        'read_date' => date('Y-m-d H:i:s'),
+                                        'read_status' => 1,
+                                        'updated_at' => date('Y-m-d H:i:s')
+                                    ]);
+                                }
+
                                 return response()->json(['status' => 1, 'message' => 'Homework list', 'data' => $hw]);
                             }   else {
                                 return response()->json(['status' => 0, 'message' => 'No Homework']);
@@ -1518,6 +1743,185 @@ class ApiController extends Controller
         } */ 
 
     } 
+
+    /*  Communications  homeworks acknowledge Details  
+    Fn Name: acknowledgePostHomeworks
+    Input: user_id   
+    return: Success Message saved / Failure Message
+    */
+    public function acknowledgePostHomeworks(Request $request)     {
+        try {   
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'hw_id'];
+
+            $error = $this->checkParams($input, $requiredParams, $request); 
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0; 
+                $hw_id = ((isset($input) && isset($input['hw_id']))) ? $input['hw_id'] : 0;  
+                $api_token = $request->header('x-api-key');  
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message']; 
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                }   else { 
+                    if($userid > 0 && $hw_id > 0) { 
+                        $main_ref_no = '';
+                        $hw = DB::table('homeworks')->where('id', $hw_id)->get();
+                        if($hw->isNotEmpty()) {
+                            $hw = $hw[0];
+                            $main_ref_no = $hw->main_ref_no;
+
+                            $post_communications = Notifications::leftjoin('communication_sms', 'communication_sms.id', 'notifications.post_id')->where('notifications.user_id', $userid)->where('notifications.type_no', 7)
+                                ->where('communication_sms.delete_status', 0)
+                                ->where('communication_sms.main_ref_no', $main_ref_no)->get();  
+
+                            if($post_communications->isNotEmpty()) {
+
+                                Notifications::leftjoin('communication_sms', 'communication_sms.id', 'notifications.post_id')
+                                ->where('notifications.user_id', $userid)->where('notifications.type_no', 7)
+                                ->where('communication_sms.delete_status', 0)
+                                ->where('communication_sms.main_ref_no', $main_ref_no)
+                                ->update(['is_acknowledged'=>1, 'updated_at'=>date('Y-m-d H:i:s')]); 
+
+                                return response()->json(['status' => 1, 'message' => 'Homeworks Acknowledged']);
+                            }   else {
+                                return response()->json(['status' => 0, 'message' => 'No Homeworks']);
+                            }
+                        }
+
+                        
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }  
+
+    } 
+
+    public function postHomeworkSubmit(Request $request) {
+        try {   
+            //$inputJSON = file_get_contents('php://input');
+
+            $input = $request->all(); // json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token', 'hw_id', 'hw_file'];
+
+            $error = $this->checkParams($input, $requiredParams, $request, true);
+
+            $error = '';
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0; 
+                $hw_id = ((isset($input) && isset($input['hw_id']))) ? $input['hw_id'] : 0;   
+                $hw_file = ((isset($input) && isset($input['hw_file']))) ? $input['hw_file'] : ''; 
+                $api_token = $request->header('x-api-key'); 
+                
+                if(empty($date)) {
+                    $date = date('Y-m-d');
+                }
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+ 
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'data' => null, 'message' => $message]);
+                }   else { 
+                    if($userid > 0) {  
+                        $user_details = DB::table('students') 
+                            ->select('students.class_id', 'students.section_id')
+                            ->where('students.user_id', $userid)->first();  
+
+                        if(!empty($user_details)) {   
+                            $hw_details = Homeworks::where('status', 'ACTIVE')
+                                ->whereDate('hw_date', '<=', date('Y-m-d H:i:s'))
+                                ->whereDate('hw_submission_date', '>=', date('Y-m-d H:i:s'))
+                                ->where('id', $hw_id)->get();
+
+                            if($hw_details->isNotEmpty()) {
+                                $school_id = $hw_details[0]->school_id;
+                                $class_id = $hw_details[0]->class_id;
+                                $section_id = $hw_details[0]->section_id;
+                                $main_ref_no = $hw_details[0]->main_ref_no;
+                                $ref_no = $hw_details[0]->ref_no;
+
+                                $chk = DB::table('homework_submissions')->where('homework_id', $hw_id)
+                                    ->where('user_id', $userid)->get();
+                                if($chk->isNotEmpty()) {
+                                    return response()->json(['status' => 0, 'message' => ' Homework Submitted already ']);
+                                } else {
+                                    $str =  ''; 
+                                    $images = $request->file('hw_file');
+                                    if (!empty($images)) {
+                                        $arr = []; 
+                                        
+                                        $accepted_formats = [ 'jpeg', 'jpg', 'png', 'doc', 'docx', 'pdf', 'JPEG', 'JPG', 'PNG', 'DOC', 'DOCX', 'PDF'];
+
+                                        foreach($images as $image) {
+                                            $ext = $image->getClientOriginalExtension();
+                                            $ext = strtolower($ext);
+                                            if (!in_array($ext, $accepted_formats) && !in_array($ext, $accepted_formats)) {
+                                                return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload jpeg, jpg, png, doc, docx, pdf']);
+                                            }
+
+                                            $countryimg = rand() . time() . '.' . $image->getClientOriginalExtension();
+
+                                            $destinationPath = public_path('/uploads/homeworks');
+
+                                            $image->move($destinationPath, $countryimg);
+
+                                            $arr[] = $countryimg;
+                                        } 
+                                        if(count($arr)>0) { 
+                                            $str = implode(';', $arr);
+                                        }  
+
+                                        DB::table('homework_submissions')->insert([
+                                            'school_id' => $school_id,
+                                            'user_id' => $userid,
+                                            'class_id' => $class_id,
+                                            'section_id' => $section_id,
+                                            'homework_id' => $hw_id,
+                                            'main_ref_no' => $main_ref_no,
+                                            'ref_no' => $ref_no,
+                                            'submitted_documents' => $str,
+                                            'status' => 'ACTIVE',
+                                            'created_by' => $userid,
+                                            'created_at' => date('Y-m-d H:i:s')
+                                        ]);
+
+                                        return response()->json(['status' => 1, 'message' => 'Homework Submitted Successfully', 'data' => []]);
+                                    }
+                                }
+
+                                return response()->json(['status' => 0, 'message' => 'No Homework Files Submitted']);
+                            }   else {
+                                return response()->json(['status' => 0, 'message' => 'No Homework']);
+                            }
+                        } else {
+                            return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid inputs']);
+                    }
+                }
+            }    else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            }
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }
+    }
 
     /*  classes list Details  
     Fn Name: getClasses
@@ -5759,6 +6163,98 @@ class ApiController extends Controller
                 'due_fees' => $dueFees,
                 'pending_fees' => $pendingFees,
             ];
+        }
+    }
+
+    public function getGalleyList(Request $request) { 
+        try {
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token'];
+
+            $error = $this->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $api_token = $request->header('x-api-key');
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'message' => $message]);
+                }   else {
+                    if($userid > 0) {  
+                        $school_id = DB::table('users')->where('id', $userid)->value('school_college_id');  
+
+                        $list = Gallery::where('status', 'ACTIVE')->where('school_id', $school_id)
+                            ->select('id', 'gallery_title', 'gallery_image', 'school_id')->orderby('id', 'desc')
+                            ->skip($page_no)->take($limit)->get();
+
+                        if ($list->isNotEmpty()) {
+                            return response()->json(['status' => 1, 'data' => $list, 'message' => 'Gallery']);
+                        } else {
+                            return response()->json(['status' => 0, 'message' => 'Gallery Not Available']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid Inputs']);
+                    }
+                }
+            } else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            } 
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
+        }
+    }
+
+    public function getRewardsList(Request $request) { 
+        try {
+            $inputJSON = file_get_contents('php://input');
+
+            $input = json_decode($inputJSON, TRUE);
+
+            $requiredParams = ['user_id', 'api_token'];
+
+            $error = $this->checkParams($input, $requiredParams, $request);
+
+            if(empty($error)) {
+
+                $userid = ((isset($input) && isset($input['user_id']))) ? $input['user_id'] : 0;  
+                $api_token = $request->header('x-api-key');
+                $page_no = ((isset($input) && isset($input['page_no']))) ? $input['page_no'] : 0;  
+                $limit = CommonController::$page_limit;
+
+                $mes = User::checkTokenExpiry($userid, $api_token);
+                $status = $mes['status'];   $message = $mes['message'];
+                if($status != 1) {
+                    return response()->json([ 'status' => $status, 'message' => $message]);
+                }   else {
+                    if($userid > 0) {  
+                        $school_id = DB::table('users')->where('id', $userid)->value('school_college_id');  
+
+                        $list = UserRemarks::where('status', 'ACTIVE')->where('school_id', $school_id)
+                            ->where('user_id', $userid)->select('id', 'remark_type', 'remark_description', 'remark_notify', 'created_by', 'created_at')->orderby('id', 'desc')
+                            ->skip($page_no)->take($limit)->get();
+
+                        if ($list->isNotEmpty()) {
+                            return response()->json(['status' => 1, 'data' => $list, 'message' => 'Rewards / Remarks']);
+                        } else {
+                            return response()->json(['status' => 0, 'message' => 'Rewards / Remarks Not Available']);
+                        }
+                    }   else {
+                        return response()->json([ 'status' => 0, 'message' => 'Invalid Inputs']);
+                    }
+                }
+            } else {
+                return response()->json([ 'status' => 0, 'message' => $error]);
+            } 
+        }   catch(\Throwable $th) {
+            return response()->json(['status' => 0, 'message' => $th->getMessage()]);
         }
     }
 }

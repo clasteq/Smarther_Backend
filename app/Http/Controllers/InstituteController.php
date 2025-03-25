@@ -209,6 +209,7 @@ class InstituteController extends Controller
             $status = $request->get('status_id', '');
             $section = $request->get('section_id', '');
             $class_id = $request->get('class_id', '');
+            $search = $request->get('search');
 
             $users_qry = User::leftjoin('countries', 'countries.id', 'users.country')
                 ->leftjoin('states', 'states.id', 'users.state_id')
@@ -241,6 +242,14 @@ class InstituteController extends Controller
                 }
             }
 
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR schools.address like "%'.$search['value'] . '%"  OR states.state_name like "%'.$search['value'] . '%"  OR districts.district_name like "%'.$search['value'] . '%" OR users.status like "%'.$search['value'] . '%")');
+                    
+                    $filtered_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR schools.address like "%'.$search['value'] . '%"  OR states.state_name like "%'.$search['value'] . '%"  OR districts.district_name like "%'.$search['value'] . '%" OR users.status like "%'.$search['value'] . '%")');
+                }
+            }
+
             if(!empty($status)){
                 $users_qry->where('users.status',$status);
                 $filtered_qry->where('users.status',$status);
@@ -249,7 +258,7 @@ class InstituteController extends Controller
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
             } else {
-                $orderby = 'users.id';
+                $orderby = 'users.joined_date';
             }
             if (empty($dir)) {
                 $dir = 'DESC';

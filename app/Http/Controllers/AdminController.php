@@ -11,6 +11,7 @@ use App\Models\Classes;
 use App\Models\ClassesMaster;
 use App\Models\Countries;
 use App\Models\CommunicationPost;
+use App\Models\CommunicationPostStaff;
 use App\Models\CommunicationGroup;
 use App\Models\Districts;
 use App\Models\Grades;
@@ -75,16 +76,22 @@ use App\Models\FeeStructureItem;
 use App\Models\FeesPaymentDetail;
 use App\Models\Account;
 use App\Models\FeesReceiptDetail;
+use App\Models\OAFeesSections;
 
 use App\Models\ContactsList;
 use App\Models\ContactsFor;
 use App\Models\PreAdmissionStudent;
+use App\Models\Departments;
 
 use App\Models\UserRoles; 
 use App\Models\Module;
 use App\Models\RoleModuleMapping;
 
 use App\Models\BloodGroups;
+use App\Models\StaffNotifications;
+use App\Models\UserRemarks;
+use App\Models\Gallery;
+use App\Models\HomeworkSubmissions;
 
 use Auth;
 use DB;
@@ -106,12 +113,13 @@ class AdminController extends Controller
     public $accepted_formats = ['jpeg', 'jpg', 'png', 'JPG', 'JPEG', 'PNG'];
     public $accepted_formats_audio = ['mp3', 'mp4', 'MP3', 'MP4'];
     public $accepted_formats_qbt = ['mp3', 'mp4', 'jpeg', 'jpg', 'png', 'doc', 'docx', 'pdf', 'MP3', 'MP4', 'JPEG', 'JPG', 'PNG', 'DOC', 'DOCX', 'PDF'];
+    public $maxsize    = 2097152;
     public $school;
 
-    public function __construct()    { 
+    public function old__construct( )    { 
         $ourl = config("constants.APP_URL"); 
         $url = $ourl; //URL('/'); 
-        $curr = url()->full();
+        $curr = url()->full(); 
         $url = str_replace('/', '', $url);
         $curr = str_replace('/', '', $curr);
         $re = '/'.$url.'(.*)admin/'; 
@@ -140,18 +148,20 @@ class AdminController extends Controller
                     return redirect('/admin/settings');
                 }
             }
-        }
-
-        //echo $school; exit;
+        } 
+        //echo URL('/');
+        //echo $this->school; //exit;
     }
 
     public function deleteAccountUrl(){ 
         return view('users.delete_account'); 
     }
 
-    public function termsconditions()    {   
-        if(!empty($this->school)) { 
-            $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $this->school)->value('id');
+    public function termsconditions(Request $request)    {   
+        //if(!empty($this->school)) { 
+        $slug = $request->get('slug', '');
+        if(!empty($slug)) {
+            $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $slug)->value('id');
             if($school_id > 0) {
                 $terms_conditions = DB::table('admin_settings')->where('school_id', $school_id)->value('terms_conditions'); 
                 if(empty($terms_conditions)) {
@@ -166,9 +176,11 @@ class AdminController extends Controller
         return view('users.pagecontent')->with('content', $terms_conditions);
     }
 
-    public function aboutus()    { 
-        if(!empty($this->school)) { 
-            $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $this->school)->value('id');
+    public function aboutus(Request $request)    { 
+        //if(!empty($this->school)) { 
+        $slug = $request->get('slug', '');
+        if(!empty($slug)) {
+            $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $slug)->value('id');
             if($school_id > 0) {
                 $about = DB::table('admin_settings')->where('school_id', $school_id)->value('about'); 
                 if(empty($about)) {
@@ -183,9 +195,11 @@ class AdminController extends Controller
         return view('users.pagecontent')->with('content', $about);
     }
 
-    public function policy()    { 
-        if(!empty($this->school)) { 
-            $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $this->school)->value('id');
+    public function policy(Request $request)    { 
+        //if(!empty($this->school)) { 
+        $slug = $request->get('slug', '');
+        if(!empty($slug)) {
+            $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $slug)->value('id');
             if($school_id > 0) {
                 $privacy_policy = DB::table('admin_settings')->where('school_id', $school_id)->value('privacy_policy'); 
                 if(empty($privacy_policy)) {
@@ -201,12 +215,250 @@ class AdminController extends Controller
         return view('users.pagecontent')->with('content', $privacy_policy);
     }
 
+    public function viewForgotPwd(){
+        $login_image = DB::table('admin_settings')->where('school_id', 0)->where('id', 1)->value('login_image');
+        if(empty($login_image)) {
+            $login_image = asset('/public/image/adminlogin.jpeg');
+        }   else {
+            $login_image = asset('/public/image/settings/'.$login_image);
+        }
+        return view('admin.forgot-pwd')->with('login_image',$login_image);
+    }
+
+    public function putForgotPwd(Request $request){
+
+        $mobile = $request->mobile;
+
+        $emailPattern = '/^\w{2,}@\w{2,}\.\w{2,4}$/';
+
+        $mobilePattern ="/^[0-9]{10}$/";
+
+        $inputtype = "mobile";
+        if(preg_match($emailPattern, $mobile)){
+            $inputtype = "email";
+        } else if(preg_match($mobilePattern, $mobile)){
+            $inputtype = "mobile";
+        } else {
+            return response()->json([
+
+                'status' => "FAILED",
+                'message' => "Invalid Input. Please Enter Valid Mobile"
+
+            ]);
+        }
+
+        $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $this->school)->value('id');
+
+        if(!empty($mobile)){ 
+
+            $userStatus = User::where('mobile', $mobile)->where('status', 'ACTIVE')->where('delete_status', 0)
+                ->where('id', $school_id)->whereIn('user_type', ['SCHOOL'])
+                ->select('id','name', 'mobile')->get();
+
+            if($userStatus->isNotEmpty()){ 
+                $user = $userStatus[0];
+            }   else { 
+                $userStatus = User::where('mobile', $mobile)->where('status', 'ACTIVE')->where('delete_status', 0)
+                    ->where('school_college_id', $school_id)
+                    ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                    ->select('id','name', 'mobile')->get();
+
+                if($userStatus->isNotEmpty()){ 
+                    $user = $userStatus[0];
+                }   else { 
+                    return response()->json(['status' => 'FAILED', 'message' => 'Mobile Not Exists',]);
+                }
+            }
+             
+            $user_id = $user->id;
+            $mobile = $user->mobile;
+            $userarr = $user->toArray();
+            $enc_id = $userarr['enc_id'];
+            $otpGeneration  = CommonController::generateNumericOTP(4);
+            DB::table('users')->where('mobile', $mobile)->where('id',$user_id)->where('user_type', 'SCHOOL')
+            ->where('status', 'ACTIVE')->where('delete_status', 0)->update(['otp'=>$otpGeneration]);
+            $code_mobile = '91'.$mobile;
+            CommonController::SendOTPSMS($code_mobile, $otpGeneration, $user_id);
+
+            return response()->json(['status' => 'SUCCESS', 'message' => 'OTP has been sent', 'userid' => $enc_id], 201);
+
+
+        }else{
+            return response()->json(['status' => 'FAILED', 'message' => 'Invalid Input',], 201);
+        }
+
+    }
+
+    public function viewResetPwd(Request $request){ 
+        $enc_id = $request->get('id', ''); 
+        $user_id = 0;
+        if(!empty($enc_id)) {
+            $user_id = User::getDecodedIdAttribute($enc_id); 
+        }
+        $login_image = DB::table('admin_settings')->where('school_id', 0)->where('id', 1)->value('login_image');
+        if(empty($login_image)) {
+            $login_image = asset('/public/image/adminlogin.jpeg');
+        }   else {
+            $login_image = asset('/public/image/settings/'.$login_image);
+        }
+        return view('admin.reset-pwd')->with('user_id',$user_id)->with('login_image',$login_image);
+    }
+
+    public function putResetPwd(Request $request)      
+    {
+        $user_id = $request->id;
+        $otp = $request->otp;
+        $newpassword = $request->new_pwd;
+        $confirmpwd = $request->confirm_pwd;
+ 
+
+        $userStatus = User::where('id', $user_id)->where('status', 'ACTIVE')->where('delete_status', 0)
+                ->where('otp', $otp)->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT'])
+                ->select('id','name', 'mobile', 'user_type')->get();  
+
+        if($userStatus->isNotEmpty())  {
+            if ($user_id > 0 && ($newpassword == $confirmpwd)) {
+                $user = User::find($user_id);
+                $user->password = Hash::make($newpassword); 
+                $user->passcode = $newpassword; 
+                $user->save();   
+                
+                $chk = DB::table('users_password_status')
+                    ->where(['user_id'=>$user_id, 'fcm_id'=>'WEBSITE'])->count();
+
+                if($chk == 0) {
+                    DB::table('users_password_status')->insert([
+                        'user_id' => $user_id,
+                        'fcm_id' => 'WEBSITE',
+                        'change_status' => 1,
+                        'created_at' => date('Y-m-d H:i:s')
+                    ]);
+                }   else {
+                    DB::table('users_password_status')->where('user_id', $user_id)->update([
+                        'change_status' => 1,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                }
+                
+
+                return response()->json(['status' => 'SUCCESS', 'message' => 'Password has been changed. Please Login']);
+
+            } else {
+                if(empty($user)) {
+                    return response()->json(['status' => 'FAILED', 'message' => 'New Password and Confirm password does not match']);
+                }
+                return response()->json(['status' => 'FAILED', 'message' => 'Invalid Passwords']);
+            }
+        } else {
+            return response()->json(['status' => 'FAILED', 'message' => 'Invalid OTP']);
+        } 
+    }
+
+    public function changePassword() {
+        if(Auth::check()){
+        return view('admin.change_password');
+        }else{
+            return redirect('/admin/login');
+        }
+    }
+
+    public function updatePassword(Request $request) {
+        if(Auth::check()){
+        $input = $request->all();
+        $new_password = $input['new_password'];
+        $confirm_password = $input['confirm_password'];
+
+        if(empty($new_password) || empty($confirm_password)) {
+            return response()->json(['status' => 'FAILED', 'message' => 'Please Enter the Passwords']);
+        }   else if($new_password != $confirm_password) {
+            return response()->json(['status' => 'FAILED', 'message' => 'New and Confirm Password must be Equal']);
+        }   else {
+            $user_id = Auth::User()->id;
+
+            $password = Hash::make($new_password);
+            $passcode = $new_password;
+            $usernow = USER::find($user_id);
+            $usernow->password = $password;
+            $usernow->passcode = $passcode;
+            $usernow->save();
+            return response()->json(['status' => 'SUCCESS', 'message' => 'Password Saved Successfully']);
+        }
+        }else{
+            return redirect('/admin/login');
+        }
+    }
+
+    public function page404()
+    { 
+        return view('admin.404');
+         
+    }
+
     public function index()
     {
         if (Auth::check()) {
             return redirect('/admin/home');
         } else {
-            return view('admin.login');
+            $login_image = DB::table('admin_settings')->where('school_id', 0)->where('id', 1)->value('login_image');
+            if(empty($login_image)) {
+                $login_image = asset('/public/image/adminlogin.jpeg');
+            }   else {
+                $login_image = asset('/public/image/settings/'.$login_image);
+            }
+            return view('admin.login')->with('login_image', $login_image);
+        }
+    }
+
+    /* Function: loginSchools
+    Login Functionality by exit super admin and logged into school automatically
+    Params: school id
+    return: JSON */
+
+    public function loginSchools(Request $request)
+    {
+        $school_id = $request->input('id', 0);
+        if($school_id > 0) {
+
+            if (Auth::check()) {
+
+                $current_session_id = Session::getId();
+                $device_id = $request->ip();
+                $current = DB::table('users_loginstatus')->where('session_id', $current_session_id)->get();
+                if ($current->isNotEmpty()) {
+                    DB::table('users_loginstatus')->update([
+                        'check_out' => date('Y-m-d H:i:s'),
+                        'status' => 'LOGOUT',
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                } else {
+                    if (Auth::check()) {
+                        DB::table('users_loginstatus')->insert(['user_id' => Auth::User()->id,
+                            'session_id' => $current_session_id,
+                            'check_in' => date('Y-m-d H:i:s'),
+                            'device_id' => $device_id,
+                            'api_token_expiry' => Auth::User()->api_token_expiry,
+                            'status' => 'LOGIN',
+                            'created_at' => date('Y-m-d H:i:s'),
+                        ]);
+                    }
+                }
+
+                $user = DB::table('users')->where('id', $school_id)->select('email', 'passcode')->first();
+                if(!empty($user)) {
+                    $request->merge(['email' => $user->email]);
+                    $request->merge(['password' => $user->passcode]);
+
+                    $ret = $this->postLogin($request);
+                    return $ret;
+                }
+                
+                //Auth::logout();
+                 
+            } else {
+                return response()->json(['status' => 'FAILED', 'message' => 'Session Logged Out']);
+            }
+        }   else {
+            return response()->json(['status' => 'FAILED', 'message' => 'Invalid Login Attempt']);
         }
     }
 
@@ -216,6 +468,151 @@ class AdminController extends Controller
     return: JSON */
 
     public function postLogin(Request $request)
+    {
+
+        $userEmail = $request->input('email');
+
+        $password = $request->input('password');
+
+        $validator = Validator::make($request->all(), [
+            'email' => 'required',  //|email
+            'password' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+
+            $msg = $validator->errors()->all();
+
+            return response()->json([
+
+                'status' => "FAILED",
+                'message' => $msg,
+
+            ]);
+        }
+
+        /*if($this->school == 'clastechowner') {
+            $user_type = 'SUPER_ADMIN';
+        } else {
+            $user_type = 'SCHOOL';
+        }
+
+        $school_id = DB::table('users')->where('user_type', 'SCHOOL')->where('slug_name', $this->school)->value('id');*/
+
+        if (Auth::attempt(['email' => $userEmail, 'password' => $password, 'user_type' => 'SUPER_ADMIN', 'status' => 'ACTIVE', 'delete_status' => 0])) {
+
+            $userStatus = User::where('email', $userEmail)->where('user_type', 'SUPER_ADMIN')->where('status', 'ACTIVE')->first();
+        } else if (Auth::attempt(['mobile' => $userEmail, 'password' => $password, 'user_type' => 'SUPER_ADMIN', 'status' => 'ACTIVE', 'delete_status' => 0])) {
+
+            $userStatus = User::where('mobile', $userEmail)->where('user_type', 'SUPER_ADMIN')->where('status', 'ACTIVE')->first();
+        } else if (Auth::attempt(['email' => $userEmail, 'password' => $password, 'user_type' => 'SCHOOL', 'status' => 'ACTIVE', 'delete_status' => 0])) {
+
+            $userStatus = User::where('email', $userEmail)->where('user_type', 'SCHOOL')->where('status', 'ACTIVE')->first();
+        }  else if (Auth::attempt(['mobile' => $userEmail, 'password' => $password, 'user_type' => 'SCHOOL', 'status' => 'ACTIVE'])) {
+
+            $userStatus = User::where('mobile', $userEmail)->where('user_type', 'SCHOOL')->where('status', 'ACTIVE')->first();
+        } else if(Auth::attempt(['email' => $userEmail, 'password' => $password, 'status' => 'ACTIVE', 'delete_status' => 0, 'user_type' => function ($query) {
+                $query->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL']);
+            }])) {
+            $userStatus = User::where('email', $userEmail)->where('status', 'ACTIVE')->where('delete_status', 0)
+                //->where('school_college_id', $school_id)
+                ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])->first();
+
+            if(in_array($userStatus->user_type, ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])) {
+                if (Auth::check()) { if(Auth::User()->user_type == 'SUPER_ADMIN')  {} else { Auth::logout(); } } 
+                return response()->json([ 
+                    'status' => "FAILED",
+                    'message' => "Invalid Login"
+                ]);
+            }
+
+        } else if(Auth::attempt(['mobile' => $userEmail, 'password' => $password, 'status' => 'ACTIVE', 'delete_status' => 0, 'user_type' => function ($query) {
+                $query->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL']);
+            }])) {
+            $userStatus = User::where('mobile', $userEmail)->where('status', 'ACTIVE')->where('delete_status', 0)
+                //->where('school_college_id', $school_id)
+                ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])->first();
+ 
+            if(in_array($userStatus->user_type, ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])) {
+                if (Auth::check()) { if(Auth::User()->user_type == 'SUPER_ADMIN')  {} else { Auth::logout(); } } 
+                return response()->json([ 
+                    'status' => "FAILED",
+                    'message' => "Invalid Login"
+                ]);
+            }
+
+        } else {
+            if (Auth::check()) { if(Auth::User()->user_type == 'SUPER_ADMIN')  {} else { Auth::logout(); } } 
+            return response()->json(['status' => 'FAILED', 'message' => 'Invalid Login Credential']);
+
+        }
+            $user_type = $userStatus->user_type;
+
+            $userStatus->last_login_date = date('Y-m-d');
+
+            $userStatus->save();
+
+            $current_session_id = Session::getId();
+            $device_id = $request->ip();
+
+            $current = DB::table('users_loginstatus')->where('session_id', $current_session_id)->get();
+            if ($current->isNotEmpty()) {
+            } else {
+                DB::table('users_loginstatus')->insert(['user_id' => $userStatus->id,
+                    'session_id' => $current_session_id,
+                    'check_in' => date('Y-m-d H:i:s'),
+                    'device_id' => $device_id,
+                    'api_token_expiry' => $userStatus->api_token_expiry,
+                    'status' => 'LOGIN',
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+            //echo "<pre>"; print_r($userStatus);
+            $role_fk = UserRoles::where('ref_code', $userStatus->user_type)->where('school_id', $userStatus->school_college_id)->value('id'); 
+            session()->forget('module');
+            $access = array();
+            $role_access = RoleModuleMapping::where('ra_role_fk', $role_fk)->get();
+            $i = 0; 
+            foreach ($role_access as $m) {
+                $module_id = $m['ra_module_fk'];
+
+                $add = $m['ra_add'];
+                $edit = $m['ra_edit'];
+                $delete = $m['ra_delete'];
+                $view = $m['ra_view'];
+
+                $list = $m['ra_list'];
+                $status_update = $m['ra_status_update'];
+                $aadhar_status_update = 0;//$m['ra_aadhar_status_update'];
+
+                $row_module = Module::find($module_id); 
+                $module_name = $row_module->url_name;
+                $url = $row_module->url;
+
+                if (! empty($url)) {
+                    $access[$module_name] = array(
+                        'aadhar_status_update' => $aadhar_status_update,
+                        'status_update' => $status_update,
+                        'list' => $list,
+                        'add' => $add,
+                        'edit' => $edit,
+                        'delete' => $delete,
+                        'view' => $view,
+                        'url' => $url
+                    );
+                }
+                $i ++;
+            } 
+            session()->put('role_fk', $role_fk);
+            session()->put('module', $access);
+            session()->put('user_type', $userStatus->user_type);
+            return response()->json(['status' => 'SUCCESS', 'message' => 'Please wait redirecting...']);
+
+        
+
+    }
+
+    /*public function postLogin(Request $request)
     {
 
         $userEmail = $request->input('email');
@@ -250,6 +647,9 @@ class AdminController extends Controller
         if (Auth::attempt(['email' => $userEmail, 'password' => $password, 'user_type' => $user_type, 'slug_name' => $this->school])) {
 
             $userStatus = User::where('email', $userEmail)->where('user_type', $user_type)->where('slug_name', $this->school)->first();
+        } else if (Auth::attempt(['mobile' => $userEmail, 'password' => $password, 'user_type' => $user_type, 'slug_name' => $this->school])) {
+
+            $userStatus = User::where('mobile', $userEmail)->where('user_type', $user_type)->where('slug_name', $this->school)->first();
         } else if(Auth::attempt(['email' => $userEmail, 'password' => $password, 'status' => 'ACTIVE', 'delete_status' => 0, 'user_type' => function ($query) {
                 $query->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL']);
             }])) {
@@ -271,7 +671,7 @@ class AdminController extends Controller
             $userStatus = User::where('mobile', $userEmail)->where('status', 'ACTIVE')->where('delete_status', 0)
                 ->where('school_college_id', $school_id)
                 ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])->first();
-
+ 
             if(in_array($userStatus->user_type, ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])) {
                 if (Auth::check()) { Auth::logout(); }
                 return response()->json([ 
@@ -349,7 +749,7 @@ class AdminController extends Controller
 
         
 
-    }
+    }*/
 
     public function checkSetAdminCountry(Request $request)
     {
@@ -375,10 +775,56 @@ class AdminController extends Controller
         ]);
     }
 
-    public function getHomeContents($school_id, $limit) {
+    public function viewSchoolProfile(Request $request) {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $user = User::where('id', $school_id)->where('user_type', 'SCHOOL')->first();
+            if(!empty($user)) {
+                $user_details = $user->toArray();
+            } else {
+                $user_details = '';
+            }
+            return view('admin.schoolprofile')->with('user_details', $user_details);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function fetchNotifications(Request $request) {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $user_id = Auth::User()->id;
+            $user_type = Auth::User()->user_type;
+
+            $staff_arr = ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'];
+            $notifications = ''; $notify_count = 0;
+            if(!in_array($user_type, $staff_arr)) {
+                $notifications = DB::table('staff_notifications')->where('user_id', $user_id)
+                    ->where('read_status', 0)->skip(0)->take(5)
+                    ->get();
+                $notify_count = DB::table('staff_notifications')->where('user_id', $user_id)
+                    ->where('read_status', 0)->count();
+                
+                if($notifications->isNotEmpty()) {
+                    return response()->json([ 'status' => "SUCCESS", 'message' => 'Notifications', 'data' => $notifications, 
+                    'notify_count' => $notify_count]);
+                } else {
+                    return response()->json([ 'status' => "FAILED", 'message' => 'No Notifications', ]);
+                }
+            } else {
+                return response()->json([ 'status' => "FAILED", 'message' => 'No Notifications', ]);
+            }
+
+        } else {
+            return response()->json([ 'status' => "FAILED", 'message' => 'No Notifications', ]);
+        }
+    }
+
+    public function getHomeContents($school_id, $limit, $auth_id) {
         $students_count = User::where('user_type', 'STUDENT')->where('delete_status',0)->whereNuLL('alumni_status')
                     ->where('users.school_college_id', $school_id)->where('status', 'ACTIVE')->count();
-                $teachers_count = User::where('user_type', 'TEACHER')
+                $teachers_count = User::whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                    //->where('user_type', 'TEACHER')
                     ->where('users.school_college_id', $school_id)->where('status', 'ACTIVE')->count();
                 $students_installed_count = User::where('user_type', 'STUDENT')->where('delete_status',0)
                     ->where('users.school_college_id', $school_id)->where('status', 'ACTIVE')->whereNuLL('alumni_status')
@@ -395,7 +841,7 @@ class AdminController extends Controller
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)->where('users.status','ACTIVE')
                     ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
                     ->where('fees_payment_details.cancel_status', '0')
-                    ->whereNuLL('users.alumni_status')
+                    //->whereNuLL('users.alumni_status')
                     ->sum('fees_payment_details.amount_paid');
 
                 $startMonth = Carbon::today()->month;  
@@ -424,7 +870,8 @@ class AdminController extends Controller
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)
                     //->whereIn(DB::raw('MONTH(users.dob)'), [$startMonth, $endMonth])
                     ->whereRAW("REPLACE( users.dob , YEAR( users.dob ), YEAR(CURDATE())) BETWEEN CURDATE() AND CURDATE()+INTERVAL 2 DAY")
-                    ->where('user_type', 'TEACHER')
+                    ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                    //->where('user_type', 'TEACHER')
                     ->select('users.id', 'name', 'mobile', 'users.dob', 'users.profile_image',
                         'teachers.department_name', 'teachers.designation')
                     ->orderby(DB::RAW("REPLACE( users.dob , YEAR( users.dob ), YEAR(CURDATE()))"), 'Asc')
@@ -469,7 +916,7 @@ class AdminController extends Controller
                             // Count the number of students in each class
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('students.class_id', $classId)
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -479,7 +926,7 @@ class AdminController extends Controller
                             // Count the number of students in each section
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('section_id', $classId)
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -488,7 +935,7 @@ class AdminController extends Controller
                         } elseif ($feeStructure->fee_post_type == '3') {
                             // Count the number of students in the school
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -509,7 +956,7 @@ class AdminController extends Controller
 
                                     $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                         ->whereIn('user_id', $members)
-                                        ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                        ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                         ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                         ->groupby('users.id')->select('users.id')
                                         ->get();
@@ -527,7 +974,7 @@ class AdminController extends Controller
                             // Count the number of students in each section
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('user_id', $classId)
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -568,7 +1015,7 @@ class AdminController extends Controller
                             // Fetch the total payments made for the given fee_structure_id and fee_structure_item_id
                             $totalPayments = DB::table('fees_payment_details')
                                 ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                               //  ->where('is_concession', 0)->where('is_waiver', 0)
                                 ->where('cancel_status', 0)
@@ -578,7 +1025,7 @@ class AdminController extends Controller
 
                              $totalPayments_conce_waiv = DB::table('fees_payment_details')
                                 ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                               //  ->where('is_concession', 0)->where('is_waiver', 0)
                                 ->where('cancel_status', 0)
@@ -589,7 +1036,7 @@ class AdminController extends Controller
                                 $totalPayments=$totalPayments+$totalPayments_conce_waiv;
 
 
-                            $overdueAmountForItem = $totalStudentCount * $item->amount - $totalPayments;
+                            $overdueAmountForItem = ($totalStudentCount * $item->amount) - $totalPayments;
                             // Ensure overdue amount does not go below zero
                             if ($overdueAmountForItem < 0) {
                                 $overdueAmountForItem = 0;
@@ -618,7 +1065,7 @@ class AdminController extends Controller
                             // Count the number of students in each class
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('students.class_id', $classId)->where('gender', 'MALE')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -628,7 +1075,7 @@ class AdminController extends Controller
                             // Count the number of students in each section
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('section_id', $classId)->where('gender', 'MALE')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -637,7 +1084,7 @@ class AdminController extends Controller
                         } elseif ($feeStructure->fee_post_type == '3') {
                             // Count the number of students in the school
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->where('gender', 'MALE')
                                 ->groupby('users.id')->select('users.id')
@@ -659,7 +1106,7 @@ class AdminController extends Controller
 
                                     $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                         ->whereIn('user_id', $members)->where('gender', 'MALE')
-                                        ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                        ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                         ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                         ->groupby('users.id')->select('users.id')
                                         ->get();
@@ -677,7 +1124,7 @@ class AdminController extends Controller
                             // Count the number of students in each section
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('user_id', $classId)->where('gender', 'MALE')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -760,7 +1207,7 @@ class AdminController extends Controller
                             // Count the number of students in each class
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('students.class_id', $classId)->where('gender', 'FEMALE')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -770,7 +1217,7 @@ class AdminController extends Controller
                             // Count the number of students in each section
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('section_id', $classId)->where('gender', 'FEMALE')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -779,7 +1226,7 @@ class AdminController extends Controller
                         } elseif ($feeStructure->fee_post_type == '3') {
                             // Count the number of students in the school
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->where('gender', 'FEMALE')
                                 ->groupby('users.id')->select('users.id')
@@ -801,7 +1248,7 @@ class AdminController extends Controller
 
                                     $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                         ->whereIn('user_id', $members)->where('gender', 'FEMALE')
-                                        ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                        ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                         ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                         ->groupby('users.id')->select('users.id')
                                         ->get();
@@ -819,7 +1266,7 @@ class AdminController extends Controller
                             // Count the number of students in each section
                             $studentCount = Student::leftjoin('users', 'users.id', 'students.user_id')
                                 ->where('user_id', $classId)->where('gender', 'FEMALE')
-                                ->where('users.delete_status',0)->whereNuLL('users.alumni_status')
+                                ->where('users.delete_status',0)//->whereNuLL('users.alumni_status')
                                 ->where('users.school_college_id', $school_id)->where('users.status', 'ACTIVE')
                                 ->groupby('users.id')->select('users.id')
                                 ->get();
@@ -896,7 +1343,8 @@ class AdminController extends Controller
                 $feeStructureItemsDeleted = FeeStructureItem::leftjoin('fee_structure_lists', 'fee_structure_items.fee_structure_id', 'fee_structure_lists.id')
                     ->leftjoin('users', 'users.id', 'fee_structure_lists.class_list') 
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)->where('users.status','ACTIVE')
-                    ->whereNuLL('users.alumni_status')->where('fee_structure_lists.fee_post_type', 5)
+                    //->whereNuLL('users.alumni_status')
+                    ->where('fee_structure_lists.fee_post_type', 5)
                     ->where('fee_structure_items.cancel_status', 2)
                     ->where('fee_structure_items.school_id', $school_id)->where('fee_structure_lists.batch', $batch)
                     ->sum('fee_structure_items.amount');
@@ -904,19 +1352,25 @@ class AdminController extends Controller
                 $get_deleted_con_records = $get_deleted_wai_records = 0;
                 $get_deleted_con_records = FeesPaymentDetail::leftjoin('users', 'users.id', 'fees_payment_details.student_id') 
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)->where('users.status','ACTIVE')
-                    ->whereNuLL('users.alumni_status')->where('cancel_status', '2')
+                    //->whereNuLL('users.alumni_status')
+                    ->where('cancel_status', '2')
                     ->where('school_id', $school_id)
                     ->where('is_concession', 1)
                     ->where('batch', $batch)->sum('concession_amount');
 
                 $get_deleted_wai_records = FeesPaymentDetail::leftjoin('users', 'users.id', 'fees_payment_details.student_id') 
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)->where('users.status','ACTIVE')
-                    ->whereNuLL('users.alumni_status')->where('cancel_status', '2')
+                    //->whereNuLL('users.alumni_status')
+                    ->where('cancel_status', '2')
                     ->where('school_id', $school_id)
                     ->where('is_waiver', 1)
                     ->where('batch', $batch)->sum('concession_amount');
 
-                $get_deleted_fees_records = $get_deleted_con_records + $get_deleted_wai_records;
+                //$get_deleted_fees_records = $get_deleted_con_records + $get_deleted_wai_records;
+
+                $get_deleted_con_fees_records = $get_deleted_con_records;
+                $get_deleted_wai_fees_records = $get_deleted_wai_records;
+
                 //echo $overallAmount1 ."==1==". $overallAmount2 ."==2==". $overallAmount3 ."==3==". $overallAmount4."==4==".$overallAmount5."==5=="; 
 
                 //echo $get_deleted_con_records ."==". $get_deleted_wai_records;
@@ -929,7 +1383,8 @@ class AdminController extends Controller
                 $overall_fee_concession = $overall_fee_waiver = 0;
                 $overall_fee_concession = FeesPaymentDetail::leftjoin('users', 'users.id', 'fees_payment_details.student_id') 
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)->where('users.status','ACTIVE')
-                    ->whereNuLL('users.alumni_status')->where('batch', $batch)
+                    //->whereNuLL('users.alumni_status')
+                    ->where('batch', $batch)
                                         ->where('school_id', $school_id)
                                         ->where('is_concession', 1)
                                         ->where('cancel_status', '0')
@@ -937,7 +1392,8 @@ class AdminController extends Controller
 
                 $overall_fee_waiver = FeesPaymentDetail::leftjoin('users', 'users.id', 'fees_payment_details.student_id') 
                     ->where('users.school_college_id', $school_id)->where('users.delete_status',0)->where('users.status','ACTIVE')
-                    ->whereNuLL('users.alumni_status')->where('batch', $batch)
+                    //->whereNuLL('users.alumni_status')
+                    ->where('batch', $batch)
                                         ->where('school_id', $school_id)
                                         ->where('is_waiver', 1)
                                         ->where('cancel_status', '0')
@@ -953,11 +1409,15 @@ class AdminController extends Controller
                 //get only pending without overdue
                 $get_only_due=$overallOutstanding-$overdueAmount;
 
-                $collected_percent = $concession_percent = $due_percent = $pending_percent = 0;
+                $collected_percent = $concession_percent = $waiver_percent = $due_percent = $pending_percent = 0;
                 if($overallAmount >0) {
                     $collected_percent = (100 * $overall_fee_collected) / $overallAmount;
                  //   $concession_percent = (100 * $overall_fee_concession + $overall_fee_waiver) / $overallAmount;
-                    $concession_percent = (($overall_fee_concession + $overall_fee_waiver - $get_deleted_fees_records) / $overallAmount) * 100;
+                    /*$concession_percent = (($overall_fee_concession + $overall_fee_waiver - $get_deleted_fees_records) / $overallAmount) * 100;*/
+
+                    $concession_percent = (($overall_fee_concession - $get_deleted_con_fees_records) / $overallAmount) * 100;
+                    $waiver_percent = (($overall_fee_waiver - $get_deleted_wai_fees_records) / $overallAmount) * 100;
+
                     $due_percent = (100 * $overdueAmount) / $overallAmount;
                  //   $pending_percent = (100 * $overallOutstanding) / $overallAmount;
                     $pending_percent =   (100 * $get_only_due) / $overallAmount;
@@ -965,12 +1425,18 @@ class AdminController extends Controller
 
                 if($collected_percent > 0) {} else { $collected_percent = 0; }
                 if($concession_percent > 0) {} else { $concession_percent = 0; }
+                if($waiver_percent > 0) {} else { $waiver_percent = 0; }
                 if($due_percent > 0) {} else { $due_percent = 0; }
                 if($pending_percent > 0) {} else { $pending_percent = 0; }
 
                 //adding waiver and concession
-                $overall_fee_concession=$overall_fee_concession+$overall_fee_waiver-$get_deleted_fees_records; 
-                $overallOutstanding = $overallOutstanding - $overall_fee_concession;
+                //$overall_fee_concession=$overall_fee_concession+$overall_fee_waiver-$get_deleted_con_fees_records; 
+
+                $overall_fee_concession=$overall_fee_concession-$get_deleted_con_fees_records; 
+                $overall_fee_waiver=$overall_fee_waiver-$get_deleted_wai_fees_records; 
+
+                $overallOutstanding = $overallOutstanding - $overall_fee_concession - $overall_fee_waiver;
+                $overdueAmount  = $overdueAmount;// - $overall_fee_concession - $overall_fee_waiver;
 
                 $sms_total_credits = DB::table('communication_sms_credits')
                     ->where('school_id', $school_id)->where('status', 'YES')->sum('total_credits');
@@ -979,6 +1445,26 @@ class AdminController extends Controller
                     ->where('school_id', $school_id)->where('status', 'YES')
                     ->orderby('id','desc')->value('available_credits');
                 if($sms_available_credits>0) {} else { $sms_available_credits = 0; }
+
+                $user_type = DB::table('users')->where('id', $auth_id)->value('user_type');
+                $last_logged_in = $school_credits = '';
+                if($user_type == "SUPER_ADMIN") {
+                    $schools_count = DB::table('users')->where('user_type', 'SCHOOL')
+                        ->where('users.school_college_id', 0)->where('status', 'ACTIVE')->where('delete_status', 0)->count();
+
+                    $last_logged_in = DB::table('users')->where('user_type', 'SCHOOL')
+                        ->where('users.school_college_id', 0)->where('status', 'ACTIVE')->where('delete_status', 0)
+                        ->select('last_login_date', 'name', 'email', 'mobile', 'id', 'profile_image')->get();
+
+                    $school_credits = SMSCredits::leftjoin('users', 'communication_sms_credits.school_id', 'users.id')
+                        ->where('communication_sms_credits.status', 'YES')
+                        ->whereRAW(" communication_sms_credits.id IN (SELECT MAX(communication_sms_credits.id) AS id FROM communication_sms_credits WHERE status = 'YES' GROUP BY communication_sms_credits.school_id) ")
+                        ->select('communication_sms_credits.school_id', 'users.name', 
+                            DB::RAW('sum(total_credits) as total_credits'), 'available_credits'
+                        )->groupby('communication_sms_credits.school_id')->get();
+                } else {
+                    $schools_count = 0;
+                }
 
             return [
                     'students_count' => $students_count,
@@ -989,9 +1475,11 @@ class AdminController extends Controller
                     'overallOutstanding' => $overallOutstanding,
                     'overdueAmount' => $overdueAmount,
                     'overall_fee_concession' => $overall_fee_concession,
+                    'overall_fee_waiver' => $overall_fee_waiver,
 
                     'collected_percent' => number_format($collected_percent,2),
                     'concession_percent' => number_format($concession_percent,2),
+                    'waiver_percent' => number_format($waiver_percent,2),
                     'due_percent' => number_format($due_percent,2),
                     'pending_percent' => number_format($pending_percent,2),
 
@@ -1002,7 +1490,71 @@ class AdminController extends Controller
 
                     'sms_total_credits' => $sms_total_credits,
                     'sms_available_credits' => $sms_available_credits,
+
+                    'schools_count' => $schools_count,
+                    'last_logged_in' => $last_logged_in,
+                    'school_credits' => $school_credits,
+
+                    'formatted_overallAmount' => CommonController::price_format($overallAmount),
+                    'formatted_overall_fee_collected' => CommonController::price_format($overall_fee_collected),
+                    'formatted_overall_fee_concession' => CommonController::price_format($overall_fee_concession),
+                    'formatted_overall_fee_waiver' => CommonController::price_format($overall_fee_waiver),
+                    'formatted_overdueAmount' => CommonController::price_format($overdueAmount),
+                    'formatted_overallOutstanding' => CommonController::price_format($overallOutstanding),
                 ];
+    }
+
+    public function homePageChk()  {
+
+        $userarray = [6371,6285];
+        $users = DB::table('users')->whereIn('id', $userarray)->where('school_college_id', '1573')->select('fcm_id')->get();
+        $array = [];
+        if($users->isNotEmpty()) {
+            foreach($users as $uv) {
+                $array[] = $uv->fcm_id;
+            }                
+        }
+
+
+        /*$array = ['ejW1O8KaTlquJPLxbtzUVN:APA91bGhRs-1xx_z0CWVmQn_iJOjL03N27oxK_mqLHtJjb48m-kLU9toifUYBRZ3LJrAyvk21vJAvmAZPR2JTOuDojIYRMvuYpXSM_w6_NkhsyyvnbSLars', 'cVJpxHqwRTODOGt3eyjrsG:APA91bHYRxdK3KWIGwNZz-HRbYrPNNLEmAvKuhHghNCPPhIvzOtRm8O7YORpzaTwS6Ysh2jw754gS2iPU_7W3oi8AjUilt_jaoFImS1ABRRPbbdsSWvI1as'];*/
+
+        $title = "test check local"; $message = "test check local message"; $type_no = 4;
+        $fcmMsg = [
+          'title' => $title,
+          'body' => $message,
+        ];
+        // APNs payload
+        $apnsPayload = [
+          'aps' => [
+            'alert' => [
+              'title' => $title,
+              'body' => $message,
+            ],
+            'sound' => 'default',
+            'type' => $type_no,
+          ]
+        ];
+
+        $messagearr = [];
+        foreach($array as $fcm) {
+            $messagearr[] = [
+                'token' => $fcm,
+                'notification' => $fcmMsg,
+                'data' => [
+                    'title' => (string)$title,
+                    'body' => (string)$message,
+                    'type' => (string)$type_no,
+                ],
+                'apns' => [
+                  'payload' => $apnsPayload,
+                  'headers' => [
+                    'apns-priority' => '10', // High priority for APNs
+                  ],
+                ],
+              ];
+        } 
+
+        CommonController::pushSendUserNotificationMessageArray($messagearr,$message,$title,$type_no);
     }
 
     public function homePage()  {
@@ -1015,17 +1567,18 @@ class AdminController extends Controller
                     return redirect('/admin/settings');
                 }
             }
-        }
+        } 
 
         if (Auth::check()) {
             $session_country_code = Session::get('session_country_code');
             $user_type = Auth::User()->user_type;
             $limit = 15;
+            $auth_id = Auth::User()->id;
             //if ($user_type == "SUPER_ADMIN" || $user_type == "SCHOOL") { // Super Admin
             if (!in_array($user_type, ['GUESTUSER', 'STUDENT'])) {
                 // allow SUPER_ADMIN, SCHOOL, teachers, role users
                 $school_id = (new AdminRoleController())->getSchoolId(); 
-                $content = $this->getHomeContents($school_id, $limit);
+                $content = $this->getHomeContents($school_id, $limit, $auth_id);
                 return view::make('admin.home')->with($content);
             }
         } else {
@@ -1351,7 +1904,7 @@ class AdminController extends Controller
             }
         }
 
-        //echo "<pre>"; print_r($classes);  print_r($section_colmns);  print_r($hw);   //print_r($sections->toArray()); 
+        //echo "<pre>";print_r($hw); print_r($classes);  print_r($section_colmns);     //print_r($sections->toArray()); 
 
         $content = view('admin.homeworks_status_list')->with([ 'classes' => $class_array, 
                 'section_colmns' => $section_colmns, 'hw' => $hw ])->render();
@@ -1446,6 +1999,242 @@ class AdminController extends Controller
 
     }
 
+    public function loadModuleStatus(Request $request) {
+        $school_id = (new AdminRoleController())->getSchoolId();
+
+        $moddate = $request->get('moddate', '');
+        if(empty($moddate)) {
+            $moddate = date('Y-m-d');
+        } 
+
+        $module_status = [];
+
+        $modules = ['commn_post' => "Post", 'commn_sms' => "SMS", 'commn_hw' => "Homework", 
+            'commn_survey' => "Survey",  'scholar_attendance' => "Scholar Attendance", 
+            'staff_attendance' => "Staff Attendance", 'gallery' => "Gallery"];   
+            /*  'fees_collection' => "Fees", 'exams_settings' => "Exam Settings", 
+            'mark_entry' => "Mark Entry",  */
+
+        $schools = DB::table('users')->where('user_type', 'SCHOOL')
+            ->where('users.school_college_id', 0)->where('status', 'ACTIVE')->where('delete_status', 0)
+            ->select('id', 'name', 'email', 'mobile', 'last_login_date', 'last_app_opened_date')                        
+            ->get();
+        if($schools->isNotEmpty()) {
+            $school_ids = [];
+            $schools = $schools->toArray();
+            foreach($schools as $scl) {
+                $module_status[$scl->id]['id'] = $scl->id;
+                $module_status[$scl->id]['commn_post'] = 0;
+                $module_status[$scl->id]['commn_sms'] = 0;
+                $module_status[$scl->id]['commn_hw'] = 0;
+                $module_status[$scl->id]['commn_survey'] = 0; 
+                $module_status[$scl->id]['scholar_attendance'] = 0;
+                $module_status[$scl->id]['staff_attendance'] = 0;
+                $module_status[$scl->id]['gallery'] = 0; 
+                $school_ids[] = $scl->id;
+            }
+
+            $commn_post = DB::table('communication_posts')->whereIn('posted_by', $school_ids)->whereDate('created_at', $moddate)
+                ->select('id', 'posted_by', 'status')//->whereIn('status', 'ACTIVE')
+                ->where('delete_status', 0)->get(); 
+            if($commn_post->isNotEmpty()) {
+                $commn_post_val = 0;
+                foreach($commn_post as $cpost) {
+                    if($cpost->status == 'ACTIVE') {
+                        $module_status[$cpost->posted_by]['commn_post'] = 3; 
+                        $commn_post_val = 1;
+                    } elseif($cpost->status == 'PENDING' && $commn_post_val == 0) {
+                        $module_status[$cpost->posted_by]['commn_post'] = 2; 
+                    }
+                }
+            }   
+
+            $commn_sms = DB::table('communication_sms')->whereIn('posted_by', $school_ids)->whereDate('created_at', $moddate)
+                ->select('id', 'posted_by', 'status')//->whereIn('status', 'ACTIVE')
+                ->where('delete_status', 0)->get(); 
+            if($commn_sms->isNotEmpty()) {
+                $commn_sms_val = 0;
+                foreach($commn_sms as $cpost) {
+                    if($cpost->status == 'ACTIVE') {
+                        $module_status[$cpost->posted_by]['commn_sms'] = 3;   
+                        $commn_sms_val = 1;
+                    } elseif($cpost->status == 'PENDING' && $commn_sms_val == 0) {
+                        $module_status[$cpost->posted_by]['commn_sms'] = 2; 
+                    }
+                }
+            }   
+
+            $commn_hw = DB::table('homeworks')->whereIn('school_id', $school_ids)->whereDate('created_at', $moddate)
+                ->select('id', 'approve_status', 'status', 'school_id')//->whereIn('status', 'ACTIVE')
+                ->get(); 
+            if($commn_hw->isNotEmpty()) {
+                $commn_hw_val = 0;
+                foreach($commn_hw as $cpost) {
+                    if($cpost->approve_status == 'APPROVED') {
+                        $module_status[$cpost->school_id]['commn_hw'] = 3; 
+                        $commn_hw_val = 1;
+                    } elseif($cpost->approve_status == 'UNAPPROVED' && $commn_hw_val == 0) {
+                        $module_status[$cpost->school_id]['commn_hw'] = 2; 
+                    }
+                }
+            }   
+
+            $commn_survey = DB::table('survey')->whereIn('school_id', $school_ids)->whereDate('created_at', $moddate)
+                ->select('id', 'school_id', 'status')//->whereIn('status', 'ACTIVE')
+                ->get(); 
+            if($commn_survey->isNotEmpty()) {
+                $commn_survey_val = 0;
+                foreach($commn_survey as $cpost) {
+                    if($cpost->status == 'ACTIVE') {
+                        $module_status[$cpost->school_id]['commn_survey'] = 3; 
+                        $commn_survey_val = 1;
+                    } elseif($cpost->status == 'INACTIVE' && $commn_survey_val == 0) {
+                        $module_status[$cpost->school_id]['commn_survey'] = 2; 
+                    }
+                }
+            }
+
+            $scholar_attendance =DB::table('attendance_approval')->whereIn('created_by', $school_ids)
+                ->whereDate('attendance_approval.date',$moddate)
+                ->select('attendance_approval.id', 'created_by')->get(); 
+
+            foreach($scholar_attendance as $attk => $attv) { 
+                $ex = DB::table('attendance_approval_class_section')->where('created_by', $attv->created_by)
+                    ->where('date', $moddate)->first();  
+                if(!empty($ex)) { 
+                    if($ex->admin_status == 1) {
+                        $module_status[$attv->created_by]['scholar_attendance'] = 3; 
+                    }   else {
+                        $module_status[$attv->created_by]['scholar_attendance'] = 2;
+                    }
+                }    else {
+                    $module_status[$attv->created_by]['scholar_attendance'] = 2;
+                }
+            }
+
+            $staff_attendance =DB::table('teachers_attendance')->whereIn('created_by', $school_ids)
+                ->whereDate('updated_at',$moddate)
+                ->select('created_by', 'updated_at')->groupby('created_by')->get(); 
+
+            foreach($staff_attendance as $attk => $attv) {   
+                $module_status[$attv->created_by]['scholar_attendance'] = 3;  
+            }   
+           
+            $gallery =DB::table('gallery')->whereIn('school_id', $school_ids)
+                ->whereDate('updated_at',$moddate)//->where('status', 'ACTIVE')
+                ->select('school_id', 'updated_at')->groupby('school_id')->get(); 
+
+            foreach($gallery as $attk => $attv) {    
+                $module_status[$attv->school_id]['gallery'] = 3;  
+            }  
+
+        }
+
+        //echo "<pre>"; print_r($gallery);   exit;
+
+        $content = view('admin.module_status_list')->with([ 'module_status' => $module_status, 
+                'modules' => $modules, 'schools' => $schools ])->render();
+
+        return response()->json(['status' => 'SUCCESS', 'data' => $content, 'message' => 'Modules Detail']);
+
+    }
+
+    public function loadModuleUpdatedStatus(Request $request) {
+        $school_id = (new AdminRoleController())->getSchoolId();
+ 
+
+        $module_status = [];
+
+        $modules = ['commn_post' => "Post", 'commn_sms' => "SMS", 'commn_hw' => "Homework", 
+            'commn_survey' => "Survey", 'fees_collection' => "Fees", 'exams_settings' => "Exam Settings", 
+            'mark_entry' => "Mark Entry",  'scholar_attendance' => "Scholar Attendance", 
+            'staff_attendance' => "Staff Attendance", 'gallery' => "Gallery"];  
+
+        $schools = DB::table('users')->where('user_type', 'SCHOOL')
+            ->where('users.school_college_id', 0)->where('status', 'ACTIVE')->where('delete_status', 0)
+            ->select('id', 'name', 'email', 'mobile', 'last_login_date', 'last_app_opened_date')                        
+            ->get();
+        if($schools->isNotEmpty()) {
+            $school_ids = [];
+            $schools = $schools->toArray();
+            foreach($schools as $scl) {
+                $module_status[$scl->id]['id'] = $scl->id;
+                $module_status[$scl->id]['commn_post'] = '';
+                $module_status[$scl->id]['commn_sms'] = '';
+                $module_status[$scl->id]['commn_hw'] = '';
+                $module_status[$scl->id]['commn_survey'] = ''; 
+                $module_status[$scl->id]['scholar_attendance'] = '';
+                $module_status[$scl->id]['staff_attendance'] = '';
+                $module_status[$scl->id]['gallery'] = ''; 
+                $school_ids[] = $scl->id;
+            }
+ 
+            $commn_post = DB::select('SELECT o.posted_by, o.created_at FROM communication_posts o WHERE (o.posted_by, o.created_at) IN ( SELECT posted_by, MAX(created_at) FROM communication_posts GROUP BY posted_by )'); 
+            if(is_array($commn_post) && count($commn_post)>0) { 
+                foreach($commn_post as $cpost) { 
+                    $module_status[$cpost->posted_by]['commn_post'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            }   
+
+            $commn_sms = DB::select('SELECT o.posted_by, o.created_at FROM communication_sms o WHERE (o.posted_by, o.created_at) IN ( SELECT posted_by, MAX(created_at) FROM communication_sms GROUP BY posted_by )');  
+            if(is_array($commn_sms) && count($commn_sms)>0) { 
+                foreach($commn_sms as $cpost) { 
+                    $module_status[$cpost->posted_by]['commn_post'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            }   
+
+            $commn_hw = DB::select('SELECT o.school_id, o.created_at FROM homeworks o WHERE (o.school_id, o.created_at) IN ( SELECT school_id, MAX(created_at) FROM homeworks GROUP BY school_id )');  
+            if(is_array($commn_hw) && count($commn_hw)>0) { 
+                foreach($commn_hw as $cpost) { 
+                    $module_status[$cpost->school_id]['commn_hw'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            }   
+
+            $commn_survey = DB::select('SELECT o.school_id, o.created_at FROM survey o WHERE (o.school_id, o.created_at) IN ( SELECT school_id, MAX(created_at) FROM survey GROUP BY school_id )');  
+            if(is_array($commn_survey) && count($commn_survey)>0) { 
+                foreach($commn_survey as $cpost) { 
+                    $module_status[$cpost->school_id]['commn_hw'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            } 
+
+            $scholar_attendance = DB::select('SELECT o.created_by, o.created_at FROM attendance_approval o WHERE (o.created_by, o.created_at) IN ( SELECT created_by, MAX(created_at) FROM attendance_approval GROUP BY created_by )');  
+ 
+            if(is_array($scholar_attendance) && count($scholar_attendance)>0) { 
+                foreach($scholar_attendance as $cpost) { 
+                    $module_status[$cpost->created_by]['scholar_attendance'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            } 
+             
+
+            $staff_attendance = DB::select('SELECT o.created_by, o.created_at FROM teachers_attendance o WHERE (o.created_by, o.created_at) IN ( SELECT created_by, MAX(created_at) FROM teachers_attendance GROUP BY created_by )'); 
+
+            if(is_array($staff_attendance) && count($staff_attendance)>0) { 
+                foreach($staff_attendance as $cpost) { 
+                    $module_status[$cpost->created_by]['staff_attendance'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            }  
+           
+            $gallery = DB::select('SELECT o.school_id, o.created_at FROM gallery o WHERE (o.school_id, o.created_at) IN ( SELECT school_id, MAX(created_at) FROM gallery GROUP BY school_id )'); 
+
+            if(is_array($gallery) && count($gallery)>0) { 
+                foreach($gallery as $cpost) { 
+                    $module_status[$cpost->school_id]['gallery'] = date('d M Y', strtotime($cpost->created_at));  
+                }
+            }  
+
+        }
+
+        //echo "<pre>"; print_r($module_status);   exit;
+
+        $content = view('admin.module_updated_status_list')->with([ 'module_status' => $module_status, 
+                'modules' => $modules, 'schools' => $schools ])->render();
+
+        return response()->json(['status' => 'SUCCESS', 'data' => $content, 'message' => 'Modules Detail']);
+
+    }
+
+    
+
 
     /* Function: logout
     Logout the session and redirects to login page */
@@ -1478,6 +2267,54 @@ class AdminController extends Controller
             return redirect('/admin');
         } else {
             return redirect('/admin');
+        }
+    }
+
+    // Settings Super Admin
+    public function adminsettings()
+    {
+        if (Auth::check()) { 
+            $settings = DB::table('admin_settings')->where('school_id', 0)->where('id', 1)
+                ->select('login_image')->orderby('id', 'asc')->first();
+
+            return view('admin.adminsettings')->with('settings', $settings);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function saveAdminSettings(Request $request)
+    {
+        if (Auth::check()) {  
+            $image = $request->file('login_image');
+            if (!empty($image)) {
+                $ext = $image->getClientOriginalExtension();
+                $ext = strtolower($ext);
+                if (!in_array($ext, $this->accepted_formats)) {
+                    return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
+                }
+                $topicimg = rand() . time() . '.' . $image->getClientOriginalExtension();
+                $destinationPath = public_path('/image/settings');
+                $image->move($destinationPath, $topicimg);
+                $login_image = $topicimg;
+
+                DB::table('admin_settings')->where('school_id', 0)->where('id', 1)->update([
+                    'login_image' => $login_image
+                ]);
+
+            }
+
+            return response()->json([
+
+                'status' => "SUCCESS",
+                'message' => "Saved Successfully",
+            ]);
+        } else {
+            return response()->json([
+
+                'status' => "FAILED",
+                'message' => "Session Logged Out. Please Login Again",
+            ]);
         }
     }
 
@@ -1520,6 +2357,13 @@ class AdminController extends Controller
 
             $data['update_holidays'] = $request->get('update_holidays', 0);
 
+            $redirect = 0;
+
+            $ex = DB::table('admin_settings')->where('school_id', $school_id)->first();
+            if(empty($ex)) {
+                $redirect = 1;
+            } 
+
             $this->saveGeneralSettings($school_id, $data);
 
             
@@ -1528,6 +2372,7 @@ class AdminController extends Controller
 
                 'status' => "SUCCESS",
                 'message' => "Saved Successfully",
+                'redirect' => $redirect,
             ]);
         } else {
             return response()->json([
@@ -1614,6 +2459,18 @@ class AdminController extends Controller
                 'updated_at'=>date('Y-m-d H:i:s'),
             ]);
         } 
+
+        $role = UserRoles::where('school_id', $school_id)->where('ref_code', 'TEACHER')->first(); 
+        if(!empty($role)) {  }  else {
+            $role = new UserRoles();
+            $role->created_at = date('Y-m-d H:i:s'); 
+            $role->ref_code = 'TEACHER'; 
+            $role->school_id = $school_id;
+            $role->user_role = 'TEACHER';
+            $role->status = 'INACTIVE'; 
+
+            $role->save(); 
+        }
         
 
         $year_start_end = DB::table('year_start_end')->where('school_id', $school_id)
@@ -1646,7 +2503,7 @@ class AdminController extends Controller
                     $y = date('Y', strtotime($mn));
                     $m = date('m', strtotime($mn));
                     $sundays[] = CommonController::getSundays($y,$m);
-                    $saturdays[] = CommonController::getSaturdays($y,$m);
+                    //$saturdays[] = CommonController::getSaturdays($y,$m);
                 }
 
                 if(count($sundays) > 0) {
@@ -1665,7 +2522,7 @@ class AdminController extends Controller
                     }
                 }
 
-                if(count($saturdays) > 0) {
+                /*if(count($saturdays) > 0) {
                     foreach($saturdays as $suns) {
                         if(is_array($suns)) {
                             foreach($suns as $sun) { 
@@ -1680,7 +2537,7 @@ class AdminController extends Controller
                             }
                         }
                     }
-                }
+                }*/
              
             }
         }
@@ -1981,6 +2838,7 @@ class AdminController extends Controller
             $dir = $request->input('order.0.dir');
             $order = $request->input('order.0.column');
             $status = $request->get('status','');
+            $search = $request->get('search','');
 
             $bgroupqry = DB::table('blood_groups')->where('status', '!=', 'DELETED');
             $filteredqry = DB::table('blood_groups')->where('status', '!=', 'DELETED');
@@ -1998,6 +2856,14 @@ class AdminController extends Controller
                     }
                 }
             }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $bgroupqry->whereRaw('( blood_groups.name like "%'.$search['value'] . '%"  )');
+                    
+                    $filteredqry->whereRaw('( blood_groups.name like "%'.$search['value'] . '%"  )');
+                }
+            } 
 
             if(!empty($status)){
                 $bgroupqry->where('status',$status);
@@ -2059,7 +2925,7 @@ class AdminController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'name' => 'required',
-                'name' => 'unique:blood_groups,name,' . $id, 
+                //'name' => 'unique:blood_groups,name,' . $id, 
                 'status' => 'required',
             ]);
 
@@ -2075,9 +2941,10 @@ class AdminController extends Controller
             }
 
             if ($id > 0) {
-                $exists = DB::table('blood_groups')->whereRAW('LOWER(name) = "' . strtolower($name) . '"')->whereNotIn('id', [$id])->first();
+                $exists = DB::table('blood_groups')->whereRAW('LOWER(name) = "' . strtolower($name) . '"')->whereNotIn('id', [$id])->where('status', '!=', 'DELETED')->first();
             } else {
-                $exists = DB::table('blood_groups')->whereRAW('LOWER(name) = "' . strtolower($name) . '"')->first();
+                $exists = DB::table('blood_groups')->whereRAW('LOWER(name) = "' . strtolower($name) . '"')
+                    ->where('status', '!=', 'DELETED')->first();
             }
 
             if (!empty($exists)) {
@@ -2130,6 +2997,213 @@ class AdminController extends Controller
         }
     }
 
+
+    //SMSTemplates
+    /* Function: viewSMSTemplates
+     */
+    public function viewSMSTemplates()
+    {   
+        if (Auth::check()) {
+            return view('admin.smstemplates');
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    /* Function: getSMSTemplates
+    Datatable Load
+     */
+    public function getSMSTemplates(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+
+            $countriesqry = DltTemplate::where('status', '!=', 'DELETED')->where('delete_status', 0);
+            $filteredqry = DltTemplate::where('status', '!=', 'DELETED')->where('delete_status', 0);
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $countriesqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $countriesqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if(!empty($status)){
+                $countriesqry->where('status',$status);
+                $filteredqry->where('status',$status);
+            }
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $countriesqry->whereRaw('( dlt_templates.name like "%'.$search['value'] . '%" OR dlt_templates.content like "%'.$search['value'] . '%" )');
+                    
+                    $filteredqry->whereRaw('( dlt_templates.name like "%'.$search['value'] . '%" OR dlt_templates.content like "%'.$search['value'] . '%" )');
+                }
+            } 
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $countries = $countriesqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = DltTemplate::where('status', '!=', 'DELETED')->where('delete_status', 0);
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($countries)) {
+                foreach ($countries as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    /* Function: postSMSTemplates
+    Save into SMSTemplates table
+     */
+    public function postSMSTemplates(Request $request)
+    {
+        if (Auth::check()) {
+            $id = $request->id;
+            $name = $request->name;
+            $content = $request->content;
+            $template_id = $request->template_id; 
+            $no_of_variables = $request->no_of_variables;
+            $is_name_replace = $request->is_name_replace; 
+            $is_name_replace_var = $request->is_name_replace_var;
+            $status = $request->status; 
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'required', 
+                'content' => 'required', 
+                'template_id' => 'required', 
+                'no_of_variables' => 'required',
+                'is_name_replace' => 'required', 
+                'status' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([ 
+                    'status' => "FAILED",
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }
+
+            if($is_name_replace == 1 && (empty($is_name_replace_var))) {
+                return response()->json([ 
+                    'status' => "FAILED",
+                    'message' => "Please select the Variables to replace ",
+                ]);
+            }
+
+            /*if(!empty($is_name_replace_var) && ($is_name_replace_var)>0) {
+                $is_name_replace_var = '##var'.$is_name_replace_var.'##';
+            }*/
+
+            if ($id > 0) {
+                $exists = DB::table('dlt_templates')->where('template_id', $template_id)->whereNotIn('id', [$id])->first();
+            } else {
+                $exists = DB::table('dlt_templates')->where('template_id', $template_id)->first();
+            }
+
+            if (!empty($exists)) {
+                return response()->json(['status' => 'FAILED', 'message' => 'Template ID Already Exists'], 201);
+            }
+
+            if ($id > 0) {
+                $template = DltTemplate::find($id);
+                $template->updated_at = date('Y-m-d H:i:s');
+            } else {
+                $template = new DltTemplate;
+                $template->created_at = date('Y-m-d H:i:s');
+            } 
+
+            $template->name = $name;
+            $template->content = $content;
+            $template->template_id = $template_id; 
+            $template->no_of_variables = $no_of_variables;
+            $template->is_name_replace = $is_name_replace; 
+            $template->is_name_replace_var = $is_name_replace_var;  
+            $template->status = $status;
+
+            $template->save();
+            return response()->json(['status' => 'SUCCESS', 'message' => 'Template Saved Successfully']);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function editSMSTemplates(Request $request)
+    {
+        if (Auth::check()) {
+            $template = DltTemplate::where('id', $request->code)->get();
+            if ($template->isNotEmpty()) {
+                return response()->json(['status' => 'SUCCESS', 'data' => $template[0], 'message' => 'Template Detail']);
+            } else {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Template Detail']);
+            }
+        } else {
+            return redirect('/admin/login');
+        }
+    }  
+
+    public function deleteSMSTemplates(Request $request)
+     {
+         if (Auth::check()) {
+             $get_data = DltTemplate::where('id', $request->id)->get();
+             if ($get_data->isNotEmpty()) {
+                DltTemplate::where('id', $request->id)->update(['status'=>'DELETED', 'delete_status' => 1, 'updated_at'=>date('Y-m-d H:i:s')]);
+                 return response()->json(['status' => 'SUCCESS', 'message' => 'Template Deleted Successfully']);
+             } else {
+                 return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Template']);
+             }
+         } else {
+             return redirect('/admin/login');
+         }
+     }  
+
     //Countries
     /* Function: viewCountries
      */
@@ -2157,6 +3231,7 @@ class AdminController extends Controller
             $dir = $request->input('order.0.dir');
             $order = $request->input('order.0.column');
             $status = $request->get('status','');
+            $search = $request->get('search','');
 
             $countriesqry = Countries::where('id', '>', 0);
             $filteredqry = Countries::where('id', '>', 0);
@@ -2179,6 +3254,14 @@ class AdminController extends Controller
                 $countriesqry->where('status',$status);
                 $filteredqry->where('status',$status);
             }
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $countriesqry->whereRaw('( countries.code like "%'.$search['value'] . '%" OR countries.name like "%'.$search['value'] . '%" OR countries.phonecode like "%'.$search['value'] . '%" OR countries.currency like "%'.$search['value'] . '%"  OR countries.currency_symbol like "%'.$search['value'] . '%" )');
+                    
+                    $filteredqry->whereRaw('( countries.code like "%'.$search['value'] . '%" OR countries.name like "%'.$search['value'] . '%" OR countries.phonecode like "%'.$search['value'] . '%" OR countries.currency like "%'.$search['value'] . '%"  OR countries.currency_symbol like "%'.$search['value'] . '%" )');
+                }
+            } 
+
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
             } else {
@@ -2186,10 +3269,7 @@ class AdminController extends Controller
             }
             if (empty($dir)) {
                 $dir = 'DESC';
-            }
-
-
-
+            } 
 
             $countries = $countriesqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
             $filters = $filteredqry->select('id')->count();
@@ -2300,7 +3380,7 @@ class AdminController extends Controller
             $country->phonecode = $phonecode;
             $country->name = $name;
             //$country->alias_name = $alias_name;
-            $country->currency_symbol = $currency_symbol;
+            $country->currency_symbol =  $currency_symbol;
             $country->currency = $currency;
             //$country->is_register = $is_register;
             $country->position = $position;
@@ -2359,6 +3439,7 @@ class AdminController extends Controller
 
             $input = $request->all();
             $status = $request->get('statestatus', '');
+            $search = $request->get('search', '');
 
             $users_qry = States::leftjoin('countries', 'countries.id', 'states.country_id');
             $filtered_qry = States::leftjoin('countries', 'countries.id', 'states.country_id');
@@ -2376,6 +3457,14 @@ class AdminController extends Controller
                     }
                 }
             }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( states.state_name like "%'.$search['value'] . '%" OR countries.name like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( states.state_name like "%'.$search['value'] . '%" OR countries.name like "%'.$search['value'] . '%" )');
+                }
+            } 
 
             if (!empty($status)) {
                 $users_qry->where('states.status', $status);
@@ -2533,6 +3622,7 @@ class AdminController extends Controller
 
             $input = $request->all();
             $status = $request->get('status', '');
+            $search = $request->get('search', '');
 
             $users_qry = Districts::leftjoin('states', 'states.id', 'districts.state_id');
             $filtered_qry = Districts::leftjoin('states', 'states.id', 'districts.state_id');
@@ -2550,6 +3640,14 @@ class AdminController extends Controller
                     }
                 }
             }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( districts.district_name like "%'.$search['value'] . '%" OR states.state_name like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( districts.district_name like "%'.$search['value'] . '%" OR states.state_name like "%'.$search['value'] . '%" )');
+                }
+            } 
 
             if (!empty($status)) {
                 $users_qry->where('districts.status', $status);
@@ -2702,6 +3800,7 @@ class AdminController extends Controller
             $columns = $request->get('columns');
             $dir = $request->input('order.0.dir');
             $order = $request->input('order.0.column');
+            $search = $request->get('search', '');
 
             $gradesqry = Grades::where('id', '>', 0)->where('school_id', $school_id);
             $filteredqry = Grades::where('id', '>', 0)->where('school_id', $school_id);
@@ -2711,15 +3810,23 @@ class AdminController extends Controller
                 foreach ($columns as $key => $value) {
                     if (!empty($value['name']) && !empty($value['search']['value'])) {
                         if ($value['name'] == 'status') {
-                            $classesqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $gradesqry->where($value['name'], 'like', $value['search']['value'] . '%');
                             $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
                         } else {
-                            $classesqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $gradesqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
                             $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
                         }
                     }
                 }
             }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $gradesqry->whereRaw('( grades.mark like "%'.$search['value'] . '%"  OR grades.grade like "%'.$search['value'] . '%" OR grades.remark like "%'.$search['value'] . '%"  OR grades.star_value like "%'.$search['value'] . '%")');
+                    
+                    $filteredqry->whereRaw('( grades.mark like "%'.$search['value'] . '%"  OR grades.grade like "%'.$search['value'] . '%" OR grades.remark like "%'.$search['value'] . '%"  OR grades.star_value like "%'.$search['value'] . '%")');
+                }
+            } 
 
             if(!empty($status)){
                 $gradesqry->where('status',$status);
@@ -3133,6 +4240,7 @@ class AdminController extends Controller
             $classesqry = Classes::where('id', '>', 0)->where('school_id', $school_id);
             $filteredqry = Classes::where('id', '>', 0)->where('school_id', $school_id);
             $status = $request->get('status','');
+            $search = $request->get('search','');
 
             if (count($columns) > 0) {
                 foreach ($columns as $key => $value) {
@@ -3147,6 +4255,14 @@ class AdminController extends Controller
                     }
                 }
             }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $classesqry->whereRaw('( classes.class_name like "%'.$search['value'] . '%"  )');
+                    
+                    $filteredqry->whereRaw('( classes.class_name like "%'.$search['value'] . '%"  )');
+                }
+            } 
 
             if(!empty($status)){
                 $classesqry->where('status',$status);
@@ -3300,6 +4416,8 @@ class AdminController extends Controller
             $order = $request->input('order.0.column');
             $subject = $request->get('subject', '0');
             $status = $request->get('status','0');
+            $search = $request->get('search','');
+
             $sectionsqry = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
                 ->select('sections.*', 'classes.class_name');
@@ -3334,10 +4452,20 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('sections.school_id', Auth::User()->id);
-                $filteredqry->where('sections.school_id', Auth::User()->id);
-            }
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $sectionsqry->whereRaw('( classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" )');
+                    
+                    $filteredqry->whereRaw('( classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" )');
+                }
+            } 
+
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('sections.school_id', $school_id);
+                $filteredqry->where('sections.school_id', $school_id);
+            //}
 
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
@@ -3354,7 +4482,7 @@ class AdminController extends Controller
             $totalDataqry = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')->orderby('id', 'asc');
             if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('sections.school_id', Auth::User()->id); 
+                $totalDataqry->where('sections.school_id', $school_id); 
             }
             $totalData = $totalDataqry->select('id')->count();
 
@@ -3391,6 +4519,7 @@ class AdminController extends Controller
     {
         // return $request;
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_id = $request->class_id;
             //$mapped_subjects = implode(',', $request->mapped_subjects);
@@ -3434,7 +4563,7 @@ class AdminController extends Controller
             } else {
                 $class = new Sections();
             }
-            $class->school_id = Auth::User()->id;
+            $class->school_id = $school_id;
             $class->class_id = $class_id;
             //$class->mapped_subjects = $mapped_subjects;
             $class->section_name = $section_name;
@@ -3468,15 +4597,16 @@ class AdminController extends Controller
     public function viewSectionSubjects()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             $subject = Subjects::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $subject->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $subject->where('school_id', $school_id); 
+            //}
             $subject = $subject->orderby('position','asc')->get();
             return view('admin.section_subjects')->with('classes', $classes)->with('subject', $subject);
         } else {
@@ -3491,6 +4621,7 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -3501,6 +4632,8 @@ class AdminController extends Controller
             $order = $request->input('order.0.column');
             $subject = $request->get('subject', '0');
             $status = $request->get('status','0');
+            $search = $request->get('search','');
+
             $sectionsqry = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
                 ->select('sections.*', 'classes.class_name');
@@ -3522,10 +4655,18 @@ class AdminController extends Controller
                 }
 
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('sections.school_id', Auth::User()->id);
-                $filteredqry->where('sections.school_id', Auth::User()->id); 
-            } 
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('sections.school_id', $school_id);
+                $filteredqry->where('sections.school_id', $school_id); 
+            //} 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $sectionsqry->whereRaw('( classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" )');
+                    
+                    $filteredqry->whereRaw('( classes.class_name like "%'.$search['value'] . '%"  OR sections.section_name like "%'.$search['value'] . '%" )');
+                }
+            }
 
             if (count($columns) > 0) {
                 foreach ($columns as $key => $value) {
@@ -3555,9 +4696,9 @@ class AdminController extends Controller
 
             $totalDataqry = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('sections.school_id', Auth::User()->id); 
-            } 
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('sections.school_id', $school_id); 
+            //} 
             $totalDataqry = $totalDataqry->orderby('id', 'asc');
             $totalData = $totalDataqry->select('id')->count();
 
@@ -3670,18 +4811,19 @@ class AdminController extends Controller
     public function viewCirculars()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status','ACTIVE')->orderby('position','asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $teacher = User::leftjoin('teachers', 'teachers.user_id', 'users.id')
                 ->where('users.user_type', 'TEACHER')
                 ->where('users.status', 'ACTIVE')
                 ->select('users.id', 'users.name', 'users.mobile');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $teacher->where('school_college_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $teacher->where('school_college_id', $school_id); 
+            //}
             $teacher = $teacher->orderby('name', 'asc')->get();
             return view('admin.circulars')->with('classes', $classes)->with('teacher', $teacher);
         } else {
@@ -3695,6 +4837,7 @@ class AdminController extends Controller
     public function getCirculars(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -3723,10 +4866,10 @@ class AdminController extends Controller
 
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('school_id', Auth::User()->id); 
-                $filteredqry->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('school_id', $school_id); 
+                $filteredqry->where('school_id', $school_id); 
+            //}
 
             if($approval_status_id != ''){
                 $sectionsqry->where('approve_status','=',$approval_status_id);
@@ -3782,9 +4925,9 @@ class AdminController extends Controller
             $filters = $filteredqry->select('circular.id')->count();
 
             $totalDataqry = Circulars::orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -3819,6 +4962,7 @@ class AdminController extends Controller
     public function postCirculars(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_ids = $request->class_ids;
             $circular_title = $request->circular_title;
@@ -3867,7 +5011,7 @@ class AdminController extends Controller
                 ]);
             }
 
-            $circular->school_id = Auth::User()->id;
+            $circular->school_id = $school_id;
 
             $circular->class_ids = $class_ids;
             $circular->circular_title = $circular_title;
@@ -3962,18 +5106,19 @@ class AdminController extends Controller
     public function viewEvents()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status','ACTIVE')->orderby('position','asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $teacher = User::leftjoin('teachers', 'teachers.user_id', 'users.id')
                 ->where('users.user_type', 'TEACHER')
                 ->where('users.status', 'ACTIVE')
                 ->select('users.id', 'users.name', 'users.mobile')->orderby('name', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $teacher->where('school_college_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $teacher->where('school_college_id', $school_id); 
+            //}
             $teacher = $teacher->get();
             return view('admin.events')->with('classes', $classes)->with('teacher', $teacher);
         } else {
@@ -3987,6 +5132,7 @@ class AdminController extends Controller
     public function getEvents(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -4022,10 +5168,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('events.school_id', Auth::User()->id);
-                $filteredqry->where('events.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('events.school_id', $school_id);
+                $filteredqry->where('events.school_id', $school_id);
+            //}
             
             if($status != '' || $status != 0){
                 $sectionsqry->where('status',$status);
@@ -4072,9 +5218,9 @@ class AdminController extends Controller
             $filters = $filteredqry->select('events.id')->count();
 
             $totalDataqry = Events::orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('events.school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('events.school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -4110,6 +5256,7 @@ class AdminController extends Controller
     {
         if (Auth::check()) {
             $id = $request->id;
+            $school_id = (new AdminRoleController())->getSchoolId();
             $class_ids = $request->class_ids;
             $circular_title = $request->circular_title;
             $circular_message = $request->circular_message;
@@ -4157,7 +5304,7 @@ class AdminController extends Controller
                     'message' => "Please select the classes ",
                 ]);
             }
-            $circular->school_id = Auth::User()->id;
+            $circular->school_id = $school_id;
             $circular->class_ids = $class_ids;
             $circular->circular_title = $circular_title;
             $circular->circular_message = $circular_message;
@@ -4368,6 +5515,7 @@ class AdminController extends Controller
     public function getHolidays(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -4405,18 +5553,18 @@ class AdminController extends Controller
                 $dir = 'DESC';
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('holidays.school_college_id', Auth::User()->id);
-                $filteredqry->where('holidays.school_college_id', Auth::User()->id);
-            } 
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('holidays.school_college_id', $school_id);
+                $filteredqry->where('holidays.school_college_id', $school_id);
+            //} 
 
             $circulars = $sectionsqry->skip($start)->take($length)->orderby($orderby, 'desc')->get();
             $filters = $filteredqry->select('holidays.id')->count();
 
             $totalDataqry = Holidays::orderby('id', 'desc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('holidays.school_college_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('holidays.school_college_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -4451,6 +5599,7 @@ class AdminController extends Controller
     public function postHolidays(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $holiday_date = $request->holiday_date;
             $holiday_description = $request->holiday_description;
@@ -4477,7 +5626,7 @@ class AdminController extends Controller
                 $holiday = new Holidays();
             }
 
-            $holiday->school_college_id = Auth::User()->id;
+            $holiday->school_college_id = $school_id;
             $holiday->holiday_date = $holiday_date;
             $holiday->holiday_description = $holiday_description;
 
@@ -4523,7 +5672,8 @@ class AdminController extends Controller
     public function viewChangeHolidays()
     {
         if (Auth::check()) {
-            $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->select('academic_start_date', 'academic_end_date')->first();
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->select('academic_start_date', 'academic_end_date')->first();
             $academic_start_date = $academic_end_date = ''; $months = [];
             if(!empty($settings)) { 
                 $academic_start_date = $settings->academic_start_date;
@@ -4543,6 +5693,7 @@ class AdminController extends Controller
     public function loadChangeHolidays(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $yrmonth = $request->code;
             if(empty($yrmonth)) {
                 return response()->json(['status' => 0, 'message' => 'Please select the Month']);
@@ -4553,10 +5704,10 @@ class AdminController extends Controller
                 ->where('status', 1)->orderby('holiday_date', 'asc');
             $wday = Holidays::where('holiday_date', '>=', $startdate)->where('holiday_date', '<=', $enddate)
                 ->where('status', 0)->orderby('holiday_date', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $holiday->whereIn('holidays.school_college_id', [Auth::User()->id]); 
-                $wday->whereIn('holidays.school_college_id', [Auth::User()->id]); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $holiday->whereIn('holidays.school_college_id', [$school_id]); 
+                $wday->whereIn('holidays.school_college_id', [$school_id]); 
+            //}
             $holiday = $holiday->get();
             $wday = $wday->get();
             $working_days = CommonController::getDatesFromRange($startdate, $enddate);
@@ -4607,6 +5758,7 @@ class AdminController extends Controller
     public function saveChangeHolidays(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $holiday_type = $input['holiday_type'];
             $holiday_date = $input['holiday_date'];
@@ -4616,13 +5768,13 @@ class AdminController extends Controller
                 foreach($holiday_type as $hk => $hv) {
                     if($hv == 'h') {
                         $ex = DB::table('holidays')->where('holiday_date', $hk)
-                            ->where('holidays.school_college_id', Auth::User()->id)->first();
+                            ->where('holidays.school_college_id', $school_id)->first();
                         if(empty($ex)) {
-                            DB::table('holidays')->insert(['school_college_id' => Auth::User()->id, 'holiday_date'=>$hk, 'holiday_description'=>$holiday_description[$hk], 
+                            DB::table('holidays')->insert(['school_college_id' => $school_id, 'holiday_date'=>$hk, 'holiday_description'=>$holiday_description[$hk], 
                                 'status'=> 1, 'created_at' => date('Y-m-d H:i:s')]);
                         } else {
-                            DB::table('holidays')->where('holiday_date', $hk)->where('holidays.school_college_id', Auth::User()->id)
-                                ->update(['school_college_id' => Auth::User()->id, 
+                            DB::table('holidays')->where('holiday_date', $hk)->where('holidays.school_college_id', $school_id)
+                                ->update(['school_college_id' => $school_id, 
                                 'holiday_date'=>$hk, 
                                 'holiday_description'=>$holiday_description[$hk], 
                                 'status'=> 1, 'updated_at' => date('Y-m-d H:i:s')]);
@@ -4630,14 +5782,14 @@ class AdminController extends Controller
                     } else {
                         if(!empty($holiday_description[$hk])) {
                             $ex = DB::table('holidays')->where('holiday_date', $hk)
-                                ->where('holidays.school_college_id', Auth::User()->id)->first();
+                                ->where('holidays.school_college_id', $school_id)->first();
                             if(empty($ex)) {
-                                DB::table('holidays')->insert(['school_college_id' => Auth::User()->id, 'holiday_date'=>$hk, 'holiday_description'=>$holiday_description[$hk], 
+                                DB::table('holidays')->insert(['school_college_id' => $school_id, 'holiday_date'=>$hk, 'holiday_description'=>$holiday_description[$hk], 
                                     'status'=> 0, 'created_at' => date('Y-m-d H:i:s')]);
                             } else {
                                 DB::table('holidays')->where('holiday_date', $hk)
-                                    ->where('holidays.school_college_id', Auth::User()->id)
-                                    ->update(['school_college_id' => Auth::User()->id, 
+                                    ->where('holidays.school_college_id', $school_id)
+                                    ->update(['school_college_id' => $school_id, 
                                     'holiday_date'=>$hk, 
                                     'holiday_description'=>$holiday_description[$hk], 
                                     'status'=> 0, 'updated_at' => date('Y-m-d H:i:s')]);
@@ -4913,10 +6065,11 @@ class AdminController extends Controller
     public function viewPeriodTiming()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id','>',0)->where('status','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             $periods = Periodtiming::all();
 
@@ -4931,6 +6084,7 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {  
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $class_id = $request->get('class_id',0);
 
@@ -4939,9 +6093,9 @@ class AdminController extends Controller
              $period = Periodtiming::leftjoin('classes', 'classes.id', 'period_timings.class_id')
                 ->where('class_id','=',$class_id)->where('period_timings.id','!=',1)
                 ->where('classes.status','ACTIVE');
-                if(Auth::User()->user_type == 'SCHOOL') {
-                    $period->where('period_timings.school_id', Auth::User()->id); 
-                }
+                //if(Auth::User()->user_type == 'SCHOOL') {
+                    $period->where('period_timings.school_id', $school_id); 
+                //}
                 $period = $period->select('period_timings.*')
                 ->orderby('updated_at','desc')->get();
 
@@ -4949,9 +6103,9 @@ class AdminController extends Controller
                 $period = Periodtiming::leftjoin('classes', 'classes.id', 'period_timings.class_id')
                 ->where('period_timings.id','!=',1)
                 ->where('classes.status','ACTIVE');
-                if(Auth::User()->user_type == 'SCHOOL') {
-                    $period->where('classes.school_id', Auth::User()->id); 
-                }
+                //if(Auth::User()->user_type == 'SCHOOL') {
+                    $period->where('classes.school_id', $school_id); 
+                //}
                 $period = $period->select('period_timings.*')
                 ->orderby('updated_at','desc')->where('period_timings.id','!=',1)->get();
             }
@@ -4965,10 +6119,11 @@ class AdminController extends Controller
     public function addPeriods(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
            return view('admin.addperiod_timings')->with('classes', $classes);
         } else {
@@ -4978,6 +6133,7 @@ class AdminController extends Controller
 
     public function postPeriodTiming(Request $request)
     {
+        $school_id = (new AdminRoleController())->getSchoolId();
 
         $id = $request->id;
         $class_id = $request->class_id;
@@ -5070,9 +6226,9 @@ class AdminController extends Controller
         else {
             $period = new Periodtiming;
         }
-        if(Auth::User()->user_type == 'SCHOOL') {
-            $period->school_id = Auth::User()->id;   
-        } 
+        //if(Auth::User()->user_type == 'SCHOOL') {
+            $period->school_id = $school_id;   
+        //} 
         $period->class_id = $class_id;
         $period->period_1 = $newPeriod_1;
         $period->period_2 = $newPeriod_2;
@@ -5109,10 +6265,11 @@ class AdminController extends Controller
     {
          
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status', 'ACTIVE')->orderby('position','asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $period = [];
             $period = Periodtiming::where('id', $request->get('id'))->get();
@@ -5140,14 +6297,15 @@ class AdminController extends Controller
   
 
     public function fetchClasses(Request $request){
+        $school_id = (new AdminRoleController())->getSchoolId();
          $getclass_id = Classes::where('id',$request->class_id)->where('status','ACTIVE')->select('class_name','position')->first();
          if(!empty($getclass_id)) {
             $class_name = $getclass_id->class_name;
             $position = $getclass_id->position;
             $classes = DB::table('classes')->where('position', '>', $position);
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $data['classes'] = $classes->where('status','=','ACTIVE')->get();
        
             return response()->json($data);
@@ -5157,6 +6315,7 @@ class AdminController extends Controller
 
 
     public function fetchClasseSubject(Request $request){
+        $school_id = (new AdminRoleController())->getSchoolId();
         $data['subjects'] = []; $subs = [];
         $mapped_subjects = DB::table('sections')->where('class_id', $request->class_id)->where('status', 'ACTIVE')
             ->orderby('position','asc')->get();
@@ -5168,9 +6327,9 @@ class AdminController extends Controller
             }
             if(count($subs)>0) {
                 $subjs = Subjects::whereIn("id", $subs)->where('status', 'ACTIVE');
-                if(Auth::User()->user_type == 'SCHOOL') {
-                    $subjs->where('school_id', Auth::User()->id); 
-                }
+                //if(Auth::User()->user_type == 'SCHOOL') {
+                    $subjs->where('school_id', $school_id); 
+                //}
                 $subjs = $subjs->select("subject_name", "id")->orderby('position','asc')->get();
                 $data['subjects'] = $subjs;
             }
@@ -5207,13 +6366,13 @@ class AdminController extends Controller
             $data['student'] = Student::leftjoin('users','users.id','students.user_id')
                 ->where('students.class_id', $request->class_id)
                 ->where('students.section_id',$request->section_id)
-                ->where('users.status','=','ACTIVE')
+                ->where('users.status','=','ACTIVE')->orderby('users.name', 'asc')
                 ->get(["users.name", "users.id"]);
         }
         else{
             $data['student'] = Student::leftjoin('users','users.id','students.user_id')
                 ->where('students.class_id', $request->class_id)
-                ->where('users.status','=','ACTIVE')
+                ->where('users.status','=','ACTIVE')->orderby('users.name', 'asc')
                 ->get(["users.name", "users.id"]);
         }
 
@@ -5233,11 +6392,15 @@ class AdminController extends Controller
     {
         /*$data['exams'] = Exams::whereRAW(' FIND_IN_SET('.$request->class_id.', class_ids) ')
             ->select("exam_name", "id", "exam_startdate", DB::RAW(' DATE_FORMAT(exam_startdate, "%Y-%m") as monthyear'))->where('status','ACTIVE')->get();*/
+        $school_id = (new AdminRoleController())->getSchoolId();  
+        $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
         $section_id = $request->get('section_id', 0);
         $exams = DB::table('exams')
             ->leftjoin('examinations', 'examinations.id', 'exams.examination_id')
             ->leftjoin('exam_sessions', 'exams.id', 'exam_sessions.exam_id')
             ->leftjoin('classes', 'classes.id', 'exam_sessions.class_id')
+            ->where('examinations.batch', $batch)
             ->where('exams.class_ids', $request->class_id)->where('exams.examination_id', '>',0);
         if($section_id > 0) {
             $exams->whereIn('exams.section_ids', [0, $section_id]);
@@ -5405,12 +6568,13 @@ class AdminController extends Controller
     //Time tables
     public function viewTimetable(Request $request) {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $class = $periods = $days = $subjects = '';
             $class = Classes::select('*')->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $class->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $class->where('school_id', $school_id); 
+            //}
             $class = $class->get();
             // $class = Section::select('*')->get()->where('status','=','ACTIVE');
            /* $periods = Periodtiming::select('period_1', 'period_2', 'period_3', 'period_4', 'period_5', 'period_6', 'period_7', 'period_8')->first()->toArray();
@@ -5432,6 +6596,7 @@ class AdminController extends Controller
      */
     public function loadTimetable(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $class_id = $request->get('class_id', '');
             $section_id = $request->get('section_id', '');
             $map_subjects = '';    $timetable = [];
@@ -5449,9 +6614,9 @@ class AdminController extends Controller
                     }
 
                     $periods = Periodtiming::where('class_id',$class_id);
-                    if(Auth::User()->user_type == 'SCHOOL') {
-                        $periods->where('school_id', Auth::User()->id); 
-                    }
+                    //if(Auth::User()->user_type == 'SCHOOL') {
+                        $periods->where('school_id', $school_id); 
+                    //}
                     $periods = $periods->select('period_1', 'period_2', 'period_3', 'period_4', 'period_5', 'period_6', 'period_7', 'period_8')->first();
 
                      if(!empty($periods)){
@@ -5751,9 +6916,10 @@ class AdminController extends Controller
     public function viewImportStudents()
     {
         if (Auth::check()) {
-            $classes = Classes::where('id', '>', 0)->where('school_id', Auth::User()->id)->where('status', 'ACTIVE')->get();
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $classes = Classes::where('id', '>', 0)->where('school_id', $school_id)->where('status', 'ACTIVE')->get();
             $sections = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
-                ->where('sections.school_id', Auth::User()->id)
+                ->where('sections.school_id', $school_id)
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')->where('sections.status','=','ACTIVE')
                 ->select('sections.*', 'classes.class_name')->get();
             return view('admin.import_students')->with(['classes' => $classes, 'sections' => $sections]);
@@ -5768,9 +6934,10 @@ class AdminController extends Controller
     public function viewImportTeachers()
     {
         if (Auth::check()) {
-            $classes = Classes::where('id', '>', 0)->where('school_id', Auth::User()->id)->where('status', 'ACTIVE')->get();
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $classes = Classes::where('id', '>', 0)->where('school_id', $school_id)->where('status', 'ACTIVE')->get();
             $sections = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
-                ->where('sections.school_id', Auth::User()->id)
+                ->where('sections.school_id', $school_id)
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')->where('sections.status','=','ACTIVE')
                 ->select('sections.*', 'classes.class_name')->get();
             return view('admin.import_teachers')->with(['classes' => $classes, 'sections' => $sections]);
@@ -5807,6 +6974,7 @@ class AdminController extends Controller
             $section = $request->get('section_id', '');
             $class_id = $request->get('class_id', '');
             $is_app_installed = $request->get('is_app_installed', '');
+            $search = $request->get('search');
 
             $users_qry = User::leftjoin('countries', 'countries.id', 'users.country')
                 ->leftjoin('states', 'states.id', 'users.state_id')
@@ -5847,9 +7015,16 @@ class AdminController extends Controller
                 }
             }
             $school_id = (new AdminRoleController())->getSchoolId(); 
-            if(Auth::User()->user_type == 'SCHOOL') {
+            //if(Auth::User()->user_type == 'SCHOOL') {
                 $users_qry->where('users.school_college_id', $school_id);
                 $filtered_qry->where('users.school_college_id', $school_id);
+            //}
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%" OR students.father_name like "%'.$search['value'] . '%" OR students.roll_no like "%'.$search['value'] . '%")');
+                    $filtered_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%" OR students.father_name like "%'.$search['value'] . '%" OR students.roll_no like "%'.$search['value'] . '%")');
+                }
             }
 
             if(!empty($status)){
@@ -5889,10 +7064,10 @@ class AdminController extends Controller
             ->leftjoin('sections', 'sections.id', 'students.section_id')
             ->where('users.delete_status',0)
             ->where('students.delete_status',0)
-            ->where('user_type', 'STUDENT')->whereNuLL('alumni_status');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalData->where('users.school_college_id', $school_id); 
-            }
+            ->where('user_type', 'STUDENT')->whereNuLL('alumni_status'); 
+            
+            $totalData->where('users.school_college_id', $school_id);  
+            
             $totalData = $totalData->get();
 
             if (!empty($totalData)) {
@@ -5948,6 +7123,7 @@ class AdminController extends Controller
             $section = $request->get('section_id', '');
             $class_id = $request->get('class_id', '');
             $is_app_installed = $request->get('is_app_installed', '');
+            $search = $request->get('search', '');
 
             $users_qry = User::leftjoin('countries', 'countries.id', 'users.country')
                 ->leftjoin('states', 'states.id', 'users.state_id')
@@ -5974,8 +7150,14 @@ class AdminController extends Controller
                 }
             }
             $school_id = (new AdminRoleController())->getSchoolId(); 
-            if(Auth::User()->user_type == 'SCHOOL') {
+            //if(Auth::User()->user_type == 'SCHOOL') {
                 $users_qry->where('users.school_college_id', $school_id); 
+            //}
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%" OR students.father_name like "%'.$search['value'] . '%" OR students.roll_no like "%'.$search['value'] . '%")'); 
+                }
             }
 
             if(!empty($status)){
@@ -6381,9 +7563,29 @@ class AdminController extends Controller
                 $classes->whereIn('id', $classids);
             }
             $classes = $classes->orderby('position','asc')->get();
-            $blood_groups = DB::table('blood_groups')->where('status', 'YES')->orderby('name', 'asc')->get();
+            $blood_groups = DB::table('blood_groups')->where('status', 'YES')->orderby('name', 'asc')->get(); 
+
+            $get_student = DB::table('students')->leftjoin('users', 'users.id', 'students.user_id')
+                    ->leftjoin('classes', 'classes.id', 'students.class_id')
+                    ->leftjoin('sections', 'sections.id', 'students.section_id') 
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','STUDENT')->where('users.school_college_id',$school_id)
+                    ->select('users.name as is_student_name', 'users.id as user_id', 
+                            'classes.class_name as is_class_name', 'sections.section_name as is_section_name');
+            if(is_array($classids) && (count($classids)>0)){
+                $get_student->whereIn('students.class_id',$classids);
+            }
+            $get_student = $get_student->get(); 
+
+            $get_staff = DB::table('teachers')->leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                    ->where('users.school_college_id',$school_id)
+                    ->select('users.id', 'users.name', 'users.mobile')->orderby('users.name'); 
+            $get_staff = $get_staff->get(); 
+
             return view('admin.student')->with('countries', $countries)->with('classes',$classes)->with('app',$app)
-                ->with('blood_groups',$blood_groups);
+                ->with('blood_groups',$blood_groups)->with('get_student',$get_student)->with('get_staff',$get_staff);
         } else {
             return redirect('/admin/login');
         }
@@ -6410,7 +7612,23 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
-
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $user_id = Auth::User()->id;
+        } else if($request->get('school_id')) {
+            $school_id = $request->get('school_id');
+            if($school_id >0){} else {
+                return response()->json([ 
+                    'status' => "FAILED",
+                    'message' => "Invalid request",
+                ]);
+            }
+            $user_id = $request->get('user_id');
+        }else {
+            return response()->json([ 
+                'status' => "FAILED",
+                'message' => "Logged Out. Please Login Again",
+            ]);
+        }
             $id = $request->id;
             $name = $request->name;
             $lastname = $request->lastname;
@@ -6431,6 +7649,7 @@ class AdminController extends Controller
             $admission_no = $request->admission_no;
             $father_name = $request->father_name;
             $address = $request->address;
+            $pincode = $request->pincode;
             $status = $request->status;
             $mobile1 = $request->mobile1;
             $emergency_contact_no = $request->emergency_contact_no;
@@ -6501,10 +7720,10 @@ class AdminController extends Controller
             if(!empty($admission_no)){
                 if ($id > 0) {
                     $admission_no_chk = DB::table('users')->where('admission_no', $admission_no)
-                    ->where('school_college_id', Auth::User()->id)->whereNotIn('id', [$id])->first();
+                    ->where('school_college_id', $school_id)->whereNotIn('id', [$id])->first();
                 } else {
                     $admission_no_chk = DB::table('users')->where('admission_no', $admission_no)
-                    ->where('school_college_id', Auth::User()->id)->first();
+                    ->where('school_college_id', $school_id)->first();
                 }
             }
          
@@ -6532,7 +7751,7 @@ class AdminController extends Controller
             if ($id > 0) {
                 $users = User::find($id);
                 $users->updated_at = $date;
-                $users->updated_by = Auth::User()->id;
+                $users->updated_by = $user_id;
 
                 $students = Student::where('user_id', $id)->first();
                 if(!empty($students)) {
@@ -6575,7 +7794,7 @@ class AdminController extends Controller
                 $users->user_source_from = 'ADMIN';
                 //$users->joined_date = $date;
                 $users->created_at = $date;
-                $users->created_by = Auth::User()->id;
+                $users->created_by = $user_id;
             }
 
             $users->user_type = "STUDENT";
@@ -6600,7 +7819,7 @@ class AdminController extends Controller
                 $users->password = Hash::make($password);
             }
 
-            $users->school_college_id = Auth::User()->id;
+            $users->school_college_id = $school_id;
 
             $users->passcode = $password;
             $country_code = DB::table('countries')->where('id', $country)->value('phonecode');
@@ -6635,6 +7854,12 @@ class AdminController extends Controller
                     return response()->json(['status' => "FAILED", 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
                 }
 
+                $size = $image->getSize();  
+                if($size < $this->maxsize) { // < 2mb can allow 
+                } else {
+                    return response()->json(['status' => "FAILED", 'message' => 'Please upload the image file size less than 2 MB']);
+                } 
+
                 $countryimg = rand() . time() . '.' . $image->getClientOriginalExtension();
 
                 $destinationPath = public_path('/uploads/userdocs/');
@@ -6656,7 +7881,7 @@ class AdminController extends Controller
             } else {
                 $students = new Student;
             }
-            $students->school_id = Auth::User()->id;
+            $students->school_id = $school_id;
             $students->user_id = $userId;
             $students->roll_no = $roll_no;
             $students->class_id = $class_id;
@@ -6664,6 +7889,7 @@ class AdminController extends Controller
             $students->admission_no = $admission_no;
             $students->father_name = $father_name;
             $students->address = $address;
+            $students->pincode = $pincode;
             $students->status = $status;
             $students->save();
 
@@ -6674,15 +7900,15 @@ class AdminController extends Controller
                     $academics = new StudentAcademics();
                     }else{
                     $academics->updated_at = date('Y-m-d H:i:s');
-                    $academics->updated_by = Auth::User()->id;
+                    $academics->updated_by = $user_id;
                     }
             } else {
                 $academics = new StudentAcademics();
                 $academics->created_at = date('Y-m-d H:i:s');
-                $academics->created_by = Auth::User()->id;
+                $academics->created_by = $user_id;
             }
 
-            $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->orderby('id', 'asc')->first();
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
             if(!empty($settings)) {} else {
                 $settings = DB::table('admin_settings')->orderby('id', 'asc')->first();
             }
@@ -6692,7 +7918,7 @@ class AdminController extends Controller
             $to_year = $acadamic_year + 1;
             $to_month = $to_year.'-'.'04';
             $academics->user_id = $userId; 
-            $academics->school_id = Auth::User()->id;
+            $academics->school_id = $school_id;
             $academics->academic_year = $acadamic_year;
             $academics->from_month = $from_month;
             $academics->to_month = $to_month;
@@ -6703,27 +7929,35 @@ class AdminController extends Controller
             $academics->save();
 
             return response()->json(['status' => 'SUCCESS', 'message' => 'Student Saved Successfully']);
-        } else {
-            return redirect('/admin/login');
-        }
+        
     }
 
     public function viewStudentProfile(Request $request) {
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId(); 
             $id = $request->get('id', 0); 
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year'); 
             $user = DB::table('users')->where('id', $id)->where('school_college_id', $school_id)->select('id')->get();
             if($user->isNotEmpty()) {
                 $user_details = CommonController::getUserDetails($id); 
                 if(!empty($user_details)) {
                     $user_details = $user_details->toArray(); 
+                    $user_remarks = UserRemarks::where('user_id', $id)->where('remark_type', 'REMARK')
+                        ->where('status', 'ACTIVE')->orderby('id', 'desc')->get();
+                    if($user_remarks->isNotEmpty()) {} else { $user_remarks = ''; }
+
+                    $user_rewards = UserRemarks::where('user_id', $id)->where('remark_type', 'REWARD')
+                        ->where('status', 'ACTIVE')->orderby('id', 'desc')->get();
+                    if($user_rewards->isNotEmpty()) {} else { $user_rewards = ''; }
+
                 } else {
-                    $user_details = '';
+                    $user_details = '';$user_remarks = ''; $user_rewards = '';
                 }
             } else {
-                $user_details = '';
+                $user_details = '';$user_remarks = '';  $user_rewards = '';
             } //echo "<pre>"; print_r($user_details); exit;
-            return view('admin.studentprofile')->with('user_details', $user_details);
+            return view('admin.studentprofile')->with('user_details', $user_details)->with('user_remarks', $user_remarks)
+                ->with('user_rewards', $user_rewards)->with('batch', $batch);
         } else {
             return redirect('/admin/login');
         }
@@ -6754,6 +7988,24 @@ class AdminController extends Controller
                 'students.address', 'students.pincode', 'classes.class_name', 'sections.section_name')->get();
 
             if ($students->isNotEmpty()) {
+
+                $stud = $students[0];
+                $mobile_scholars = Student::leftjoin('users', 'users.id', 'students.user_id')
+                    ->where('users.mobile', $stud->mobile)
+                    ->where('users.user_type', 'STUDENT')->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                    ->where('users.school_college_id', $stud->school_college_id)
+                    ->select('students.class_id', 'students.section_id','students.user_id','students.aadhar_number', 
+                        'students.emis_id','users.name', 'users.admission_no', 'users.profile_image')
+                    ->where('users.id', '!=',$stud->id)->get();
+
+                if($mobile_scholars->isNotEmpty()) {
+                    foreach($mobile_scholars as $mk => $ms) {
+                        $mobile_scholars[$mk]->is_profile_image = User::getUserProfileImageAttribute($ms->user_id);
+                    }
+                }
+
+                $students[0]->mobile_scholars = $mobile_scholars;
+
                 return response()->json(['status' => 'SUCCESS', 'data' => $students[0], 'message' => 'Student Detail']);
             } else {
                 return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Student Detail']);
@@ -6788,6 +8040,23 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $user_id = Auth::User()->id;
+        } else if($request->get('school_id')) {
+            $school_id = $request->get('school_id');
+            if($school_id >0){} else {
+                return response()->json([ 
+                    'status' => "FAILED",
+                    'message' => "Invalid request",
+                ]);
+            }
+            $user_id = $request->get('user_id');
+        }else {
+            return response()->json([ 
+                'status' => "FAILED",
+                'message' => "Logged Out. Please Login Again",
+            ]);
+        }
 
             $id = $request->id;
             $identification_mark_1 = $request->identification_mark_1;
@@ -6842,10 +8111,188 @@ class AdminController extends Controller
             } else {
                 return response()->json([ 'status' => "FAILED",  'message' => "Invalid ID"   ]);
             }     
+        
+    }
+
+    public function editStudentSiblingstaffs(Request $request)
+    {
+
+        if (Auth::check()) { 
+
+            $students = DB::table('users')->where('user_type', 'STUDENT')->where('users.id', $request->id)
+                ->select('users.id', 'users.sibling_ids', 'users.staff_child_ids')->get();
+
+            if ($students->isNotEmpty()) {
+                return response()->json(['status' => 'SUCCESS', 'data' => $students[0], 'message' => 'Student Detail']);
+            } else {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Student Detail']);
+            }
         } else {
             return redirect('/admin/login');
         }
     }
+
+    public function postStudentSiblingstaffs(Request $request)
+    {
+
+        if (Auth::check()) {
+
+            $id = $request->id;
+            $sibling_ids = $request->student_id;
+            $staff_child_ids = $request->staff_id; 
+
+            $validator = Validator::make($request->all(), [
+                'id' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => "FAILED",
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }     
+
+            $date = date('Y-m-d H:i:s');
+            if ($id > 0) { 
+                $students = User::where('id', $id)->first(); 
+                if(!empty($students)) {
+                    $students->updated_at = $date; 
+
+                    if(is_array($sibling_ids) && count($sibling_ids)>0) {
+                        $sibling_ids = implode(',', $sibling_ids);
+                    }  else {
+                        $sibling_ids = '';
+                    } 
+
+                    if(is_array($staff_child_ids) && count($staff_child_ids)>0) {
+                        $staff_child_ids = implode(',', $staff_child_ids);
+                    }  else {
+                        $staff_child_ids = '';
+                    } 
+
+
+                    $students->sibling_ids = $sibling_ids;
+                    $students->staff_child_ids = $staff_child_ids; 
+                    $students->save();
+
+                    return response()->json(['status' => 'SUCCESS', 'message' => 'Details Saved Successfully']);
+
+                } else {
+                     return response()->json([ 'status' => "FAILED",  'message' => "Invalid Student"   ]);
+                } 
+            } else {
+                return response()->json([ 'status' => "FAILED",  'message' => "Invalid ID"   ]);
+            }     
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function postStudentScholarReward(Request $request)
+    {
+
+        if (Auth::check()) {
+
+            $id = $request->id;
+            $remark_type = $request->remark_type;
+            $remark_notify = $request->get('remark_notify', 0); 
+            $remark_description = $request->remark_description; 
+            if(empty($remark_notify)) { $remark_notify = 0; }
+            $validator = Validator::make($request->all(), [
+                'id' => 'required',
+                'remark_type' => 'required',
+                'remark_description' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => "FAILED",
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }     
+
+            $date = date('Y-m-d H:i:s');
+            if ($id > 0) { 
+                $school_id = (new AdminRoleController())->getSchoolId();  
+                UserRemarks::insert([
+                    'school_id' => $school_id,
+                    'user_id' => $id,
+                    'remark_type' => $remark_type,
+                    'remark_notify' => $remark_notify,
+                    'remark_description' => $remark_description,
+                    'status' => 'ACTIVE',
+                    'created_by' => Auth::User()->id,
+                    'created_at' => $date,  
+                ]);  
+
+                if($remark_notify == 1) {
+                    $post_type = 2;
+                    $receiver_end = $id;
+
+                    $post_new= new CommunicationPost;
+                    $post_new->created_by = Auth::User()->id;
+              
+
+                    $post_new->title = $remark_type;
+                    $post_new->message = $remark_description;
+                    $post_new->title_push = $remark_type;
+
+                    $remark_description = trim($remark_description);
+
+                    if(strlen($remark_description) > 30) {
+                        $message = substr($remark_description, 0, 27).'...';
+                    }   else {
+                        $message = $remark_description;
+                    }
+
+                    if($remark_type == 'REMARK') {
+                        $category_id = -3;
+                    }   else if($remark_type == 'REWARD') {
+                        $category_id = -2;
+                    } 
+
+                    $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year'); 
+
+                    $post_new->message_push = $message;
+                    $post_new->category_id = $category_id;
+                    $post_new->batch = $batch;
+                    $post_new->post_type = $post_type;  
+                    $post_new->receiver_end = $receiver_end; 
+                    $post_new->background_id = 0;
+                    $post_new->request_acknowledge = 1;
+                    $post_new->notify_datetime = date('Y-m-d H:i:s');
+                    $post_new->posted_by = $school_id;
+                    $post_new->youtube_link = ''; 
+                    
+                    $user_type = Auth::User()->user_type;
+                    if($user_type == "SCHOOL" ) {
+                        $post_new->status='ACTIVE';
+                    }   else {
+                        $post_new->status='PENDING';
+                    }
+
+                    $post_new->save();
+                }
+
+                return response()->json(['status' => 'SUCCESS', 'message' => 'Details Saved Successfully']);
+
+                
+            } else {
+                return response()->json([ 'status' => "FAILED",  'message' => "Invalid Scholar"   ]);
+            }     
+        } else {
+            return response()->json([ 'status' => "FAILED",  'message' => "Session Logged Out. Please Login Again"   ]);
+        }
+    }
+
 
     public function deleteStudent(Request $request)
     {
@@ -6908,6 +8355,7 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $id = $request->id;
             $alumni_status = $request->alumni_status;   
@@ -6957,7 +8405,7 @@ class AdminController extends Controller
 
                 $users->save();
 
-                $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->orderby('id', 'asc')->first();
+                $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
                 if(!empty($settings)) {} else {
                     $settings = DB::table('admin_settings')->orderby('id', 'asc')->first();
                 }
@@ -6970,7 +8418,7 @@ class AdminController extends Controller
                 if(!empty($ex)) {
 
                 }   else {*/
-                    DB::table('student_alumnis')->insert(['school_id' => Auth::User()->id, 'user_id' => $id, 
+                    DB::table('student_alumnis')->insert(['school_id' => $school_id, 'user_id' => $id, 
                         'academic_year' => $acadamic_year, 'class_id' => $students->class_id, 
                         'section_id' => $students->section_id, 'status' => $users->status, 
                         'alumni_status' => $alumni_status,  'created_by' => Auth::User()->id, 
@@ -7082,11 +8530,12 @@ class AdminController extends Controller
     {
         if (Auth::check()) {
             $app = $request->get('app', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
             $countries = Countries::select('id', 'name')->where('status','=','ACTIVE')->get();
             $classes = Classes::where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            // if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             return view('admin.alumni')->with('countries', $countries)->with('classes',$classes)->with('app',$app);
         } else {
@@ -7142,10 +8591,12 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $users_qry->where('users.school_college_id', Auth::User()->id);
-                $filtered_qry->where('users.school_college_id', Auth::User()->id);
-            }
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $users_qry->where('users.school_college_id', $school_id);
+                $filtered_qry->where('users.school_college_id', $school_id);
+            //}
 
             if(!empty($status)){
                 $users_qry->where('users.status',$status);
@@ -7183,9 +8634,9 @@ class AdminController extends Controller
                 ->where('user_type', 'STUDENT')->whereNotNULL('users.alumni_status')
                 ->where('users.delete_status',0)
                 ->whereRAW('student_alumnis.id = (SELECT MAX(id) FROM student_alumnis WHERE student_alumnis.user_id = users.id) ');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalData->where('users.school_college_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalData->where('users.school_college_id', $school_id); 
+            //}
             $totalData = $totalData->get();
 
             if (!empty($totalData)) {
@@ -7228,15 +8679,19 @@ class AdminController extends Controller
 
     public function viewTeachers()
     {
-        if (Auth::check()) {
+        if (Auth::check()) {  
+            $school_id = (new AdminRoleController())->getSchoolId();
             $countries = Countries::select('id', 'name')->where('status','=','ACTIVE')->get();
             $classes = Classes::where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id',$school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get(); 
             $subjects = Subjects::all();
-            return view('admin.teachers')->with('countries', $countries)->with('classes', $classes)->with('subjects', $subjects);
+            $departments = Departments::where('status', 'ACTIVE')->where('school_id', $school_id)->get();
+            $roles = UserRoles::where('status', 'ACTIVE')->where('school_id', $school_id)->get();
+            return view('admin.teachers')->with('countries', $countries)->with('classes', $classes)->with('subjects', $subjects)
+                ->with('departments', $departments)->with('roles', $roles);
         } else {
             return redirect('/admin/login');
         }
@@ -7258,17 +8713,25 @@ class AdminController extends Controller
             $status = $request->get('status_id','');
             $section = $request->get('section_id','');
             $class_id = $request->get('class_id','');
+            $search = $request->get('search','');
+            $school_id = (new AdminRoleController())->getSchoolId();  
+
             $users_qry = User::with('teachers')->leftjoin('countries', 'countries.id', 'users.country')
                 ->leftjoin('states', 'states.id', 'users.state_id')
                 ->leftjoin('districts', 'districts.id', 'users.city_id')
                 ->leftjoin('teachers', 'teachers.user_id', 'users.id')
                 ->leftjoin('classes', 'classes.id', 'teachers.class_tutor')
                 ->leftjoin('sections', 'sections.id', 'teachers.section_id')
-                ->where('user_type', 'TEACHER')
+                ->leftjoin('departments', 'departments.id', 'teachers.department_id')
+                ->leftjoin('userroles', 'userroles.ref_code', 'users.user_type')
+                ->where('userroles.school_id', $school_id)
+                //->where('user_type', 'TEACHER')
+                ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
                 ->select('users.*', 'countries.name as country_name', 'states.state_name', 'districts.district_name',
                 'teachers.emp_no', 'teachers.date_of_joining', 'teachers.qualification', 'teachers.exp', 'teachers.post_details',
                 'teachers.subject_id', 'teachers.class_id', 'teachers.class_tutor',  'teachers.section_id', 'teachers.father_name',
-                'teachers.address', 'classes.class_name', 'sections.section_name');
+                'teachers.address', 'classes.class_name', 'sections.section_name', 'departments.department_name', 
+                'userroles.user_role');
 
                 if($subject != 0){
                     $users_qry->where('teachers.subject_id','like','%'.$subject.'%');
@@ -7280,11 +8743,16 @@ class AdminController extends Controller
                 ->leftjoin('teachers', 'teachers.user_id', 'users.id')
                 ->leftjoin('classes', 'classes.id', 'teachers.class_tutor')
                 ->leftjoin('sections', 'sections.id', 'teachers.section_id')
-                ->where('user_type', 'TEACHER')
+                ->leftjoin('departments', 'departments.id', 'teachers.department_id')
+                ->leftjoin('userroles', 'userroles.ref_code', 'users.user_type')
+                ->where('userroles.school_id', $school_id)
+                //->where('user_type', 'TEACHER')
+                ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
                 ->select('users.*', 'countries.name as country_name', 'states.state_name', 'districts.district_name',
                 'teachers.emp_no', 'teachers.date_of_joining', 'teachers.qualification', 'teachers.exp', 'teachers.post_details',
                 'teachers.subject_id', 'teachers.class_id', 'teachers.class_tutor',  'teachers.section_id', 'teachers.father_name',
-                'teachers.address', 'classes.class_name', 'sections.section_name');
+                'teachers.address', 'classes.class_name', 'sections.section_name', 'departments.department_name', 
+                'userroles.user_role');
                 if($subject != 0){
                     $filtered_qry->where('teachers.subject_id','like','%'.$subject.'%');
 
@@ -7303,10 +8771,16 @@ class AdminController extends Controller
                     }
                 }
             }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $users_qry->where('users.school_college_id', $school_id);
+                $filtered_qry->where('users.school_college_id', $school_id);
+            //}
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $users_qry->where('users.school_college_id', Auth::User()->id);
-                $filtered_qry->where('users.school_college_id', Auth::User()->id);
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR teachers.emp_no like "%'.$search['value'] . '%" OR teachers.qualification like "%'.$search['value'] . '%" OR teachers.father_name like "%'.$search['value'] . '%" OR teachers.address like "%'.$search['value'] . '%" OR userroles.user_role like "%'.$search['value'] . '%" OR users.gender like "%'.$search['value'] . '%")'); 
+                    $filtered_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR teachers.emp_no like "%'.$search['value'] . '%" OR teachers.qualification like "%'.$search['value'] . '%" OR teachers.father_name like "%'.$search['value'] . '%" OR teachers.address like "%'.$search['value'] . '%" OR userroles.user_role like "%'.$search['value'] . '%" OR users.gender like "%'.$search['value'] . '%")'); 
+                }
             }
 
             if(!empty($status)){
@@ -7339,10 +8813,11 @@ class AdminController extends Controller
             ->leftjoin('teachers', 'teachers.user_id', 'users.id')
             ->leftjoin('classes', 'classes.id', 'teachers.class_tutor')
             ->leftjoin('sections', 'sections.id', 'teachers.section_id')
-            ->where('user_type', 'TEACHER');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalData->where('users.school_college_id', Auth::User()->id); 
-            }
+            //->where('user_type', 'TEACHER');
+            ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL']);
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalData->where('users.school_college_id', $school_id); 
+            //}
             $totalData = $totalData->get();
 
             if (!empty($totalData)) {
@@ -7400,6 +8875,11 @@ class AdminController extends Controller
 
         if (Auth::check()) {
             $id = $request->id;
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $user_type = $request->get('user_type', '');
+            if(empty($user_type)) { $user_type = 'TEACHER'; }
+
             $name = $request->name;
             $lastname = $request->lastname;
             $gender = $request->gender;
@@ -7409,6 +8889,7 @@ class AdminController extends Controller
             $country = $request->country;
             $state_id = $request->state_id;
             $city_id = $request->city_id;
+            $department_id = $request->department_id;
             $image = $request->file('profile_image');
 
             $emp_no = $request->emp_no;
@@ -7426,6 +8907,7 @@ class AdminController extends Controller
             $classId = 0;
 
             $address = $request->address;
+            $pincode = $request->pincode;
             $password = $request->password;
 
             $status = $request->status;
@@ -7433,8 +8915,7 @@ class AdminController extends Controller
             $validator = Validator::make($request->all(), [
                 'emp_no' => 'required',
                 'date_of_joining' => 'required',
-                'mobile' => 'required',
-               
+                'mobile' => 'required',  
             ]);
 
             if($country == ''){
@@ -7454,6 +8935,9 @@ class AdminController extends Controller
             }
             if($section_id == ''){
                 $section_id = 0;
+            }
+            if($department_id == ''){
+                $department_id = 0;
             }
             if ($validator->fails()) {
 
@@ -7477,12 +8961,13 @@ class AdminController extends Controller
             $school_id = (new AdminRoleController())->getSchoolId(); 
 
             if (!empty($mobile)) {
-                if ($id > 0) {
+                if ($id > 0) { 
                     $exists = DB::table('users')->where('mobile', $mobile)->where('school_college_id', $school_id)
-                        ->where('user_type', 'TEACHER')->where('status', '!=', 'DELETED')->whereNotIn('id', [$id])->first();
+                        ->where('user_type', '!=', 'STUDENT')->where('status', '!=', 'DELETED')->whereNotIn('id', [$id])->first();
                 } else {
                     $exists = DB::table('users')->where('mobile', $mobile)->where('school_college_id', $school_id)
-                        ->where('user_type', 'TEACHER')->where('status', '!=', 'DELETED')->first();
+                        //->where('user_type', 'TEACHER')
+                        ->where('user_type', '!=', 'STUDENT')->where('status', '!=', 'DELETED')->first();
                 }
             }
 
@@ -7518,7 +9003,7 @@ class AdminController extends Controller
                 $users->created_at = $date;
                 $users->created_by = Auth::User()->id; 
 
-                $users->user_type = "TEACHER";
+                //$users->user_type = $user_type; "TEACHER";
 
                 $lastjobid = DB::table('users')
                     ->where('created_at', 'like', date('Y-m-d') . '%')
@@ -7533,7 +9018,9 @@ class AdminController extends Controller
                 $users->password = Hash::make($password);
             }
 
-            $users->school_college_id = Auth::User()->id;
+            $users->user_type = $user_type; 
+
+            $users->school_college_id = $school_id;
             $users->name = $name;
             $users->last_name = $lastname;
             $users->gender = $gender;
@@ -7568,6 +9055,12 @@ class AdminController extends Controller
                     return response()->json(['status' => "FAILED", 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
                 }
 
+                $size = $image->getSize();  
+                if($size < $this->maxsize) { // < 2mb can allow 
+                } else {
+                    return response()->json(['status' => "FAILED", 'message' => 'Please upload the image file size less than 2 MB']);
+                } 
+
                 $countryimg = rand() . time() . '.' . $image->getClientOriginalExtension();
 
                 $destinationPath = public_path('/uploads/userdocs/');
@@ -7589,19 +9082,21 @@ class AdminController extends Controller
             } else {
                 $teachers = new Teacher;
             }
-            $teachers->school_id = Auth::User()->id;
+            $teachers->school_id = $school_id;
             $teachers->user_id = $userId;
             $teachers->emp_no = $emp_no;
             $teachers->date_of_joining = $date_of_joining;
             $teachers->qualification = $qualification;
             $teachers->exp = $exp;
             $teachers->post_details = $post_details;
+            $teachers->department_id  = $department_id;
             $teachers->subject_id = $subjectId;
             $teachers->class_id = $classId;
             $teachers->class_tutor = $class_tutor;
             $teachers->section_id = $section_id;
             $teachers->father_name = $father_name;
             $teachers->address = $address;
+            $teachers->pincode = $pincode;
             $teachers->status = $status;
             $teachers->save();
             return response()->json(['status' => 'SUCCESS', 'message' => 'Teachers Saved Successfully']);
@@ -7621,11 +9116,12 @@ class AdminController extends Controller
                 ->leftjoin('teachers', 'teachers.user_id', 'users.id')
                 ->leftjoin('classes', 'classes.id', 'teachers.class_tutor')
                 ->leftjoin('sections', 'sections.id', 'teachers.section_id')
-                ->where('user_type', 'TEACHER') 
+                //->where('user_type', 'TEACHER') 
+                ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
                 ->select('users.*', 'countries.name as country_name', 'states.state_name', 'districts.district_name',
                 'teachers.emp_no', 'teachers.date_of_joining', 'teachers.qualification', 'teachers.exp', 'teachers.post_details',
                 'teachers.subject_id', 'teachers.class_id', 'teachers.class_tutor',  'teachers.section_id', 'teachers.father_name',
-                'teachers.address')->where('user_id', $request->id)->get();
+                'teachers.address', 'teachers.department_id')->where('user_id', $request->id)->get();
                 //   echo "<pre>"; print_r($teachers); exit;
 
             if ($teachers->isNotEmpty()) {
@@ -7646,7 +9142,7 @@ class AdminController extends Controller
             if($user->isNotEmpty()) {
                 $user_details = User::with('teachers')->leftjoin('teachers', 'teachers.user_id', 'users.id') 
                     ->where('user_type', 'TEACHER') 
-                    ->select('users.*')->where('user_id', $request->id)->get();
+                    ->select('users.*')->where('user_id', $request->id)->first();
                 if(!empty($user_details)) {
                     $user_details = $user_details->toArray(); 
                 } else {
@@ -7751,14 +9247,15 @@ class AdminController extends Controller
       public function viewClassTeachers()
      {
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
              $classes = Classes::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
              $subjects = Subjects::all();
              $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')
-                ->where('users.user_type','TEACHER')->where('users.school_college_id', Auth::User()->id)
+                ->where('users.user_type','TEACHER')->where('users.school_college_id', $school_id)
                 ->where('users.status','ACTIVE')->orderby('users.name', 'asc')->get();
              return view('admin.class_teachers')->with('classes', $classes)->with('subjects', $subjects)->with('teacher',$teacher);
          } else {
@@ -7770,6 +9267,7 @@ class AdminController extends Controller
      {
 
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
              $limit = $request->get('length', '10');
              $start = $request->get('start', '0');
              $dir = $request->input('order.0.dir');
@@ -7805,10 +9303,10 @@ class AdminController extends Controller
                  }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $users_qry->where('users.school_college_id', Auth::User()->id);
-                $filtered_qry->where('users.school_college_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $users_qry->where('users.school_college_id', $school_id);
+                $filtered_qry->where('users.school_college_id', $school_id);
+            //}
 
 
             if(!empty($status)){
@@ -7958,13 +9456,14 @@ class AdminController extends Controller
      public function viewMappingSubject()
      {
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get(); 
              $subjects = Subjects::all();
-             $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')->where('users.user_type','TEACHER')->where('users.status','=','ACTIVE')->where('users.school_college_id', Auth::User()->id)->orderby('users.name', 'asc')->get();
+             $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')->where('users.user_type','TEACHER')->where('users.status','=','ACTIVE')->where('users.school_college_id', $school_id)->orderby('users.name', 'asc')->get();
              return view('admin.subject_mapping')->with('classes', $classes)->with('subjects', $subjects)->with('teacher',$teacher);
          } else {
              return redirect('/admin/login');
@@ -7973,13 +9472,14 @@ class AdminController extends Controller
      public function addSubjectMapping(Request $request)
      {
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get(); 
             $subjects = Subjects::all();
-            $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')->where('users.user_type','TEACHER')->where('users.status','=','ACTIVE')->where('users.school_college_id', Auth::User()->id)->orderby('users.name', 'asc')->get();
+            $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')->where('users.user_type','TEACHER')->where('users.status','=','ACTIVE')->where('users.school_college_id', $school_id)->orderby('users.name', 'asc')->get();
 
             return view('admin.addsubject_mapping')->with('classes', $classes)->with('subjects', $subjects)->with('teacher',$teacher);
          } else {
@@ -8259,10 +9759,11 @@ class AdminController extends Controller
      public function editMappingSubject(Request $request)
      {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get(); 
             $subjects = Subjects::all();
             $teacher = DB::table('teachers')->leftjoin('users','users.id','teachers.user_id')->where('users.user_type','TEACHER')->where('users.id',$request->teacher_id)->where('users.status','=','ACTIVE')->get();
@@ -8306,13 +9807,14 @@ class AdminController extends Controller
 
      public function viewStudentPromotions(Request $request) {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            // if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             $students  = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
-                ->where('users.status', 'ACTIVE')->where('user_type', 'STUDENT')->where('users.school_college_id', Auth::User()->id)
+                ->where('users.status', 'ACTIVE')->where('user_type', 'STUDENT')->where('users.school_college_id', $school_id)
                 ->select('users.id', 'name', 'last_name', 'students.admission_no')->orderby('students.admission_no', 'Asc')->get();
             return view('admin.student_promotions')->with('classes', $classes);
 
@@ -8325,6 +9827,7 @@ class AdminController extends Controller
 
     public function loadStudentPromotions(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -8461,7 +9964,7 @@ class AdminController extends Controller
                     $academics = StudentAcademics::find($id);
                     $academics->updated_at = date('Y-m-d H:i:s');
                     $academics->updated_by = Auth::User()->id;
-                    $academics->school_id = Auth::User()->id;
+                    $academics->school_id = $school_id;
                     $academics->user_id = $user_id;
                     $academics->academic_year = $academic_year;
                     $academics->from_month = $from_month;
@@ -8476,7 +9979,7 @@ class AdminController extends Controller
                     $academics = new StudentAcademics();
                     $academics->created_at = date('Y-m-d H:i:s');
                     $academics->created_by = Auth::User()->id;
-                    $academics->school_id = Auth::User()->id;
+                    $academics->school_id = $school_id;
                     $academics->user_id = $user_id;
                     $academics->academic_year = $academic_year;
                     $academics->from_month = $from_month;
@@ -8611,11 +10114,12 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $status = $request->get('status',0);
            if($status != ''){
-            $subjects = Subjects::where('status','=',$status)->where('school_id','=',Auth::User()->id)->get();
+            $subjects = Subjects::where('status','=',$status)->where('school_id','=',$school_id )->get();
            }else{
-            $subjects = Subjects::where('school_id','=',Auth::User()->id)->get();
+            $subjects = Subjects::where('school_id','=',$school_id )->get();
            }
 
 
@@ -8629,7 +10133,7 @@ class AdminController extends Controller
     public function postSubjects(Request $request)
     {
         if (Auth::check()) {
-            $school_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $subject_name = $request->subject_name;
             $short_name = $request->short_name;
@@ -8646,9 +10150,9 @@ class AdminController extends Controller
             ]);
 
             if ($id > 0) {
-                $exists = DB::table('subjects')->where('subject_name', $subject_name)->where('school_id','=',Auth::User()->id)->whereNotIn('id', [$id])->first();
+                $exists = DB::table('subjects')->where('subject_name', $subject_name)->where('school_id','=',$school_id)->whereNotIn('id', [$id])->first();
             } else {
-                $exists = DB::table('subjects')->where('subject_name', $subject_name)->where('school_id','=',Auth::User()->id)->first();
+                $exists = DB::table('subjects')->where('subject_name', $subject_name)->where('school_id','=',$school_id)->first();
             }
 
             if (!empty($exists)) {
@@ -8659,9 +10163,9 @@ class AdminController extends Controller
             }
 
             if ($id > 0) {
-                $exists = DB::table('subjects')->where('short_name', $short_name)->where('school_id','=',Auth::User()->id)->whereNotIn('id', [$id])->first();
+                $exists = DB::table('subjects')->where('short_name', $short_name)->where('school_id','=',$school_id)->whereNotIn('id', [$id])->first();
             } else {
-                $exists = DB::table('subjects')->where('short_name', $short_name)->where('school_id','=',Auth::User()->id)->first();
+                $exists = DB::table('subjects')->where('short_name', $short_name)->where('school_id','=',$school_id)->first();
             }
 
             if (!empty($exists)) {
@@ -8740,22 +10244,23 @@ class AdminController extends Controller
     public function viewHomework()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $classes = Classes::where('status','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             $subjects = Subjects::where('status','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $subjects->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $subjects->where('school_id', $school_id); 
+            //}
             $subjects = $subjects->orderby('position','asc')->get();
              $tests = Tests::all();
             $periods = Periodtiming::select('period_1', 'period_2', 'period_3', 'period_4', 'period_5', 'period_6', 'period_7', 'period_8');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $periods->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $periods->where('school_id', $school_id); 
+            //}
             $periods = $periods->first();
             if(!empty($periods)) {
                 $periods = $periods->toArray();
@@ -8773,6 +10278,7 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $input = $request->all();
             $start = $input['start'];
@@ -8816,10 +10322,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $hwqry->where('homeworks.school_id', Auth::User()->id);
-                $filteredqry->where('homeworks.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $hwqry->where('homeworks.school_id', $school_id);
+                $filteredqry->where('homeworks.school_id', $school_id);
+            //}
 
             if(!empty($status)){
                 $hwqry->where('homeworks.status',$status);
@@ -8877,9 +10383,9 @@ class AdminController extends Controller
             $filters = $filteredqry->select('id')->count();
 
             $totalDataqry = Homeworks::orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -8928,6 +10434,9 @@ class AdminController extends Controller
             $count_subject = count($subject_ids);
             // Convert test_id array to comma-separated string
             $test = !empty($test_id) ? implode(',', $test_id) : '';
+
+            $req_ack = $request->has('req_ack') ? 1 : 0;
+
             $is_hw_attachment = $request->is_hw_attachment;
             $is_dt_attachment = $request->is_dt_attachment;
             $validator = Validator::make($request->all(), [
@@ -8944,31 +10453,53 @@ class AdminController extends Controller
             if ($validator->fails()) {
                 $msg = $validator->errors()->all();
                 return response()->json([
-                    'status' => "FAILED",
+                    'status' => 0,
                     'message' => "Please check your inputs",
                 ]);
             }
             // Check homework submission date validity
             if (strtotime($hw_submission_date) <= strtotime($hw_date)) {
                 return response()->json([
-                    'status' => 'FAILED',
+                    'status' => 0,
                     'message' => 'Homework Submission Date must be greater than Homework Date',
                 ]);
-            }
+            } 
 
+            // check attachment files format 
+            $file_attachment = $request->file('file_attachment');
+
+            $images = $request->file('file_attachment'); 
+            if(is_array($images) && count($images)>0) {
+                $allowedExtensions = [ 'jpg', 'jpeg', 'png', 'doc', 'docx', 'pdf' ];
+                foreach($images as $image) {
+                    if (!empty($image) && $image != 'null') { 
+                        $ext = $image->getClientOriginalExtension();
+                        $ext = strtolower($ext);
+                        if(!in_array($ext, $allowedExtensions)) {
+                            return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload jpeg, jpg, png, doc, docx, pdf']);
+                        }
+
+                        $size = $image->getSize();  
+                        if($size < $this->maxsize) { // < 2mb can allow 
+                        } else {
+                            return response()->json(['status' => 0, 'message' => 'Please upload the attachment file size less than 2 MB']);
+                        } 
+                    }
+                }
+            } 
             
-            $inarr = ['user_id' => Auth::User()->id, 'school_id' => $school_id,'section_id' => $section_id,
+            $inarr = [ 'user_id' => Auth::User()->id, 'school_id' => $school_id,'section_id' => $section_id,
                 'class_id' => $class_id, 'subject_id' => $subject_ids,'sms_alert' => $sms_alert,'test_id' => $test_id,
                 'hw_descriptions' => $hw_descriptions, 'hw_date' => $hw_date,'hw_submission_date' => $hw_submission_date,
-                'approve_status' => $approve_status, 'id' => $id
+                'approve_status' => $approve_status, 'id' => $id, 'req_ack' => $req_ack
             ];
 
-            $this->createPostHWs($request, $inarr);   
-
-            return response()->json([
+            $retresponse = $this->createPostHWs($request, $inarr);   
+            return $retresponse;
+            /*return response()->json([
                 'status' => 'SUCCESS',
                 'message' => 'Homework Saved Successfully',
-            ]);
+            ]);*/
         } else {
             return redirect('/admin/login');
         }
@@ -8981,9 +10512,13 @@ class AdminController extends Controller
         $subject_ids = $inarr['subject_id'];
         $sms_alert = $request->get('sms_alert');
         $test_id = $request->get('test_id', []);
-        $sms_alert = $request->get('sms_alert', 0);         
+        $sms_alert = $request->get('sms_alert', 0);     
+        $req_ack = $request->get('req_ack', 0);         
         if(empty($sms_alert)) {
             $sms_alert = 0;
+        }
+        if(empty($req_ack)) {
+            $req_ack = 0;
         }
 
         $hw_descriptions = $request->get('hw_description');
@@ -8993,11 +10528,18 @@ class AdminController extends Controller
         $school_id = $inarr['school_id'];
         $id = $inarr['id'];
 
+        if(strtotime($hw_date) < strtotime(date('Y-m-d H:i:s'))) {
+            $hw_date = date('Y-m-d H:i:s');
+        }
+
         //$reqinput = $request->all(); echo "<pre>"; print_r($reqinput); exit; 
 
         $section_array = [];
-
+        $is_all = 0;
         if($section_id == -1) {
+            
+            $is_all = 1;
+
             $sections = Sections::where('class_id', $class_id)->where('status','=','ACTIVE')
                 ->orderby('position', 'asc')->select("section_name", "id")->get();
             if($sections->isNotEmpty()) {
@@ -9008,6 +10550,8 @@ class AdminController extends Controller
         } else {
             $section_array[] = $section_id;
         }
+
+        $main_ref_no = '';
 
         if(count($section_array)>0) {
             $sub_shorts = [];
@@ -9020,6 +10564,20 @@ class AdminController extends Controller
             // Initialize variables to store filenames from the first loop
             $hw_attachment_filename = null;
             $dt_attachment_filename = null;
+            $hw_attached_filenames = null;
+
+            $lastorderid = DB::table('homeworks')->orderby('id', 'desc')->select('id')->limit(1)->get();
+
+            if ($lastorderid->isNotEmpty()) {
+                $lastorderid = $lastorderid[0]->id;
+                $lastorderid = $lastorderid + 1;
+            } else {
+                $lastorderid = 1;
+            }
+
+            $append = str_pad($lastorderid, 3, "0", STR_PAD_LEFT);
+            $main_ref_no = date("Ymd") . $append; 
+
             foreach($section_array as $sindex => $section_id) {
                 // Process each subject_id and hw_description pair
                 foreach ($subject_ids as $index => $subject_id) {
@@ -9047,14 +10605,16 @@ class AdminController extends Controller
                             $append = str_pad($lastorderid, 3, "0", STR_PAD_LEFT);
                             $ref_no = date("Ymd") . $append; 
                         }
-
+                        $homework->main_ref_no = $main_ref_no;  
                         $homework->ref_no = $ref_no;  
                     }
+                    $homework->is_all = $is_all;
 
                     $homework->school_id = $school_id;
                     $homework->class_id = $class_id;
                     $homework->section_id = $section_id;
                     $homework->is_sms_alert = $sms_alert;
+                    $homework->is_req_submission = $req_ack;
                     $homework->subject_id = $subject_id;
                     $homework->test_id = !empty($test_id[$index]) ? $test_id[$index] : null;
                     $homework->hw_description = $hw_descriptions[$index];
@@ -9064,13 +10624,31 @@ class AdminController extends Controller
                     $homework->status = 'ACTIVE';  
                     $homework->approve_status = $approve_status;
 
+                    if ($index === 0 && $sindex === 0) {
+                        $images = $request->file('file_attachment'); $files = [];
+                        if(is_array($images) && count($images)>0) { 
+                            foreach($images as $image) {
+                                if (!empty($image) && $image != 'null') { 
+                                    $ext = $image->getClientOriginalExtension();
+                                    $ext = strtolower($ext);
+                                    $image1_name = rand() . time() . '.' . $image->getClientOriginalExtension(); 
+                                    $image->move(public_path('/image/homework'), $image1_name); 
+                                    $files[] = $image1_name;
+                                }
+                                $hw_attached_filenames = implode(',', $files);
+                            }
+                        } 
+                    } 
+                    $accepted_formats = ['jpeg', 'jpg', 'png', 'JPG', 'JPEG', 'PNG', 'doc', 'docx', 'pdf'];
+
                     // Handle homework attachment only for the first loop
                     if ($index === 0 && $sindex === 0) {
                         $homeworkfile = $request->file('hw_attachment');
                         if (!empty($homeworkfile)) {
                             $ext = $homeworkfile->getClientOriginalExtension();
-                            if (!in_array($ext, $this->accepted_formats)) {
-                                return response()->json(['status' => "FAILED", 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
+                            $ext = strtolower($ext);
+                            if (!in_array($ext, $accepted_formats)) {
+                                return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
                             }
                             $topicimg = rand() . time() . '.' . $homeworkfile->getClientOriginalExtension();
                             $destinationPath = public_path('/image/homework');
@@ -9083,8 +10661,9 @@ class AdminController extends Controller
                         $dailytask = $request->file('dt_attachment');
                         if (!empty($dailytask)) {
                             $ext = $dailytask->getClientOriginalExtension();
-                            if (!in_array($ext, $this->accepted_formats)) {
-                                return response()->json(['status' => "FAILED", 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
+                            $ext = strtolower($ext);
+                            if (!in_array($ext, $accepted_formats)) {
+                                return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
                             }
                             $topicimg = rand() . time() . '.' . $dailytask->getClientOriginalExtension();
                             $destinationPath = public_path('/image/dailytask');
@@ -9095,6 +10674,7 @@ class AdminController extends Controller
                     // Assign filenames from the first loop if available
                     $homework->hw_attachment = $hw_attachment_filename;
                     $homework->dt_attachment = $dt_attachment_filename;
+                    $homework->file_attachments = $hw_attached_filenames;
                     // Save the homework object
                     
                     $homework->save();
@@ -9121,6 +10701,7 @@ class AdminController extends Controller
                         if ($firstHomework) {
                             $hw_attachment_filename = $firstHomework->hw_attachment;
                             $dt_attachment_filename = $firstHomework->dt_attachment;
+                            $hw_attached_filenames = $firstHomework->file_attachments;
                             $ref_no = $firstHomework->ref_no;
                         }
                     }
@@ -9318,8 +10899,356 @@ class AdminController extends Controller
                 $post_new->content_vars=$content_vars;
                 $post_new->notify_datetime=$schedule_date;
                 $post_new->posted_by=$school_id;
-                
+                $post_new->is_homework = 1;
+                $post_new->main_ref_no = $main_ref_no;
                 $post_new->save();
+
+                //echo "<pre>"; print_r($post_new); exit; 
+            } 
+            /*  Communication SMS */
+            
+         
+        return response()->json([  'status' => 1,  'message' => 'Homework Saved Successfully' ]);
+
+    }
+
+    public function updateHomework(Request $request) {
+        if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $id = $request->id;
+            $class_id = $request->class_id;
+            $section_id = $request->section_id;
+            $sms_alert = $request->has('sms_alert') ? 1 : 0;
+            $subject_ids = $request->subject_id; // Array of subject_ids
+            $hw_descriptions = $request->hw_description; // Array of hw_descriptions
+            $hw_date = $request->hw_date;
+            $hw_submission_date = $request->hw_submission_date;
+            $position = $request->position;
+            $status = $request->status;
+            $approve_status = $request->approve_status;
+            $test_id = $request->test_id;
+            $count_subject = count($subject_ids);
+            // Convert test_id array to comma-separated string
+            $test = !empty($test_id) ? implode(',', $test_id) : '';
+
+            $req_ack = $request->has('req_ack') ? 1 : 0;
+
+            $is_hw_attachment = $request->is_hw_attachment;
+            $is_dt_attachment = $request->is_dt_attachment;
+            $validator = Validator::make($request->all(), [
+                'class_id' => 'required',
+                'section_id' => 'required',
+                'subject_id' => 'required|array',
+                'subject_id.*' => 'required', // Each subject_id must be present
+                'hw_description' => 'required|array',
+                'hw_description.*' => 'required', // Each hw_description must be present
+                'hw_date' => 'required',
+                'hw_submission_date' => 'required',
+                'approve_status' => 'required',
+            ]);
+            if ($validator->fails()) {
+                $msg = $validator->errors()->all();
+                return response()->json([
+                    'status' => 0,
+                    'message' => "Please check your inputs",
+                ]);
+            }
+            // Check homework submission date validity
+            if (strtotime($hw_submission_date) <= strtotime($hw_date)) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Homework Submission Date must be greater than Homework Date',
+                ]);
+            } 
+
+            // check attachment files format 
+            $file_attachment = $request->file('file_attachment');
+
+            $images = $request->file('file_attachment'); 
+            if(is_array($images) && count($images)>0) {
+                $allowedExtensions = [ 'jpg', 'jpeg', 'png', 'doc', 'docx', 'pdf' ];
+                foreach($images as $image) {
+                    if (!empty($image) && $image != 'null') { 
+                        $ext = $image->getClientOriginalExtension();
+                        $ext = strtolower($ext);
+                        if(!in_array($ext, $allowedExtensions)) {
+                            return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload jpeg, jpg, png, doc, docx, pdf']);
+                        }
+
+                        $size = $image->getSize();  
+                        if($size < $this->maxsize) { // < 2mb can allow 
+                        } else {
+                            return response()->json(['status' => 0, 'message' => 'Please upload the attachment file size less than 2 MB']);
+                        } 
+                    }
+                }
+            } 
+            
+            $inarr = [ 'user_id' => Auth::User()->id, 'school_id' => $school_id,'section_id' => $section_id,
+                'class_id' => $class_id, 'subject_id' => $subject_ids,'sms_alert' => $sms_alert,'test_id' => $test_id,
+                'hw_descriptions' => $hw_descriptions, 'hw_date' => $hw_date,'hw_submission_date' => $hw_submission_date,
+                'approve_status' => $approve_status, 'id' => $id, 'req_ack' => $req_ack
+            ];
+
+            $retresponse = $this->updatePostHWs($request, $inarr);   
+            return $retresponse;
+            /*return response()->json([
+                'status' => 'SUCCESS',
+                'message' => 'Homework Saved Successfully',
+            ]);*/
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function updatePostHWs($request, $inarr=[]) {
+        $user_id = $inarr['user_id'];
+        $section_id = $request->get('section_id');
+        $class_id = $request->get('class_id');
+        $subject_ids = $inarr['subject_id'];
+        $sms_alert = $request->get('sms_alert');
+        $test_id = $request->get('test_id', []);
+        $sms_alert = $request->get('sms_alert', 0);     
+        $req_ack = $request->get('req_ack', 0);         
+        if(empty($sms_alert)) {
+            $sms_alert = 0;
+        }
+        if(empty($req_ack)) {
+            $req_ack = 0;
+        }
+
+        $hw_descriptions = $request->get('hw_description');
+        $hw_date = $request->get('hw_date');
+        $hw_submission_date = $request->get('hw_submission_date');
+        $approve_status = $request->get('approve_status');
+        $school_id = $inarr['school_id'];
+        $id = $inarr['id'];
+        
+        $reqinput = $request->all(); //echo "<pre>"; print_r($reqinput); exit; 
+
+        $homeworks = DB::table('homeworks')->where('id', $id)->first();
+        if(empty($homeworks)) {
+            return response()->json([  'status' => 0,  'message' => 'Invalid Homework' ]); 
+        }
+        $section_array = [];
+        $is_all = 0;
+        if($section_id == -1) {
+            
+            $is_all = 1;
+
+            $sections = Sections::where('class_id', $class_id)->where('status','=','ACTIVE')
+                ->orderby('position', 'asc')->select("section_name", "id")->get();
+            if($sections->isNotEmpty()) {
+                foreach($sections as $sid) {
+                    $section_array[] = $sid->id;
+                }
+            }
+        } else {
+            $section_array[] = $section_id;
+        }
+
+        if(count($section_array)>0) {
+            $sub_shorts = [];
+            $shorts = DB::table('subjects')->whereIn('id', $subject_ids)->select('id', 'short_name')->get();
+            if($shorts->isNotEmpty()) {
+                foreach ($shorts as $si => $shi) {
+                    $sub_shorts[$shi->id] = $shi->short_name;
+                }
+            }//echo "<pre>"; print_r($sub_shorts); 
+            // Initialize variables to store filenames from the first loop  
+            $hw_attachment_filename = $homeworks->hw_attachment;
+            $dt_attachment_filename = $homeworks->dt_attachment;
+            $hw_attached_filenames = $homeworks->file_attachments;
+            $main_ref_no = $homeworks->main_ref_no;
+            
+            DB::table('homeworks')->where('main_ref_no', $main_ref_no)->update(['status'=>'INACTIVE']); 
+
+            foreach($section_array as $sindex => $section_id) {
+                // Process each subject_id and hw_description pair
+                foreach ($subject_ids as $index => $subject_id) {
+
+                    $ex_id = 0;
+                    $ex = DB::table('homeworks')->where('main_ref_no', $main_ref_no)->where('section_id', $section_id)
+                        ->where('subject_id', $subject_id)->first();
+                    if(!empty($ex)) {
+                        $ex_id = $ex->id;
+                    }
+
+                    if ($ex_id > 0) {
+                        $homework = Homeworks::find($ex_id);
+                        $homework->updated_at = date('Y-m-d H:i:s');
+                        $homework->updated_by = $user_id;
+                    } else {
+                        $homework = new Homeworks();
+                        $homework->created_at = date('Y-m-d H:i:s');
+                        $homework->created_by = $user_id;
+
+                        if ($index === 0) {
+                            // Last Order id
+                            $lastorderid = DB::table('homeworks')
+                                ->orderby('id', 'desc')->select('id')->limit(1)->get();
+
+                            if ($lastorderid->isNotEmpty()) {
+                                $lastorderid = $lastorderid[0]->id;
+                                $lastorderid = $lastorderid + 1;
+                            } else {
+                                $lastorderid = 1;
+                            }
+
+                            $append = str_pad($lastorderid, 3, "0", STR_PAD_LEFT);
+                            $ref_no = date("Ymd") . $append; 
+                        }
+                        $homework->main_ref_no = $main_ref_no;  
+                        $homework->ref_no = $ref_no;  
+                    }
+                    $homework->is_all = $is_all;
+
+                    $homework->school_id = $school_id;
+                    $homework->class_id = $class_id;
+                    $homework->section_id = $section_id;
+                    $homework->is_sms_alert = $sms_alert;
+                    $homework->is_req_submission = $req_ack;
+                    $homework->subject_id = $subject_id;
+                    $homework->test_id = !empty($test_id[$index]) ? $test_id[$index] : null;
+                    $homework->hw_description = $hw_descriptions[$index];
+                    $homework->hw_date = $hw_date;
+                    $homework->hw_submission_date = $hw_submission_date;
+                    $homework->position = 1; // You may adjust this based on your form
+                    $homework->status = 'ACTIVE';  
+                    $homework->approve_status = $approve_status;
+
+                    if ($index === 0 && $sindex === 0) {
+                        $images = $request->file('file_attachment'); $files = [];
+                        if(is_array($images) && count($images)>0) { 
+                            foreach($images as $image) {
+                                if (!empty($image) && $image != 'null') { 
+                                    $ext = $image->getClientOriginalExtension();
+                                    $ext = strtolower($ext);
+                                    $image1_name = rand() . time() . '.' . $image->getClientOriginalExtension(); 
+                                    $image->move(public_path('/image/homework'), $image1_name); 
+                                    $files[] = $image1_name;
+                                }
+                                $hw_attached_filenames = implode(',', $files);
+                            }
+                        } 
+                    } 
+
+                    // Handle homework attachment only for the first loop
+                    if ($index === 0 && $sindex === 0) {
+                        $homeworkfile = $request->file('hw_attachment');
+                        if (!empty($homeworkfile)) {
+                            $ext = $homeworkfile->getClientOriginalExtension();
+                            if (!in_array($ext, $this->accepted_formats)) {
+                                return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
+                            }
+                            $topicimg = rand() . time() . '.' . $homeworkfile->getClientOriginalExtension();
+                            $destinationPath = public_path('/image/homework');
+                            $homeworkfile->move($destinationPath, $topicimg);
+                            $hw_attachment_filename = $topicimg;
+                        }
+                    }
+                    // Handle daily task attachment only for the first loop
+                    if ($index === 0 && $sindex === 0) {
+                        $dailytask = $request->file('dt_attachment');
+                        if (!empty($dailytask)) {
+                            $ext = $dailytask->getClientOriginalExtension();
+                            if (!in_array($ext, $this->accepted_formats)) {
+                                return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload png,jpeg,jpg']);
+                            }
+                            $topicimg = rand() . time() . '.' . $dailytask->getClientOriginalExtension();
+                            $destinationPath = public_path('/image/dailytask');
+                            $dailytask->move($destinationPath, $topicimg);
+                            $dt_attachment_filename = $topicimg;
+                        }
+                    }
+                    // Assign filenames from the first loop if available
+                    $homework->hw_attachment = $hw_attachment_filename;
+                    $homework->dt_attachment = $dt_attachment_filename;
+                    $homework->file_attachments = $hw_attached_filenames;
+                    // Save the homework object
+                    
+                    $homework->save();
+
+
+                    // Update related tests if necessary
+                    if (!empty($test_id) && count($test_id) > 0) {
+                        foreach ($test_id as $tid) {
+                            $test_to_date = DB::table('tests')->where('id', $tid)->value('to_date');
+                            $hw_submission_date = date('Y-m-d', strtotime($hw_submission_date));
+                            if (strtotime($test_to_date) < strtotime($hw_submission_date)) {
+                                DB::table('tests')->where('id', $tid)->update([
+                                    'to_date' => $hw_submission_date,
+                                    'updated_by' => user_id,
+                                    'updated_at' => date('Y-m-d H:i:s')
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    // Fetch the last created homework record to get the filenames for subsequent loops
+                    if ($index === 0 && $homework->id) {
+                        $firstHomework = Homeworks::find($homework->id);
+                        if ($firstHomework) {
+                            $hw_attachment_filename = $firstHomework->hw_attachment;
+                            $dt_attachment_filename = $firstHomework->dt_attachment;
+                            $hw_attached_filenames = $firstHomework->file_attachments;
+                            $ref_no = $firstHomework->ref_no;
+                        }
+                    }
+                }
+
+            }
+        }
+
+         
+
+            /*  Communication SMS */ 
+            $category = -1;
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+            $post_type = 1;
+            $smart_sms = 2; // $sms_alert;
+            $send_type = 1;
+            $schedule_date = date('Y-m-d H:i:s');
+            $final_content = '';
+            $receiver_arr = $section_array;
+            $receiver_arr = array_unique($receiver_arr); 
+            $receiver_arr = array_filter($receiver_arr); 
+            $receiver_end = implode(',', $receiver_arr);
+            $count_subject = count($subject_ids);
+            $index = 0; 
+
+            $strsub = $content_vars = ''; $template_id = 0;
+            if(count($sub_shorts) > 0) { 
+                $strsub = implode(', ', $sub_shorts). ' Homework given'; 
+            } else {
+                $strsub = 'Homework given in subjects';
+            }
+            $final_content = $strsub;
+             
+            //if(!empty($content_vars) && !empty($final_content)) {
+            if(!empty($final_content)) {
+                $post_new = new CommunicationSms;
+
+                $post_new->template_id=$template_id;
+                $post_new->category_id=$category;
+                $post_new->batch=$batch;
+                $post_new->post_type=$post_type;
+                $post_new->receiver_end=$receiver_end;
+                /*if($smart_sms == 1) {
+                    $post_new->smart_sms=$smart_sms;
+                }   else {
+                    $post_new->smart_sms=2;
+                }*/  
+                $post_new->smart_sms=2;
+                $post_new->send_type=$send_type;
+                $post_new->content=$final_content;
+                $post_new->content_vars=$content_vars;
+                $post_new->notify_datetime=$schedule_date;
+                $post_new->posted_by=$school_id;
+                
+                //$post_new->save();
 
                 //echo "<pre>"; print_r($post_new); exit; 
             } 
@@ -10169,9 +12098,9 @@ class AdminController extends Controller
             $content = '';
             if ($homework->isNotEmpty()) {
 
-                $ref_no = $homework[0]->ref_no;
-                $homeworks = PostHomeworks::where('ref_no', $ref_no)->where('status', 'ACTIVE')
-                ->select('ref_no', 'created_by', 'created_at', 'approve_status', 'id')
+                $ref_no = $homework[0]->main_ref_no; // $homework[0]->ref_no;
+                $homeworks = PostHomeworks::where('main_ref_no', $ref_no)->where('ref_no', $ref_no)->where('status', 'ACTIVE')
+                ->select('main_ref_no', 'is_all', 'ref_no', 'created_by', 'created_at', 'approve_status', 'id', 'is_req_submission')
                 ->orderby('id', 'asc')->groupby('ref_no')->first();
 
                 $homeworks_array = $subjects_array = []; 
@@ -10179,17 +12108,41 @@ class AdminController extends Controller
 
                     $homeworks_array = $homeworks->toArray();
 
-                    $mapped_subjects = DB::table('sections')->where('id', $homeworks_array["homeworks_list"][0]["section_id"])
-                        ->value('mapped_subjects');
-                    if(!empty($mapped_subjects)) {
-                        $mapped_subjects = explode(',', $mapped_subjects);
-                        $subjects = DB::table('subjects')->whereIn("id", $mapped_subjects)->where('status','ACTIVE')
-                            ->select("subject_name", "id")->orderby('position', 'asc')->get();
+                    if($homeworks_array["homeworks_list"][0]["is_all"] == 1) { 
+                        $subs = [];
+                        $mapped_subjects = DB::table('sections')->where('class_id', $homeworks_array["homeworks_list"][0]["class_id"])
+                            ->where('status', 'ACTIVE')->orderby('position', 'asc')->get();
+                        if($mapped_subjects->isNotEmpty()) {
+                            foreach($mapped_subjects as $sec) {
+                                $mapsubs = $sec->mapped_subjects;
+                                $mapsubs = explode(',', $mapsubs);
+                                $subs = array_merge($subs, $mapsubs);
+                            }
+                            if(count($subs)>0) {
+                                $subjects = DB::table('subjects')->whereIn("id", $subs)->where('status','ACTIVE')
+                                    ->select("subject_name", "id")->orderby('position', 'asc')->get();
 
-                        if($subjects->isNotEmpty()) {
-                            $subjects_array = $subjects->toArray();
+                                if($subjects->isNotEmpty()) {
+                                    $subjects_array = $subjects->toArray();
+                                }
+                            }
                         }
-                    } 
+                    } else {
+
+                        $mapped_subjects = DB::table('sections')->where('id', $homeworks_array["homeworks_list"][0]["section_id"])
+                            ->value('mapped_subjects');
+                        if(!empty($mapped_subjects)) {
+                            $mapped_subjects = explode(',', $mapped_subjects);
+                            $subjects = DB::table('subjects')->whereIn("id", $mapped_subjects)->where('status','ACTIVE')
+                                ->select("subject_name", "id")->orderby('position', 'asc')->get();
+
+                            if($subjects->isNotEmpty()) {
+                                $subjects_array = $subjects->toArray();
+                            }
+                        } 
+
+                    }
+                    //echo "<pre>"; print_r( $subjects_array );
                     $content = view('admin.homeworks_subjects_list')->with([ 'homeworks' => $homeworks_array, 'subjects' => $subjects_array ])->render();
                 }
 
@@ -10204,6 +12157,7 @@ class AdminController extends Controller
 
     public function postHomeworkGroup(Request $request) {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_id = $request->class_id;
             $section_id = $request->section_id;
@@ -10275,7 +12229,7 @@ class AdminController extends Controller
                     $homework->ref_no = $ref_no;  
                 }
 
-                $homework->school_id = Auth::User()->id;
+                $homework->school_id = $school_id;
                 $homework->class_id = $class_id;
                 $homework->section_id = $section_id;
                 $homework->is_sms_alert = $sms_alert;
@@ -10346,7 +12300,7 @@ class AdminController extends Controller
                     ->where('students.section_id', $section_id)
                     ->where('users.status', 'ACTIVE')
                     ->where('users.user_type', 'STUDENT')
-                    ->where('users.school_college_id', Auth::User()->id)
+                    ->where('users.school_college_id', $school_id)
                     ->select('users.id')
                     ->groupBy('users.id')
                     ->get();
@@ -10385,7 +12339,7 @@ class AdminController extends Controller
                     if($sms_alert == 1) {
 
                         $category = -1;
-                        $batch = DB::table('admin_settings')->where('school_id', Auth::User()->id)->value('acadamic_year');
+                        $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
                         $post_type = 1;
                         $smart_sms = 1;
                         $send_type = 1;
@@ -10502,10 +12456,11 @@ class AdminController extends Controller
     public function viewChapters()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status','ACTIVE')->orderby('position','asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $subjects = Subjects::all(); 
             return view('admin.chapters')->with('classes', $classes)->with('subjects', $subjects);
@@ -10518,6 +12473,7 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             /*$status = $request->get('status','0');
             $class_id = $request->get('class_id','0');
@@ -10575,10 +12531,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $chaptersqry->where('school_id', Auth::User()->id);
-                $filteredqry->where('school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $chaptersqry->where('school_id', $school_id);
+                $filteredqry->where('school_id', $school_id);
+            //}
 
             if(!empty($status)){
                 $chaptersqry->where('status',$status);
@@ -10611,9 +12567,9 @@ class AdminController extends Controller
             $filters = $filteredqry->select('id')->count();
 
             $totalDataqry = Chapters::orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -10645,6 +12601,7 @@ class AdminController extends Controller
     public function postChapters(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_id = $request->class_id;
             $subject_id = $request->subject_id;
@@ -10714,7 +12671,7 @@ class AdminController extends Controller
             if ($id > 0) {
                 $chapter = Chapters::find($id);
                 $chapter->updated_at = date('Y-m-d H:i:s'); 
-                $chapter->school_id = Auth::User()->id;
+                $chapter->school_id = $school_id;
                 $chapter->class_id = $class_id;
                 $chapter->subject_id = $subject_id; 
                 $chapter->term_id = $term_id; 
@@ -10744,7 +12701,7 @@ class AdminController extends Controller
                         $append = str_pad($lastorderid, 3, "0", STR_PAD_LEFT);
 
                         $chapter->ref_code = CommonController::$code_prefix . 'CH' . $append; 
-                        $chapter->school_id = Auth::User()->id;
+                        $chapter->school_id = $school_id;
                         $chapter->class_id = $class_id;
                         $chapter->subject_id = $subject_id; 
                         $chapter->term_id = $term_id; 
@@ -10814,10 +12771,11 @@ class AdminController extends Controller
     public function viewChaptersTopics()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status','ACTIVE')->orderby('position','asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $subjects = Subjects::where('status','ACTIVE')->orderby('position','asc')->get();
             return view('admin.chapterstopics')->with('classes', $classes)->with('subjects', $subjects);
@@ -10829,6 +12787,7 @@ class AdminController extends Controller
     public function getChapterTopics(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             /*$status = $request->get('status','');
 
@@ -10871,10 +12830,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $chaptersqry->where('chapter_topics.school_id', Auth::User()->id);
-                $filteredqry->where('chapter_topics.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $chaptersqry->where('chapter_topics.school_id', $school_id);
+                $filteredqry->where('chapter_topics.school_id', $school_id);
+            //}
 
             if(!empty($status)){
                 $chaptersqry->where('chapter_topics.status',$status);
@@ -10909,9 +12868,9 @@ class AdminController extends Controller
             $filters = $filteredqry->select('chapter_topics.id')->count();
 
             $totalDataqry = ChapterTopics::orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('chapter_topics.school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('chapter_topics.school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -10942,6 +12901,7 @@ class AdminController extends Controller
     public function postChapterTopics(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_id = $request->class_id;
             $subject_id = $request->subject_id;
@@ -11011,7 +12971,7 @@ class AdminController extends Controller
 
                 $chapter->ref_code = CommonController::$code_prefix . 'CHT' . $append;
             }
-            $chapter->school_id = Auth::User()->id;
+            $chapter->school_id = $school_id;
             $chapter->class_id = $class_id;
             $chapter->subject_id = $subject_id;
             $chapter->chapter_id = $chapter_id;
@@ -11056,10 +13016,11 @@ class AdminController extends Controller
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status','ACTIVE')->orderby('position','asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $subjects = Subjects::all();
             return view('admin.topics')->with('classes', $classes)->with('subjects', $subjects);
@@ -11071,6 +13032,7 @@ class AdminController extends Controller
     public function getTopics(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             /*$status = $request->get('status','');
             $topics_qry = Topics::leftjoin('subjects', 'subjects.id', 'topics.subject_id')
@@ -11121,10 +13083,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $chaptersqry->where('topics.school_id', Auth::User()->id);
-                $filteredqry->where('topics.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $chaptersqry->where('topics.school_id', $school_id);
+                $filteredqry->where('topics.school_id', $school_id);
+            //}
 
             if(!empty($status)){
                 $chaptersqry->where('topics.status',$status);
@@ -11159,9 +13121,9 @@ class AdminController extends Controller
             $filters = $filteredqry->select('id')->count();
 
             $totalDataqry = Topics::orderby('topics.id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('topics.school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('topics.school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -11196,6 +13158,7 @@ class AdminController extends Controller
     public function postTopics(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_id = $request->class_id;
             $subject_id = $request->subject_id;
@@ -11296,7 +13259,7 @@ class AdminController extends Controller
 
             $topics->is_free = "Yes";
 
-            $topics->school_id = Auth::User()->id;
+            $topics->school_id = $school_id;
             $topics->class_id = $class_id;
             $topics->subject_id = $subject_id;
             $topics->term_id = $term_id;
@@ -11369,15 +13332,16 @@ class AdminController extends Controller
      public function viewStudentLeave()
      {
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             // $student = Student::leftjoin('users','users.id','students.user_id')->get('students.user_id','users.name as name');
             $student = User::leftjoin('students', 'students.user_id', 'users.id')
             ->where('users.user_type', 'STUDENT')
             ->where('users.status','ACTIVE')
             ->select('users.*')->get();
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
              $teacher = Teacher::where('user_id', Auth::user()->id)->select('*')->first();
              return view('admin.studentleave')->with('teacher',$teacher)->with('student',$student)->with('class',$classes);
@@ -11391,6 +13355,7 @@ class AdminController extends Controller
      {
 
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $student_id = $request->get('student_id','');
             $class_id = $request->get('class_id', '');
             $section_id = $request->get('section_id','');
@@ -11428,10 +13393,10 @@ class AdminController extends Controller
                  }
              }
 
-             if(Auth::User()->user_type == 'SCHOOL') {
-                $users_qry->where('users.school_college_id', Auth::User()->id);
-                $filtered_qry->where('users.school_college_id', Auth::User()->id);
-            }
+            // if(Auth::User()->user_type == 'SCHOOL') {
+                $users_qry->where('users.school_college_id', $school_id);
+                $filtered_qry->where('users.school_college_id', $school_id);
+            //}
 
              
              if(!empty(trim($mindate))) {
@@ -11469,9 +13434,9 @@ class AdminController extends Controller
  
              $users = $users_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
              $totalData = Leaves::leftjoin('classes','classes.id','leaves.class_id')->leftjoin('sections','sections.id','leaves.section_id')->leftjoin('users','users.id','leaves.student_id')->select('leaves.*','classes.class_name','sections.section_name','users.name');
-             if(Auth::User()->user_type == 'SCHOOL') {
-                $totalData->where('users.school_college_id', Auth::User()->id); 
-             }
+            // if(Auth::User()->user_type == 'SCHOOL') {
+                $totalData->where('users.school_college_id', $school_id); 
+            // }
 
              $totalData = $totalData->get();
            
@@ -11749,8 +13714,9 @@ class AdminController extends Controller
      public function viewTeacherLeave()
      {
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $teacher = User::leftjoin('teachers', 'teachers.user_id', 'users.id')
-            ->where('users.user_type', 'TEACHER')->where('users.school_college_id', Auth::User()->id)
+            ->where('users.user_type', 'TEACHER')->where('users.school_college_id', $school_id)
             ->where('users.status', 'ACTIVE')
             ->select('users.*')->get();
              return view('admin.teacherleave')->with('teacher',$teacher);
@@ -11764,6 +13730,7 @@ class AdminController extends Controller
      {
 
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -11794,10 +13761,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $users_qry->where('users.school_college_id', Auth::User()->id);
-                $filtered_qry->where('users.school_college_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $users_qry->where('users.school_college_id', $school_id);
+                $filtered_qry->where('users.school_college_id', $school_id);
+            //}
 
              if($teacher_id != '' || $teacher_id != 0){
                 $users_qry->where('user_id',$teacher_id);
@@ -11829,7 +13796,7 @@ class AdminController extends Controller
 
             $users = $users_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
             $totalData =Teacherleave::leftjoin('users','users.id','teacher_leave.user_id')
-                ->where('users.school_college_id', Auth::User()->id)->select('teacher_leave.*','users.name')->get();
+                ->where('users.school_college_id', $school_id)->select('teacher_leave.*','users.name')->get();
           
             if (!empty($totalData)) {
                 $totalData = count($totalData);
@@ -11991,16 +13958,17 @@ class AdminController extends Controller
 
     public function viewOAStudentAttendanceApproval(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $class_id = $section_id = '';
             $lastdate = date('t', strtotime(date('Y-m')));
             $classes = Classes::where('status', 'ACTIVE')->orderby('position', 'Asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->get();
             $students  = $acadamic_year = '';
             $cdate = date('Y-m-d');     $monthyear = date('Y-m'); 
-            $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->orderby('id', 'asc')->first();
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
             if(!empty($settings)) {
                 $acadamic_year = trim($settings->acadamic_year);
             }
@@ -12010,33 +13978,33 @@ class AdminController extends Controller
                 ->leftjoin('users', 'users.id', 'student_class_mappings.user_id')
                 ->where('student_class_mappings.academic_year', $acadamic_year) 
                 ->where('users.delete_status',0)->where('users.status', 'ACTIVE')
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->select('users.id')->count(); 
 
             $oa_boys = DB::table('student_class_mappings')
             ->leftjoin('users', 'users.id', 'student_class_mappings.user_id')
             ->where('student_class_mappings.academic_year', $acadamic_year) 
             ->where('users.status', 'ACTIVE')->where('users.gender', 'MALE')->where('users.delete_status',0)
-            ->where('users.school_college_id', Auth::User()->id)
+            ->where('users.school_college_id', $school_id)
             ->select('users.id')->count();  
 
             $oa_girls = DB::table('student_class_mappings')
             ->leftjoin('users', 'users.id', 'student_class_mappings.user_id')
             ->where('student_class_mappings.academic_year', $acadamic_year) 
             ->where('users.status', 'ACTIVE')->where('users.gender', 'FEMALE')->where('users.delete_status',0)
-            ->where('users.school_college_id', Auth::User()->id)
+            ->where('users.school_college_id', $school_id)
             ->select('users.id')->count(); 
  
             $cday = 'day_'.date('j');   $cday_an = 'day_'.date('j').'_an';
 
             $att_bp_fn = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday, 1)->where('user_type', 'STUDENT')
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->where('users.delete_status',0)->where('gender', 'MALE') 
                 ->select('users.id')->count();
             $att_bp_an = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday_an, 1)->where('user_type', 'STUDENT')
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->where('users.delete_status',0)->where('gender', 'MALE') 
                 ->select('users.id')->count();
 
@@ -12045,12 +14013,12 @@ class AdminController extends Controller
 
             $att_gp_fn = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday, 1)->where('user_type', 'STUDENT')
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->where('users.delete_status',0)->where('gender', 'FEMALE') 
                 ->select('users.id')->count();
             $att_gp_an = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday_an, 1)->where('user_type', 'STUDENT')
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->where('users.delete_status',0)->where('gender', 'FEMALE') 
                 ->select('users.id')->count();
 
@@ -12063,9 +14031,9 @@ class AdminController extends Controller
             $att_oaa_an = $att_ba_an + $att_ga_an;
 
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
 
             return view('admin.students_attendance_oa_approval')->with(['monthyear'=>$monthyear, 'cdate'=>$cdate,
@@ -12085,6 +14053,7 @@ class AdminController extends Controller
 
     public function loadOAStudentAttendanceApproval(Request $request) {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = -1; // $input['length'];
@@ -12103,12 +14072,12 @@ class AdminController extends Controller
             OASections::$cdate = $cdate;
             $sectionsqry = OASections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
-                ->where('classes.school_id', Auth::User()->id)
+                ->where('classes.school_id', $school_id)
                 ->where('sections.status','=','ACTIVE')
                 ->select('sections.class_id', 'sections.id', 'classes.class_name', 'sections.section_name');
             $filteredqry = OASections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
-                ->where('classes.school_id', Auth::User()->id)
+                ->where('classes.school_id', $school_id)
                 ->where('sections.status','=','ACTIVE')
                 ->select('sections.class_id', 'sections.id', 'classes.class_name', 'sections.section_name');
 
@@ -12153,11 +14122,11 @@ class AdminController extends Controller
                 $totalFiltered = $filters;
             }
 
-            $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->orderby('id', 'asc')->first();
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
             if(!empty($settings)) {
                 $acadamic_year = trim($settings->acadamic_year);
             }
-            $overall = OASections::getOverallAttribute($acadamic_year, Auth::User()->id);
+            $overall = OASections::getOverallAttribute($acadamic_year, $school_id);
             $data = [];
             if (!empty($sections)) {
                 foreach ($sections as $post) {
@@ -12239,16 +14208,17 @@ class AdminController extends Controller
 
     public function viewOAStudentAttendance(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $class_id = $section_id = '';
             $lastdate = date('t', strtotime(date('Y-m')));
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             $students  = $acadamic_year = '';
             $cdate = date('Y-m-d');     $monthyear = date('Y-m'); 
-            $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->orderby('id', 'asc')->first();
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
             if(!empty($settings)) {
                 $acadamic_year = trim($settings->acadamic_year);
             }
@@ -12258,21 +14228,21 @@ class AdminController extends Controller
                 ->leftjoin('users', 'users.id', 'student_class_mappings.user_id')
                 ->where('student_class_mappings.academic_year', $acadamic_year) 
                 ->where('users.delete_status',0)->where('users.status', 'ACTIVE')
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->select('users.id')->count();
 
             $oa_boys = DB::table('student_class_mappings')
             ->leftjoin('users', 'users.id', 'student_class_mappings.user_id')
             ->where('student_class_mappings.academic_year', $acadamic_year) 
             ->where('users.status', 'ACTIVE')->where('users.gender', 'MALE')->where('users.delete_status',0)
-            ->where('users.school_college_id', Auth::User()->id)
+            ->where('users.school_college_id', $school_id)
             ->select('users.id')->count();  
 
             $oa_girls = DB::table('student_class_mappings')
             ->leftjoin('users', 'users.id', 'student_class_mappings.user_id')
             ->where('student_class_mappings.academic_year', $acadamic_year) 
             ->where('users.status', 'ACTIVE')->where('users.gender', 'FEMALE')->where('users.delete_status',0)
-            ->where('users.school_college_id', Auth::User()->id)
+            ->where('users.school_college_id', $school_id)
             ->select('users.id')->count(); 
  
             $cday = 'day_'.date('j');   $cday_an = 'day_'.date('j').'_an';
@@ -12280,12 +14250,12 @@ class AdminController extends Controller
             $att_bp_fn = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday, 1)->where('user_type', 'STUDENT')
                 ->where('users.delete_status',0)->where('gender', 'MALE') 
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->select('users.id')->count();
             $att_bp_an = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday_an, 1)->where('user_type', 'STUDENT')
                 ->where('users.delete_status',0)->where('gender', 'MALE') 
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->select('users.id')->count();
 
             $att_ba_fn = $oa_boys - $att_bp_fn;
@@ -12294,12 +14264,12 @@ class AdminController extends Controller
             $att_gp_fn = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday, 1)->where('user_type', 'STUDENT')
                 ->where('users.delete_status',0)->where('gender', 'FEMALE') 
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->select('users.id')->count();
             $att_gp_an = DB::table('studentsdaily_attendance')->leftjoin('users', 'users.id', 'studentsdaily_attendance.user_id')
                 ->where('monthyear', $monthyear)->where($cday_an, 1)->where('user_type', 'STUDENT')
                 ->where('users.delete_status',0)->where('gender', 'FEMALE') 
-                ->where('users.school_college_id', Auth::User()->id)
+                ->where('users.school_college_id', $school_id)
                 ->select('users.id')->count();
 
             $att_ga_fn = $oa_girls - $att_gp_fn;
@@ -12311,9 +14281,9 @@ class AdminController extends Controller
             $att_oaa_an = $att_ba_an + $att_ga_an;
 
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}/
             $classes = $classes->orderby('position', 'Asc')->get();
 
             return view('admin.students_attendance_oa')->with(['monthyear'=>$monthyear, 'cdate'=>$cdate,
@@ -12333,6 +14303,7 @@ class AdminController extends Controller
 
     public function loadOAStudentAttendance(Request $request) {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = -1; // $input['length'];
@@ -12367,10 +14338,10 @@ class AdminController extends Controller
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('classes.school_id', Auth::User()->id);
-                $filteredqry->where('classes.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('classes.school_id', $school_id);
+                $filteredqry->where('classes.school_id', $school_id);
+            //}
 
             if($class_id>0){
                 $sectionsqry->where('class_id',$class_id);
@@ -12404,12 +14375,12 @@ class AdminController extends Controller
                 $totalFiltered = $filters;
             }
 
-            $settings = DB::table('admin_settings')->where('school_id', Auth::User()->id)->orderby('id', 'asc')->first();
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
             if(!empty($settings)) {
                 $acadamic_year = trim($settings->acadamic_year);
             }
 
-            $overall = OASections::getOverallAttribute($acadamic_year, Auth::User()->id);
+            $overall = OASections::getOverallAttribute($acadamic_year, $school_id);
             $data = [];
             if (!empty($sections)) {
                 foreach ($sections as $post) {
@@ -12734,6 +14705,7 @@ foreach($students as $k=>$v){
 
     public function viewStudentDailyAttendance(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $monthyear = $class_id = $section_id = '';
             $students  = '';
@@ -12753,13 +14725,13 @@ foreach($students as $k=>$v){
             }
             list($year, $month) = explode('-', $monthyear);
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             $sundays = CommonController::getSundays($year, $month); 
             $saturdays = CommonController::getSaturdays($year, $month); 
-            $holidays = DB::table('holidays')->where('school_college_id', Auth::User()->id)->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
+            $holidays = DB::table('holidays')->where('school_college_id', $school_id)->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
                 ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')
                 ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
             
@@ -12772,12 +14744,18 @@ foreach($students as $k=>$v){
         }
     }
 
-    public function updateAttendanceLeave($leave_date, $userid, $leave_type, $status) {  
+    public function updateAttendanceLeave($leave_date, $userid, $leave_type, $status, $auth_user_id=0) {  
         list($year, $month, $date) = explode('-', $leave_date);
         $sundays = CommonController::getSundays($year, $month); 
         $saturdays = CommonController::getSaturdays($year, $month); 
+
+        if (Auth::check()) {
+            //$auth_user_id = Auth::User()->id;
+            $auth_user_id = (new AdminRoleController())->getSchoolId();
+        } 
+
         $holidays = DB::table('holidays')->whereRAW('holiday_date = "'.$leave_date.'" ')
-            ->where('school_college_id', Auth::User()->id)->get();
+            ->where('school_college_id', $auth_user_id)->get();
         $day = $date * 1;
         $new_leave_date = $year.'-'.$month.'-'.$day;
         $leave_end_date = $new_leave_date;
@@ -12866,6 +14844,7 @@ foreach($students as $k=>$v){
 
     public function postDailyAttendance(Request $request)
     {
+        $school_id = (new AdminRoleController())->getSchoolId();
         $monthyear = date('Y-m');
         $class_id = $request->tclass_id;
         $new_date = $request->new_date;
@@ -12933,7 +14912,7 @@ foreach($students as $k=>$v){
                             'created_by'=>Auth::User()->id
                         ]);
                     } 
-                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF MORNING','CANCELLED'); 
+                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF MORNING','CANCELLED', $school_id); 
 
 
                 }   else{
@@ -12971,7 +14950,7 @@ foreach($students as $k=>$v){
                         ]);
                     }
 
-                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF MORNING','APPROVED'); 
+                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF MORNING','APPROVED', $school_id); 
                 }
             
             }     else{
@@ -13009,7 +14988,7 @@ foreach($students as $k=>$v){
                     ]);
                 }
 
-                $this->updateAttendanceLeave($new_date, $value->id, 'HALF MORNING','APPROVED'); 
+                $this->updateAttendanceLeave($new_date, $value->id, 'HALF MORNING','APPROVED', $school_id); 
             }       
 
             if(isset($an_section)){
@@ -13050,7 +15029,7 @@ foreach($students as $k=>$v){
                         ]);
                     }
 
-                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF AFTERNOON','CANCELLED'); 
+                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF AFTERNOON','CANCELLED', $school_id); 
                 }
                 else{
                     $ex = DB::table('studentsdaily_attendance')->where('user_id', $value->id)->where('monthyear', $monthyear)->where('class_id', $class_id)->where('section_id', $section_id)->first();
@@ -13085,7 +15064,7 @@ foreach($students as $k=>$v){
                             'created_by'=>Auth::User()->id
                         ]);
                     }
-                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF AFTERNOON','APPROVED');
+                    $this->updateAttendanceLeave($new_date, $value->id, 'HALF AFTERNOON','APPROVED', $school_id);
                 }
             }  else{
                 $ex = DB::table('studentsdaily_attendance')->where('user_id', $value->id)->where('monthyear', $monthyear)->where('class_id', $class_id)->where('section_id', $section_id)->first();
@@ -13120,7 +15099,7 @@ foreach($students as $k=>$v){
                         'created_by'=>Auth::User()->id
                     ]);
                 }
-                $this->updateAttendanceLeave($new_date, $value->id, 'HALF AFTERNOON','APPROVED');
+                $this->updateAttendanceLeave($new_date, $value->id, 'HALF AFTERNOON','APPROVED', $school_id);
             } 
 
             $ex = DB::table('attendance_approval')->where('class_id',$class_id)->where('section_id',$section_id)
@@ -13230,7 +15209,7 @@ foreach($students as $k=>$v){
 
     public function loadStudentDailyAttendance(Request $request)   {
         if(Auth::check()){   
-            $school_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $request->get('monthyear', '');
             $lastdate = date('t', strtotime($monthyear));
             $class_id = $request->get('class_id', 0);
@@ -13438,11 +15417,218 @@ foreach($students as $k=>$v){
     }
 
 
+    public function viewMarkAttendance(Request $request)   {
+        if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $monthyear = $class_id = $section_id = '';
+            $students  = '';
+
+            $date = $request->get('date', '');
+            $class_id = $request->get('class_id', 0);
+            $section_id = $request->get('section_id', 0);
+
+            if(empty(trim($date))) {
+                $lastdate = date('t', strtotime(date('Y-m')));
+                $new_date = date('Y-m-d');
+                $monthyear = date('Y-m');
+            } else {
+                $lastdate = date('t', strtotime(date('Y-m', strtotime($date))));  
+                $new_date = date('Y-m-d', strtotime($date));
+                $monthyear = date('Y-m', strtotime($date));
+            }
+            list($year, $month) = explode('-', $monthyear);
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            } else {
+                if(Auth::User()->user_type == 'TEACHER') {
+                    $classes->whereIn('id', [0]);
+                }
+            }
+            $classes = $classes->orderby('position', 'Asc')->get();   
+
+            $appstatus = '';
+            return view('admin.mark_attendance')->with(['classes'=>$classes, 'monthyear'=>$monthyear, 'class_id'=>$class_id,'section_id'=>$section_id, 'new_date' => $new_date])->with('appstatus', $appstatus);
+        }else{
+            return redirect('/login');
+        }
+    }
+
+    public function getScholarMarkedAttendance(Request $request)
+    {
+
+        if (Auth::check()) {
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $session_id = $request->get('session_id', '');
+            $section_id = $request->get('section_id', '');
+            $class_id = $request->get('class_id', ''); 
+            $date = date('Y-m-d');
+            $users_qry = DB::table('attendance_approval')
+                    ->leftjoin('classes', 'classes.id', 'attendance_approval.class_id')
+                    ->leftjoin('sections', 'sections.id', 'attendance_approval.section_id') 
+                    ->where('attendance_approval.date', $date)->where('attendance_approval.admin_status', 0)
+                    ->whereRAW(' (attendance_approval.fn_status = 2 or attendance_approval.an_status = 2) ')
+                    ->select('classes.class_name', 'sections.section_name', 'attendance_approval.*')
+                    ->groupby('attendance_approval.section_id');  
+
+            $filtered_qry = DB::table('attendance_approval')
+                    ->leftjoin('classes', 'classes.id', 'attendance_approval.class_id')
+                    ->leftjoin('sections', 'sections.id', 'attendance_approval.section_id') 
+                    ->where('attendance_approval.date', $date)->where('attendance_approval.admin_status', 0)
+                    ->whereRAW(' (attendance_approval.fn_status = 2 or attendance_approval.an_status = 2) ')
+                    ->select('classes.class_name', 'sections.section_name', 'attendance_approval.*')
+                    ->groupby('attendance_approval.section_id');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'attendance_approval.status') {
+                            $users_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $users_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $users_qry->where('classes.school_id', $school_id);
+            $filtered_qry->where('classes.school_id', $school_id); 
+  
+            if($section_id>0){
+                $users_qry->where('attendance_approval.section_id',$section);
+                $filtered_qry->where('attendance_approval.section_id',$section);
+            }
+            if($class_id>0){
+                $users_qry->where('attendance_approval.class_id',$class_id);
+                $filtered_qry->where('attendance_approval.class_id',$class_id);
+            }
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'attendance_approval.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $users = $users_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+            $totalData = DB::table('attendance_approval')
+                    ->leftjoin('classes', 'classes.id', 'attendance_approval.class_id')
+                    ->leftjoin('sections', 'sections.id', 'attendance_approval.section_id')
+                    ->whereRAW(' (attendance_approval.fn_status = 2 or attendance_approval.an_status = 2) ')
+                    ->where('attendance_approval.date', $date)->where('attendance_approval.admin_status', 0)
+                    ->groupby('attendance_approval.section_id'); 
+            
+            $totalData->where('attendance_approval.id', $school_id);  
+            
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
 
 
+            $data = [];
+            if (!empty($users)) {
+                $users = $users->toArray(); 
+
+                foreach ($users as $post) {
+                    $strength = DB::table('students')->leftjoin('users', 'users.id', 'students.user_id')
+                        ->where('students.class_id', $post->class_id)
+                        ->where('students.section_id', $post->section_id)
+                        ->where('users.status', 'ACTIVE')->where('users.delete_status', 0) 
+                        ->select('students.id')
+                        ->get()->count();
+                    $post->strength = $strength;
+
+                    $present = DB::table('attendance_approval')
+                        ->leftjoin('users', 'users.id', 'attendance_approval.user_id')
+                        ->leftjoin('students', 'students.user_id', 'users.id')
+                        ->where('students.class_id', $post->class_id)
+                        ->where('students.section_id', $post->section_id)
+                        ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                        ->whereRAW(' (attendance_approval.fn_status = 1 or attendance_approval.an_status = 1) ')
+                        ->where('attendance_approval.date', $date)
+                        ->select('students.id')
+                        ->get()->count();
+                    $post->present = $present;
+
+                    $absent = DB::table('attendance_approval')
+                        ->leftjoin('users', 'users.id', 'attendance_approval.user_id')
+                        ->leftjoin('students', 'students.user_id', 'users.id')
+                        ->where('students.class_id', $post->class_id)
+                        ->where('students.section_id', $post->section_id)
+                        ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                        ->whereRAW(' (attendance_approval.fn_status = 2 or attendance_approval.an_status = 2) ')
+                        ->where('attendance_approval.date', $date)
+                        ->select('students.id')
+                        ->get()->count();
+                    $post->absent = $absent;
+
+                    $present_percentage = 0;
+                    if($strength > 0) {
+                        $present_percentage = (100 * $present) / $strength;
+                    }
+                    $post->present_percentage = $present_percentage;
+
+                    //echo "<pre>"; print_r($post); exit;
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+
+    } 
+    
+    public function addScholarMarkedAbsent(Request $request)   {
+        if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $attids = $request->get('attids', '');
+            $studentId = $request->get('studentId', 0); 
+
+            if(empty($attids)) {
+                $attids = $studentId;
+            } else {
+            }
+            return response()->json(['status' => 'SUCCESS', 'data' => 'sdfsdf', 'message' => 'Absent Scholars']);
+        }else{
+            return response()->json(['status' => 'FAILED', 'data' => '', 'message' => 'No Scholars']);
+        }
+    }
 
     public function viewStudentDailyAttendancePage(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             $monthyear = $class_id = $section_id = '';
             $students  = '';
@@ -13462,13 +15648,13 @@ foreach($students as $k=>$v){
             }
             list($year, $month) = explode('-', $monthyear);
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             $sundays = CommonController::getSundays($year, $month); 
             $saturdays = CommonController::getSaturdays($year, $month); 
-            $holidays = DB::table('holidays')->where('school_college_id', Auth::User()->id)->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
+            $holidays = DB::table('holidays')->where('school_college_id', $school_id)->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
                 ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')
                 ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
             
@@ -13481,9 +15667,133 @@ foreach($students as $k=>$v){
         }
     }
 
+    public function loadScholarDailyAttendancePage(Request $request)   {
+        if(Auth::check()){   
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $monthyear = $request->get('monthyear', '');
+            $lastdate = date('t', strtotime($monthyear));
+            $class_id = $request->get('class_id', 0);
+            $section_id = $request->get('section_id', 0);
+            $new_date = $request->get('date',''); 
+             $orderdate = explode('-', $new_date);
+             $year = $orderdate[0];
+             $month   = $orderdate[1];
+             $day  = $orderdate[2];
+              $day = $day * 1;          
+            if($class_id > 0) {} else { $class_id = 0; }
+            if($section_id > 0) {} else { $section_id = 0; }
+
+            if($class_id == 0) {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'Please select the Class']);
+            }
+            if($section_id == 0) {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'Please select the Section']);
+            }
+
+            User::$monthyear = $monthyear;
+            User::$class_id = $class_id;
+            User::$section_id = $section_id;
+            
+            $academic_year = date('Y');
+            $final_year = date('Y') + 1;
+            $cur_month = date('m');
+            $from_month =  $academic_year.'-06';
+            $to_month = $final_year.'-04';
+            $check_month =  $academic_year.'-'.$cur_month;
+            $userids = []; $students = '';
+
+            $orderdate = explode('-', $monthyear);
+            $year = $orderdate[0];
+            $month   = $orderdate[1];
+            $fin_month = $year.'-'.$month;
+            
+            $users = User::leftjoin('students', 'students.user_id', 'users.id')
+            //->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+            ->where('user_type', 'STUDENT')->where('students.delete_status', 0)
+            ->where('users.status','ACTIVE')
+            // ->whereRaw("'".$check_month."' BETWEEN from_month and to_month")
+            ->where('students.class_id', $class_id)
+            ->where('students.section_id', $section_id)
+            ->select('students.*','users.id', 'name', 'email', 'mobile','profile_image', 'students.class_id', 'students.section_id', 'students.admission_no')
+            ->orderby('name')
+            ->get();
+
+
+            // $users = DB::select("select student_class_mappings.*, `users`.`id`, `name`, `email`, `mobile`, `students`.`class_id`, `students`.`section_id`, `students`.`admission_no` from `student_class_mappings` left join `users` on `student_class_mappings`.`user_id` = `users`.`id` left join `students` on `students`.`user_id` = `users`.`id` where `users `.`user_type` = 'STUDENT' and `student_class_mappings`.`class_id` = '".$class_id."' and `student_class_mappings`.`section_id` = '".$section_id."'");
+
+            $appstatus = 0;
+            $app = DB::table('attendance_approval')->where('class_id', $class_id)
+                    ->where('section_id', $section_id)->where('date', $new_date)->where('admin_status', 1)->get();
+            if($app->isNotEmpty()) {
+                $appstatus = 1;
+            }
+            if(!empty($users)) {
+                foreach($users as $user) {
+                    $userids[] = $user->user_id;
+                }
+                $userids = array_unique($userids);
+                list($year, $month) = explode('-', $monthyear);
+
+                $students = User::with('dailyattendance')
+                ->leftjoin('students', 'students.user_id', 'users.id')
+                //->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                ->where('user_type', 'STUDENT')->where('students.delete_status', 0)
+                ->where('users.status','ACTIVE')
+                ->whereIn('users.id', $userids)
+                //->whereRaw("'".$fin_month."' BETWEEN from_month and to_month")
+                /* ->where('student_class_mappings.class_id', $class_id)
+                ->where('student_class_mappings.section_id', $section_id)*/
+                 ->where('students.class_id', $class_id)
+                ->where('students.section_id', $section_id)
+                ->select('users.id', 'name', 'email', 'mobile','profile_image', 'students.class_id', 'students.section_id', 'students.admission_no', 'students.father_name')
+                ->orderby('users.name', 'asc')
+                ->get(); 
+
+                $date = 'day_'.$day;
+                $fn_chk = StudentsDailyAttendance::whereIn('user_id', $userids)->where($date,1)->where('monthyear', $monthyear)->select('id')->get()->count();
+                $date2 = 'day_'.$day.'_an';
+                $an_chk = StudentsDailyAttendance::whereIn('user_id', $userids)->where($date2,1)->where('monthyear', $monthyear)->select('id')->get()->count();
+
+                   list($year, $month) = explode('-', $monthyear);
+                   $sundays = CommonController::getSundays($year, $month); 
+                   $saturdays = CommonController::getSaturdays($year, $month); 
+                   $holidays = DB::table('holidays')->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
+                        ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')->where('school_college_id', $school_id)
+                        ->where('status', 1)
+                        ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
+                        if($holidays->isNotEmpty()){
+                            $holidays = $holidays->toArray();
+                        } 
+                
+
+                if($students->isNotEmpty()) {
+                    $students = $students->toArray();
+                    //echo "<pre>";print_r($students);exit;
+                    $html = view('admin.load_scholars_daily_attendance')->with(['monthyear'=>$monthyear, 'class_id'=>$class_id,
+                    'section_id'=>$section_id, 'students'=>$students, 'lastdate'=>$lastdate])->with('fn_chk',$fn_chk)->with('an_chk',$an_chk)->with('new_date',$new_date)->with('sundays',$sundays)->with('saturdays',$saturdays)->with('holidays',$holidays) 
+                        ->with('appstatus',$appstatus)
+                        ->render();
+
+                    return response()->json(['status' => 'SUCCESS', 'data' => $html, 'message' => 'Students attendance Detail']);
+
+                }   else {
+                    return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Students attendance Detail']);
+                }
+            }   else {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Students attendance Detail']);
+            }
+
+
+            return view('admin.studentsdailyattendance')->with(['monthyear'=>$monthyear, 'class_id'=>$class_id,
+                'section_id'=>$section_id, 'classes'=>$classes, 'lastdate'=>$lastdate]);
+        }else{
+            return redirect('/login');
+        }
+    }
+
     public function loadStudentDailyAttendancePage(Request $request)   {
         if(Auth::check()){   
-            $school_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $request->get('monthyear', '');
             $lastdate = date('t', strtotime($monthyear));
             $class_id = $request->get('class_id', 0);
@@ -13707,6 +16017,13 @@ foreach($students as $k=>$v){
         $student_id = $request->student_id; 
         $att_chk = $request->get('att_chk', 0); 
         $attendance_type = $request->get('attendance_type', []); 
+        $user_id = $request->get('user_id', 0); 
+
+        if (Auth::check()) {
+            $auth_user_id = Auth::User()->id;
+        } else {
+            $auth_user_id =  $user_id;
+        }
 
         if($att_chk > 0) {} else {
             return response()->json(['status' => 'FAILED', 'message' => 'Please select the mode of Attendance']);
@@ -13774,14 +16091,14 @@ foreach($students as $k=>$v){
 
                 if(!empty($ex)) {
                     $data['updated_at'] = date('Y-m-d H:i:s');
-                    $data['updated_by'] = Auth::User()->id;
+                    $data['updated_by'] = $auth_user_id;
 
                     DB::table('studentsdaily_attendance')->where('user_id', $value->id)
                             ->where('monthyear', $monthyear)->where('class_id', $class_id)->where('section_id', $section_id)
                             ->update($data); 
                 } else {  
                     $data['created_at'] = date('Y-m-d H:i:s');
-                    $data['created_by'] = Auth::User()->id;
+                    $data['created_by'] = $auth_user_id;
 
                     $data['user_id'] = $value->id;
                     $data['class_id'] = $class_id;
@@ -13821,19 +16138,19 @@ foreach($students as $k=>$v){
                     $data[$date1] = $mode;
                 }
 
-                $data['admin_status'] = 1;
+                $data['admin_status'] = 0; // 1;
 
                 if(!empty($ex)) {
 
                     $data['updated_at'] = date('Y-m-d H:i:s');
-                    $data['updated_by'] = Auth::User()->id;
+                    $data['updated_by'] = $auth_user_id;
 
                     DB::table('attendance_approval')->where('class_id',$class_id)->where('section_id',$section_id)->where('user_id',$value->id)->where('date',$new_date)
                         ->update($data);
                 }   else {
 
                     $data['created_at'] = date('Y-m-d H:i:s');
-                    $data['created_by'] = Auth::User()->id;
+                    $data['created_by'] = $auth_user_id;
 
                     $data['user_id'] = $value->id;
                     $data['class_id'] = $class_id;
@@ -13858,15 +16175,15 @@ foreach($students as $k=>$v){
                 }
 
                 if($mode == 1) {
-                    $this->updateAttendanceLeave($new_date, $value->id, $leave_type,'APPROVED'); 
+                    $this->updateAttendanceLeave($new_date, $value->id, $leave_type,'APPROVED', $auth_user_id); 
                 }   else {
-                    $this->updateAttendanceLeave($new_date, $value->id, $leave_type,'CANCELLED');
+                    $this->updateAttendanceLeave($new_date, $value->id, $leave_type,'CANCELLED', $auth_user_id);
                 }
                 
 
             } 
 
-            $ex = DB::table('attendance_approval')->where('class_id',$class_id)->where('section_id',$section_id)
+            /*$ex = DB::table('attendance_approval')->where('class_id',$class_id)->where('section_id',$section_id)
                 ->where('user_id',$value->id)->where('date',$new_date)->first();
             if(!empty($ex)) {
                 $fn_status_after = $ex->fn_status;
@@ -13908,7 +16225,7 @@ foreach($students as $k=>$v){
                 }
             }   else {
                 $fn_status = $an_status = $exid = 0; 
-            }      
+            }*/      
                         
         }
 
@@ -14199,6 +16516,7 @@ foreach($students as $k=>$v){
      */
     public function viewTeacherDailyAttendance(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $request->get('monthyear', '');
             if(empty($monthyear)) {
                 $monthyear = date('Y-m');
@@ -14209,14 +16527,16 @@ foreach($students as $k=>$v){
             $teachers = User::with('teacherdailyattendance')
                 ->leftjoin('teachers', 'teachers.user_id', 'users.id')
                 ->where('teachers.user_id', '>', 0)
-                ->where('users.status', 'ACTIVE')->where('users.school_college_id', Auth::User()->id)
-                ->select('users.id', 'name', 'email', 'mobile', 'emp_no','users.profile_image')->get();
+                ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                ->where('users.status', 'ACTIVE')->where('users.school_college_id', $school_id)
+                ->select('users.id', 'name', 'email', 'mobile', 'emp_no','users.profile_image')
+                ->orderby('users.name', 'ASC')->get();
                 $userids = array();
                 foreach($teachers as $k=>$v){
 
                     list($year, $month) = explode('-', $monthyear);
                  $holidays = DB::table('holidays')->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
-                    ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')->where('holidays.school_college_id', Auth::User()->id)
+                    ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')->where('holidays.school_college_id', $school_id)
                     ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
                     $teachers[$k]->holidays_list = $holidays;
                     array_push($userids,$v->id);
@@ -14257,6 +16577,7 @@ foreach($students as $k=>$v){
 
     public function loadTeacherDailyAttendance(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $request->get('monthyear', '');
             $new_date = $request->get('date','');
             if(empty($monthyear)) {
@@ -14265,10 +16586,12 @@ foreach($students as $k=>$v){
             $lastdate = date('t', strtotime($monthyear));
             User::$monthyear = $monthyear;
 
-            $teachers = User::with('teacherdailyattendance')
+            $teachers = User::with('teacherdailyattendance')->where('users.school_college_id', $school_id)
                 ->leftjoin('teachers', 'teachers.user_id', 'users.id')
-                ->where('user_type', 'TEACHER')
+                //->where('user_type', 'TEACHER')
+                ->whereNotIn('user_type',  ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
                 ->select('users.id', 'name', 'email', 'mobile', 'teachers.emp_no','users.profile_image')
+                ->orderby('users.name', 'ASC')
                 ->get();
                 $userids = array();
                 foreach($teachers as $k=>$v){
@@ -14278,7 +16601,7 @@ foreach($students as $k=>$v){
                 list($year, $month) = explode('-', $monthyear);
 
                 $sundays = CommonController::getSundays($year, $month); 
-                $saturdays = CommonController::getSaturdays($year, $month); 
+                $saturdays = '';//CommonController::getSaturdays($year, $month); 
                 // echo"<pre>".print_r($sundays);
                 // echo "<pre>".print_r($saturdays);
                 // exit;
@@ -14638,6 +16961,9 @@ foreach($students as $k=>$v){
             }   else {
                 $data['created_at'] = date('Y-m-d H:i:s');
                 $data['created_by'] = Auth::User()->id; 
+
+                $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+                $data['batch'] = $batch; 
                 $exam_id = Examinations::insertGetId($data); 
             }  
  
@@ -15007,7 +17333,7 @@ foreach($students as $k=>$v){
                         ->update(['monthyear'=>$monthyear, 'class_ids'=>$class_id, 'section_ids'=>$section_id, 
                         'exam_startdate'=>$from_date, 'exam_enddate' =>$last_date, 'result_in'=>$resultin, 
                         'rank_settings'=>$rank_settings, 'grade_settings'=>$grade_settings, 'rank_type'=>$rank_type, 
-                        'rankincludefailures'=>$rankincludefailures, 'schedule_status' => $schedule_status, 
+                        'rankincludefailures'=>$rankincludefailures, 'include_practicals' => $include_practicals, 'schedule_status' => $schedule_status, 
                         'publish_status'=>$publish_status]);
             }   else {
 
@@ -15020,14 +17346,16 @@ foreach($students as $k=>$v){
                         ->update(['monthyear'=>$monthyear, 'class_ids'=>$class_id, 'section_ids'=>$section_id, 
                         'exam_startdate'=>$from_date, 'exam_enddate' =>$last_date, 'result_in'=>$resultin, 
                         'rank_settings'=>$rank_settings, 'grade_settings'=>$grade_settings, 'rank_type'=>$rank_type, 
-                        'rankincludefailures'=>$rankincludefailures, 'schedule_status' => $schedule_status, 
+                        'rankincludefailures'=>$rankincludefailures, 'include_practicals' => $include_practicals, 
+                        'schedule_status' => $schedule_status, 
                         'publish_status'=>$publish_status]);
                 }   else {
                     $exam_id = DB::table('exams')->insertGetId(['school_id'=>$school_id, 'examination_id'=>$examination_id, 
                         'class_ids'=>$class_id, 'section_ids'=>$section_id, 'monthyear'=>$monthyear,
                         'exam_startdate'=>$from_date, 'exam_enddate' =>$last_date, 'result_in'=>$resultin, 
                         'rank_settings'=>$rank_settings, 'grade_settings'=>$grade_settings, 'rank_type'=>$rank_type, 
-                        'rankincludefailures'=>$rankincludefailures, 'schedule_status' => $schedule_status, 
+                        'rankincludefailures'=>$rankincludefailures, 'include_practicals' => $include_practicals, 
+                        'schedule_status' => $schedule_status, 
                         'publish_status'=>$publish_status]);
                 }  
 
@@ -15495,10 +17823,11 @@ foreach($students as $k=>$v){
     public function viewExams()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             return view('admin.exams')->with('classes', $classes);
         } else {
@@ -15508,6 +17837,7 @@ foreach($students as $k=>$v){
 
     public function loadExams(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->get('id', 0);
             $start_date = $request->get('start_date', '');
             $end_date = $request->get('end_date', '');
@@ -15531,9 +17861,9 @@ foreach($students as $k=>$v){
             $map_subjects = '';    $timetable = [];
               if (($start_date != '') && ($end_date != '')) {
                 $classes = Classes::where('status','ACTIVE');
-                if(Auth::User()->user_type == 'SCHOOL') {
-                    $classes->where('school_id', Auth::User()->id); 
-                }
+                //if(Auth::User()->user_type == 'SCHOOL') {
+                    $classes->where('school_id', $school_id); 
+                //}
                 $classes = $classes->orderby('position','asc')->get();
                 
                 // exit;   
@@ -15669,6 +17999,7 @@ foreach($students as $k=>$v){
 
     public function viewloadExams(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $examid = $request->get('id', '');
             $start_date = $request->get('start_date', '');
             $end_date = $request->get('end_date', '');
@@ -15677,9 +18008,9 @@ foreach($students as $k=>$v){
             $map_subjects = '';    $timetable = [];
               if (($start_date != '') && ($end_date != '')) {
                 $classes = Classes::where('status','ACTIVE');
-                if(Auth::User()->user_type == 'SCHOOL') {
-                    $classes->where('school_id', Auth::User()->id); 
-                }
+                //if(Auth::User()->user_type == 'SCHOOL') {
+                    $classes->where('school_id', $school_id); 
+                //}
                 $classes = $classes->orderby('position','asc')->get();
                 
                 // exit;   
@@ -15728,7 +18059,7 @@ foreach($students as $k=>$v){
                     }
                    
 
-                      $periods = Periodtiming::select('period_1', 'period_2', 'period_3', 'period_4', 'period_5', 'period_6', 'period_7', 'period_8')->where('school_id', Auth::User()->id)->first();
+                      $periods = Periodtiming::select('period_1', 'period_2', 'period_3', 'period_4', 'period_5', 'period_6', 'period_7', 'period_8')->where('school_id', $school_id)->first();
                         $startTimeStamp = strtotime($start_date);
                          $endTimeStamp = strtotime($end_date);
                          $timeDiff = abs($endTimeStamp - $startTimeStamp);
@@ -15742,7 +18073,7 @@ foreach($students as $k=>$v){
                          $Variable1 = strtotime($start_date);
                          $Variable2 = strtotime($end_date);
                         //  $date = date('Y-m-d',(strtotime ( '-1 day' , strtotime ( $date) ) ));
-                       $timetable1 = DB::table('exams')->where('school_id', Auth::User()->id)->where('monthyear',$monthyear)->where('exam_name',$exam_name)->get();
+                       $timetable1 = DB::table('exams')->where('school_id', $school_id)->where('monthyear',$monthyear)->where('exam_name',$exam_name)->get();
                     if($timetable1->isNotEmpty()) {
                         $exam_id = array();
                         foreach($timetable1 as $times) {
@@ -15831,6 +18162,7 @@ foreach($students as $k=>$v){
     public function getExams(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -15866,10 +18198,10 @@ foreach($students as $k=>$v){
                 $filteredqry->where('exams.status',$status);
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $examsqry->where('exams.school_id', Auth::User()->id);
-                $filteredqry->where('exams.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $examsqry->where('exams.school_id', $school_id);
+                $filteredqry->where('exams.school_id', $school_id);
+            //}
 
             if($class_id > 0) {
                 $examsqry->where('exam_sessions.class_id',$class_id);
@@ -15929,10 +18261,11 @@ foreach($students as $k=>$v){
      public function addExams(Request $request)
      {
          if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
              $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             
             // return view('admin.add_exam')->with('classes', $classes);
@@ -15946,6 +18279,7 @@ foreach($students as $k=>$v){
 
      public function postExams(Request $request){
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $id = $request->get('id', 0);
             $from_date = $request->from_date;
@@ -15970,7 +18304,7 @@ foreach($students as $k=>$v){
                 $data['exam_name'] = $examname;
                 $data['exam_startdate'] = $from_date;
                 $data['exam_enddate'] = $last_date;
-                $data['school_id'] = Auth::User()->id;
+                $data['school_id'] = $school_id;
                 if($id > 0) {
                     $data['updated_at'] = date('Y-m-d H:i:s');
                     $exam_id = $id; 
@@ -16078,7 +18412,7 @@ foreach($students as $k=>$v){
             } 
 
             /* Check for the Inactivated subjects in exam and revise the total for the students */
-            $school_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();
             $exam_sessions = DB::table('exam_sessions')->where('exam_id', $exam_id)->where('status', 'INACTIVE')->get();
             if($exam_sessions->isNotEmpty()) {
                 foreach($exam_sessions as $es) {
@@ -16350,6 +18684,7 @@ foreach($students as $k=>$v){
     public function previewExams(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $exam_id = $request->get('id');
             $exams = Exams::where('id', $exam_id)->get();  
             if ($exams->isNotEmpty()) { 
@@ -16357,9 +18692,9 @@ foreach($students as $k=>$v){
                 $exam = $exams[0];
                 $examsarr = $examsarr[0];
                 $classes = Classes::where('status', 'ACTIVE');
-                if(Auth::User()->user_type == 'SCHOOL') {
-                    $classes->where('school_id', Auth::User()->id); 
-                }
+                //if(Auth::User()->user_type == 'SCHOOL') {
+                    $classes->where('school_id', $school_id); 
+                //}
                 $classes = $classes->orderby('position','asc')->get();
                 return view('admin.previewexam')->with('start_date','')->with('end_date','')
                     ->with('class', '')->with('periods', '')->with('classes', '')->with('subjects', '')
@@ -16398,10 +18733,11 @@ foreach($students as $k=>$v){
     public function viewTerms()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             return view('admin.termsacademics')->with('classes', $classes);
         } else {
@@ -16415,6 +18751,7 @@ foreach($students as $k=>$v){
     public function getTerms(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -16440,10 +18777,10 @@ foreach($students as $k=>$v){
                 $filteredqry->whereRAW(' FIND_IN_SET('.$request->cls_id.', class_ids) ');
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $termsqry->where('terms.school_id', Auth::User()->id);
-                $filteredqry->where('terms.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $termsqry->where('terms.school_id', $school_id);
+                $filteredqry->where('terms.school_id', $school_id);
+            //}
 
             if (count($columns) > 0) {
                 foreach ($columns as $key => $value) {
@@ -16472,9 +18809,9 @@ foreach($students as $k=>$v){
             $filters = $filteredqry->select('terms.id')->count();
 
             $totalDataqry = Terms::orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('terms.school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('terms.school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -16509,6 +18846,7 @@ foreach($students as $k=>$v){
     public function postTerms(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $id = $request->id;
             $class_ids = $request->class_ids;
             $term_name = $request->term_name;
@@ -16532,9 +18870,9 @@ foreach($students as $k=>$v){
             }
 
             if ($id > 0) {
-                $exists = DB::table('terms')->where('term_name', $term_name)->where('school_id', Auth::User()->id)->whereNotIn('id', [$id])->first();
+                $exists = DB::table('terms')->where('term_name', $term_name)->where('school_id', $school_id)->whereNotIn('id', [$id])->first();
             } else {
-                $exists = DB::table('terms')->where('term_name', $term_name)->where('school_id', Auth::User()->id)->first();
+                $exists = DB::table('terms')->where('term_name', $term_name)->where('school_id', $school_id)->first();
             }
 
             if (!empty($exists)) {
@@ -16557,7 +18895,7 @@ foreach($students as $k=>$v){
                     'message' => "Please select the classes ",
                 ]);
             }
-            $terms->school_id = Auth::User()->id;
+            $terms->school_id = $school_id;
             $terms->class_ids = $class_ids;
             $terms->term_name = $term_name;
             $terms->status = $status;
@@ -16588,10 +18926,11 @@ foreach($students as $k=>$v){
      */
     public function viewMarksEntry(Request $request)   {
         if(Auth::check()){ //$this->updateRank(1574, 43, 99, 19);
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             $monthyear = $request->get('monthyear', '');
             $class_id = $request->get('class_id', 0);
@@ -16762,7 +19101,9 @@ foreach($students as $k=>$v){
             $section_id = $request->section_id;
             $exam_id = $request->exam_id;
 
-            $total_marks1 = $request->total_marks;
+            $total_marks1 = $request->total_marks;  
+            $theory_marks1 = $request->theory_marks;
+            $practical_marks1 = $request->practical_marks;
             $marks1 = $request->marks;
             $remarks1 = $request->remarks;
             $is_absent1  = $request->is_absent;  //echo "<pre>"; print_r($input);  exit;
@@ -16791,6 +19132,27 @@ foreach($students as $k=>$v){
                 ]);
             } 
             $log = DB::enableQueryLog();   $error = '';
+
+            $subjects = DB::table('exams')->leftjoin('exam_sessions', 'exam_sessions.exam_id', 'exams.id')
+                    ->leftjoin('subjects', 'subjects.id', 'exam_sessions.subject_id')
+                    ->where('exams.id',$exam_id)->where('exam_sessions.class_id',$class_id)
+                    ->where('subjects.id','>',0)->where('exam_sessions.status','ACTIVE')
+                    ->whereIn('exam_sessions.section_id',[0, $section_id]);
+            /*if($subject_id  >0){
+                $subjects->where('exam_sessions.subject_id',$subject_id);
+            }*/ 
+            $subjects = $subjects->select('exam_sessions.subject_id as is_subject_id', 'subjects.subject_name as is_subject_name', 'exam_sessions.is_practical', 'exam_sessions.theory_mark', 'exam_sessions.practical_mark')
+                    ->get();
+
+            $max = [];
+            if($subjects->isNotEmpty()) {
+                foreach($subjects as $sk=>$sv) {
+                    $max[$sv->is_subject_id]['theory_mark'] = $sv->theory_mark;
+                    $max[$sv->is_subject_id]['practical_mark'] = $sv->practical_mark;
+                    $max[$sv->is_subject_id]['is_practical'] = $sv->is_practical;
+                }
+            }
+
             if(!empty($total_marks1) && count($total_marks1)>0) {
                 foreach($total_marks1 as $student_id => $subs) {
                     if(!empty($subs) && count($subs)>0) {
@@ -16798,7 +19160,9 @@ foreach($students as $k=>$v){
                             if($student_id > 0) {
 
                                 $total_marks = $total_marks1[$student_id][$subject];
-                                $marks = $marks1[$student_id][$subject];
+                                $marks = (isset($marks1[$student_id]) && isset($marks1[$student_id][$subject])) ?  $marks1[$student_id][$subject] : '';
+                                $theory_marks = (isset($theory_marks1[$student_id]) && isset($theory_marks1[$student_id][$subject])) ?  $theory_marks1[$student_id][$subject] : '';  
+                                $practical_marks = (isset($practical_marks1[$student_id]) && isset($practical_marks1[$student_id][$subject])) ?  $practical_marks1[$student_id][$subject] : '';   
                                 $remarks = $remarks1[$student_id][$subject]; 
                                 $is_absent = (isset($is_absent1[$student_id][$subject])) ? $is_absent1[$student_id][$subject] : 0; 
 
@@ -16810,6 +19174,16 @@ foreach($students as $k=>$v){
 
                                 if(empty($marks)) {
                                     $marks = 0;
+                                }
+                                if(empty($theory_marks)) {
+                                    $theory_marks = 0;
+                                }
+                                if(empty($practical_marks)) {
+                                    $practical_marks = 0;
+                                }
+
+                                if($max[$subject]['is_practical'] == 1) {
+                                    $marks = $theory_marks  + $practical_marks;
                                 }
 
                                 if($marks > 0) {
@@ -16825,8 +19199,23 @@ foreach($students as $k=>$v){
                                     $error =  '  Entered mark should not be greater than Total Marks';
                                 }
 
+                                if($marks > 0 && $max[$subject]['is_practical'] == 1) {
+                                    if($theory_marks <= $max[$subject]['theory_mark']) {
+                                    }   else {
+                                        $sname = DB::table('users')->where('id', $student_id)->value('name');
+                                        $error =  '  Entered Theory mark should not be greater than Total Theory Marks'.' '. $sname;
+                                    }
+
+                                    if($practical_marks <= $max[$subject]['practical_mark']) {
+                                    }   else {
+                                        $sname = DB::table('users')->where('id', $student_id)->value('name');
+                                        $error =  '  Entered Practical mark should not be greater than Total Practical Marks'.' '. $sname;
+                                    }
+                                } 
+
                                 $data = ['subject_id'=>$subject, 'total_marks'=>$total_marks, 'is_absent' => $is_absent,
-                                        'marks'=>$marks, 'remarks'=>$remarks, 'grade'=>$grade];
+                                        'marks'=>$marks, 'theory_marks'=>$theory_marks, 'practical_marks'=>$practical_marks, 
+                                        'remarks'=>$remarks, 'grade'=>$grade];
                                 if(!empty($ex)) {
                                     $data['updated_at'] = date('Y-m-d H:i:s');
                                     $data['updated_by'] = Auth::User()->id;
@@ -16923,7 +19312,7 @@ foreach($students as $k=>$v){
                 }
             } //$queries = DB::getQueryLog();  echo "<pre>"; print_r($queries);
             if(!empty($error)) {
-                return response()->json(['status' => 0, 'message' => 'Entered mark should not be greater than Total Marks']);
+                return response()->json(['status' => 0, 'message' => $error]);
             }
 
             $this->updateRank($school_id, $class_id, $section_id, $exam_id);
@@ -17191,7 +19580,7 @@ foreach($students as $k=>$v){
             $exam_id = $request->get('exam_id', 0);
             $subject_id = $request->get('subject_id', 0);
             $student_id = $request->get('student_id',0);
-            $total_marks = $request->get('total_marks',0);
+            $total_marks = 100; // $request->get('total_marks',0);
             if(empty($monthyear)) {
                 $monthyear = date('Y-m');
             }
@@ -17233,7 +19622,8 @@ foreach($students as $k=>$v){
             $students = $students->where('student_class_mappings.status', 'ACTIVE')
                 ->where('user_type', 'STUDENT')->where('users.delete_status', 0)->where('users.status', 'ACTIVE')
                 ->where('student_class_mappings.user_id', '>', 0)
-                ->select('users.id', 'name', 'email', 'mobile', 'students.admission_no', 'students.class_id', 'students.section_id')->get();
+                ->select('users.id', 'name', 'email', 'mobile', 'students.admission_no', 'students.class_id', 'students.section_id')
+                ->orderby('users.name')->get();
  
              
                 /*foreach($students as $k => $v){
@@ -17265,7 +19655,7 @@ foreach($students as $k=>$v){
                 /*if($section_id  >0){
                     $subjects->where('exam_sessions.section_id',$section_id);
                 }*/
-                $subjects = $subjects->select('exam_sessions.subject_id as is_subject_id', 'subjects.subject_name as is_subject_name')
+                $subjects = $subjects->select('exam_sessions.subject_id as is_subject_id', 'subjects.subject_name as is_subject_name', 'exam_sessions.is_practical', 'exam_sessions.theory_mark', 'exam_sessions.practical_mark')
                         ->get();
                 $students = $students->toArray();
                 foreach($students as $k => $v){
@@ -17299,10 +19689,11 @@ foreach($students as $k=>$v){
      */
     public function viewExamResults(Request $request)   {
         if(Auth::check()){ 
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             $monthyear = $request->get('monthyear', '');
             $class_id = $request->get('class_id', 0);
@@ -17438,16 +19829,143 @@ foreach($students as $k=>$v){
         }
     }
 
+    /* Function: loadExamResultsPdf
+     */
+    public function loadExamResultsPdf(Request $request)   {
+        if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+            $monthyear = $request->get('monthyear', '');
+            if(empty($monthyear)) {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'Please enter the Year']);
+            }
+            $class_id = $request->get('class_id', 0);
+            $section_id = $request->get('section_id', 0);
+            $exam_id = $request->get('exam_id', 0);
+            $subject_id = $request->get('subject_id', 0);
+            $student_id = $request->get('student_id',0);
+            $total_marks = $request->get('total_marks',0);
+            if(empty($monthyear)) {
+                $monthyear = date('Y-m');
+            }
+            User::$monthyear = $monthyear;
+            User::$class_id = $class_id;
+            User::$section_id = $section_id;
+            User::$exam_id = $exam_id;
+            if($subject_id  >0){
+                User::$subject_id = $subject_id;
+                MarksEntry::$subject_id = $subject_id;
+            }
+            // User::$student_id = $student_id;
+            /*if($subject_id  != '' || $subject_id  != ''){
+                MarksEntry::$subject_id = $subject_id;
+            }*/
+           
+            MarksEntry::$exam_id = $exam_id;
+            MarksEntry::$class_id = $class_id; 
+
+            $section_id1 = DB::table('exams')->where('id', $exam_id)->value('section_ids');
+
+            MarksEntry::$section_id = $section_id1;
+            $students = User::with('marksentry')
+                ->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                ->leftjoin('students', 'students.user_id', 'users.id')
+                ->whereRaw( "'".$monthyear."' BETWEEN from_month and to_month ")
+                ->where('student_class_mappings.class_id', $class_id);
+
+            if($section_id > 0) {
+                $students->where('student_class_mappings.section_id', $section_id);
+            }
+
+            if($student_id > 0) {
+                $students->where('student_class_mappings.user_id',$student_id);
+            }
+
+            $students = $students->where('student_class_mappings.status', 'ACTIVE')
+                ->where('user_type', 'STUDENT')
+                ->where('student_class_mappings.user_id', '>', 0)
+                ->select('users.id', 'name', 'email', 'mobile', 'students.admission_no')
+                ->orderby('name')->get();
+ 
+             
+                /*foreach($students as $k => $v){
+
+                    $get_sub = Sections::where('class_id',$class_id)->where('id',$section_id)->first();
+                    $students[$k]->subject = $get_sub;
+
+                    if($get_sub->isNotEmpty()) {
+                        foreach($get_sub as $sk=>$sub) {
+                            $get_sub[$sk]->is_subject_name = $sub->subject_name;
+                            $get_sub[$sk]->is_subject_id = $sub->subject_id;
+                        }
+                    }
+                    $students[$k]->subject = $get_sub; 
+
+                }*/
+               
+            if($students->isNotEmpty()) {
+
+                $subjects = DB::table('exams')->leftjoin('exam_sessions', 'exam_sessions.exam_id', 'exams.id')
+                        ->leftjoin('subjects', 'subjects.id', 'exam_sessions.subject_id')
+                        ->where('exams.id',$exam_id)->where('subjects.id','>',0)->where('exam_sessions.status','ACTIVE');
+                if($subject_id  >0){
+                    $subjects->where('exam_sessions.subject_id',$subject_id);
+                }
+                if($class_id  >0){
+                    $subjects->where('exam_sessions.class_id',$class_id);
+                }
+                $section_id = DB::table('exams')->where('id', $exam_id)->value('section_ids');
+                if($section_id  >0){
+                    $subjects->where('exam_sessions.section_id',$section_id);
+                }
+                $subjects = $subjects->select('exam_sessions.subject_id as is_subject_id', 'subjects.subject_name as is_subject_name')
+                        ->get();
+                $students = $students->toArray();
+                foreach($students as $k => $v){
+                    $marks = [];
+                    if(isset($v['marksentry']) && !empty($v['marksentry'])) {
+                        if(isset($v['marksentry']['marksentryitems']) && !empty($v['marksentry']['marksentryitems'])) {
+                            foreach($v['marksentry']['marksentryitems'] as $k1 => $v1){
+                                $marks[$v1['subject_id']] = $v1;
+                            }
+                        }
+                    }
+                    $students[$k]['marks'] = $marks;
+                }
+                // 
+
+                $is_school = DB::table('users')->leftjoin('schools', 'schools.user_id', 'users.id')
+                ->where('users.id', $school_id)->select('users.name', 'users.name_code', 'schools.address')
+                ->first();
+                $logo = User::getUserProfileImageAttribute($school_id);
+
+                $html = view('admin.load_exam_results_pdf')->with(['monthyear'=>$monthyear, 'students'=>$students, 'subjects'=>$subjects, 'totalmarks'=>$total_marks, 'in_subject_id'=>$subject_id, 'is_school'=>$is_school, 'logo'=>$logo])->render();
+                //echo "<pre>"; print_r($html);exit;
+                $pdf = PDF::loadHTML($html); //->setPaper('a4', 'portrait');
+                return $pdf->download('Examresult.pdf'); exit;
+
+
+                return response()->json(['status' => 'SUCCESS', 'data' => $html, 'message' => 'Students Detail']);
+
+            }   else {
+                $students = [];
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Students Detail']);
+            }
+        }else{
+            return redirect('/login');
+        }
+    }
+
     //Question Banks
     /* Function: viewQuestionbank
      */
     public function viewQuestionbank()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('id', '>', 0)->where('status','=','ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position','asc')->get();
             $subject = Subjects::where('id', '>', 0)->orderby('position','asc')->get();
             return view('admin.questionbank')->with(['class'=>$classes, 'subject'=>$subject]);
@@ -17462,6 +19980,7 @@ foreach($students as $k=>$v){
     public function getQuestionbank(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -17515,10 +20034,10 @@ foreach($students as $k=>$v){
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $termsqry->where('question_banks.school_id', Auth::User()->id);
-                $filteredqry->where('question_banks.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $termsqry->where('question_banks.school_id', $school_id);
+                $filteredqry->where('question_banks.school_id', $school_id);
+            //}
 
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
@@ -17533,9 +20052,9 @@ foreach($students as $k=>$v){
             $filters = $filteredqry->select('question_banks.id')->count();
 
             $totalDataqry = QuestionBanks::where('deleted_status',0)->orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('question_banks.school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('question_banks.school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -20385,12 +22904,13 @@ foreach($students as $k=>$v){
 
     public function viewStudentAttenReport(){
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
         $monthyear = $class_id = $section_id = '';
         $lastdate = date('t', strtotime(date('Y-m')));
         $classes = Classes::where('status', 'ACTIVE');
-        if(Auth::User()->user_type == 'SCHOOL') {
-            $classes->where('school_id', Auth::User()->id); 
-        }
+        //if(Auth::User()->user_type == 'SCHOOL') {
+            $classes->where('school_id', $school_id); 
+        //}
         $classes = $classes->orderby('position', 'Asc')->get();
         $students  = '';
         $new_date = date('Y-m-d');
@@ -20399,9 +22919,9 @@ foreach($students as $k=>$v){
         list($year, $month) = explode('-', $monthyear);
         $holidays = DB::table('holidays')->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
         ->whereRAW('MONTH(holiday_date) = "'.$month.'" ');
-        if(Auth::User()->user_type == 'SCHOOL') {
-            $holidays->where('school_college_id', Auth::User()->id); 
-        }
+        //if(Auth::User()->user_type == 'SCHOOL') {
+            $holidays->where('school_college_id', $school_id); 
+        //}
         $holidays = $holidays->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
         // $students[$k]->holidays_list = $holidays;
         if($holidays->isNotEmpty()){
@@ -20764,6 +23284,7 @@ foreach($students as $k=>$v){
      */
     public function loadTeacherAttendanceRep(Request $request)   {
         if(Auth::check()){
+            $school_id = (new AdminRoleController())->getSchoolId();
             $monthyear = $request->get('monthyear', '');
             if(empty($monthyear)) {
                 return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'Please enter the Year']);
@@ -20773,13 +23294,13 @@ foreach($students as $k=>$v){
             list($year, $month) = explode('-', $monthyear);
             $teachers = User::with('teacherdailyattendance')
                 ->leftjoin('teachers', 'teachers.user_id', 'users.id')
-                ->where('user_type', 'TEACHER')->where('users.school_college_id', Auth::User()->id)
+                ->where('user_type', 'TEACHER')->where('users.school_college_id', $school_id)
                 ->select('users.id', 'name', 'email', 'mobile','profile_image', 'teachers.emp_no')
                 ->get();
                 foreach($teachers as $k=>$v){
                    
                  $holidays = DB::table('holidays')->whereRAW('YEAR(holiday_date) = "'.$year.'" ')
-                    ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')->where('holidays.school_college_id', Auth::User()->id)
+                    ->whereRAW('MONTH(holiday_date) = "'.$month.'" ')->where('holidays.school_college_id', $school_id)
                     ->select(DB::RAW(' DATE_FORMAT(holiday_date, "%d") as holiday'))->get();
                     $teachers[$k]->holidays_list = $holidays;
                 }
@@ -20808,10 +23329,11 @@ foreach($students as $k=>$v){
     public function viewStudentStrength()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             return view('admin.studentstrength')->with(['classes'=>$classes]);
         } else {
@@ -20825,6 +23347,7 @@ foreach($students as $k=>$v){
     public function getStudentStrength(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -20857,10 +23380,10 @@ foreach($students as $k=>$v){
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('classes.school_id', Auth::User()->id);
-                $filteredqry->where('classes.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('classes.school_id', $school_id);
+                $filteredqry->where('classes.school_id', $school_id);
+            //}
 
             if($class_id>0){
                 $sectionsqry->where('class_id',$class_id);
@@ -20888,7 +23411,7 @@ foreach($students as $k=>$v){
 
             $totalDataqry = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
-                ->where('sections.status','=','ACTIVE')->where('classes.school_id', Auth::User()->id)
+                ->where('sections.status','=','ACTIVE')->where('classes.school_id', $school_id)
                 ->select('sections.id');
             $totalData = $totalDataqry->select('id')->count();
 
@@ -21031,6 +23554,7 @@ foreach($students as $k=>$v){
     public function viewStudentAbsentReport()
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $student = User::leftjoin('students', 'students.user_id', 'users.id')
             ->where('users.user_type', 'STUDENT')
             ->where('users.status','ACTIVE')
@@ -21040,9 +23564,9 @@ foreach($students as $k=>$v){
             // ->get(["users.name", "users.id"])
 
             $classes = Classes::where('status', 'ACTIVE');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $classes->where('school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $classes->where('school_id', $school_id); 
+            //}
             $classes = $classes->orderby('position', 'Asc')->get();
             return view('admin.studentsabsent')->with(['class'=>$classes,'student'=>$student]);
         } else {
@@ -21056,6 +23580,7 @@ foreach($students as $k=>$v){
     public function getStudentAbsentReport(Request $request)
     {
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -21106,10 +23631,10 @@ foreach($students as $k=>$v){
                 $filteredqry->where('date',$date);
             }
             
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $users_qry->where('users.school_college_id', Auth::User()->id);
-                $filteredqry->where('users.school_college_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $users_qry->where('users.school_college_id', $school_id);
+                $filteredqry->where('users.school_college_id', $school_id);
+            //}
 
             if($user_id != '' || $user_id != 0){
                 $users_qry->where('attendance_approval.user_id',$user_id);
@@ -21146,7 +23671,7 @@ foreach($students as $k=>$v){
 
             $totalDataqry = AttendanceApproval::leftjoin('classes','classes.id','attendance_approval.class_id')
             ->leftjoin('sections','sections.id','attendance_approval.section_id')
-            ->leftjoin('users','users.id','attendance_approval.user_id')->where('users.school_college_id', Auth::User()->id)
+            ->leftjoin('users','users.id','attendance_approval.user_id')->where('users.school_college_id', $school_id)
             ->where(function($query) {
                 $query->where('attendance_approval.fn_status', 2)
                       ->orWhere('attendance_approval.an_status', 2);
@@ -21551,11 +24076,11 @@ foreach($students as $k=>$v){
 
         if (Auth::check()) {
             $hw_id = $request->get('post_id', 0); 
-            $hw = DB::table('homeworks')->where('id', $hw_id)->select('ref_no')->first();
+            $hw = DB::table('homeworks')->where('id', $hw_id)->select('main_ref_no')->first();
             if(!empty($hw)) { 
-                $ref_no = $hw->ref_no;
-                DB::table('homeworks')->where('ref_no', $ref_no)->update(['status'=>'INACTIVE', 'approve_status' => 'UNAPPROVED', 
-                         'updated_by' => Auth::User()->id, 'updated_at' => date('Y-m-d H:i:s')]);
+                $ref_no = $hw->main_ref_no;
+                DB::table('homeworks')->where('main_ref_no', $ref_no)->update(['status'=>'INACTIVE', 
+                    'approve_status' => 'UNAPPROVED', 'updated_by' => Auth::User()->id, 'updated_at' => date('Y-m-d H:i:s')]);
             } 
 
             return response()->json([ 'status' => 1, 'message' => 'Homework deleted successfully']); 
@@ -21567,6 +24092,7 @@ foreach($students as $k=>$v){
     public function updatePostHomeworks(Request $request) {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
 
             //$input = $request->all();  echo "<pre>"; print_r($input); exit;
             $approve_status = $request->get('status', ''); 
@@ -21587,7 +24113,7 @@ foreach($students as $k=>$v){
                         ->where('students.section_id', $section_id)
                         ->where('users.status', 'ACTIVE')
                         ->where('users.user_type', 'STUDENT')
-                        ->where('users.school_college_id', Auth::User()->id)
+                        ->where('users.school_college_id', $school_id)
                         ->select('users.id')
                         ->groupBy('users.id')
                         ->get();
@@ -21603,7 +24129,7 @@ foreach($students as $k=>$v){
                             if($sms_alert == 1) {
 
                                 $category = -1;
-                                $batch = DB::table('admin_settings')->where('school_id', Auth::User()->id)->value('acadamic_year');
+                                $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
                                 $post_type = 1;
                                 $smart_sms = 1;
                                 $send_type = 1;
@@ -21677,7 +24203,7 @@ foreach($students as $k=>$v){
                                     $post_new->content=$final_content;
                                     $post_new->content_vars=$content_vars;
                                     $post_new->notify_datetime=$schedule_date;
-                                    $post_new->posted_by=Auth::User()->id; 
+                                    $post_new->posted_by=$school_id; 
                                     $post_new->created_by=$homework->created_by;
                                     $post_new->save();
                                 }
@@ -21712,7 +24238,433 @@ foreach($students as $k=>$v){
     } 
 
     // Communication Homeworks 
+
     public function viewPostHomeworks(Request $request)  {
+        if (Auth::check()) { 
+            $limit = 50;  $page_no = 0;  $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            }
+            $classes = $classes->orderby('position', 'Asc')->get();   
+
+            $homeworks = PostHomeworks::where('school_id', $school_id)->where('status', 'ACTIVE')
+                ->select('main_ref_no', 'is_all', 'ref_no', 'created_by', 'created_at', 'approve_status', 'id', 'class_id', 
+                    'section_id')
+                ->groupby('main_ref_no')->orderby('id', 'desc')
+                ->paginate($limit, ['homeworks.*'], 'page', $page_no);
+
+                //echo "<pre>"; print_r($homeworks->toArray()); exit;
+
+                /*Homeworks::leftjoin('classes', 'classes.id', 'homeworks.class_id')
+                ->leftjoin('sections', 'sections.id', 'homeworks.section_id')
+                ->leftjoin('subjects', 'subjects.id', 'homeworks.subject_id')
+                ->where('homeworks.school_id', Auth::User()->id)
+                ->select('homeworks.*')
+                ->orderby('id', 'desc')
+                ->paginate($limit, ['homeworks.*'], 'page', $page_no);*/
+ 
+            return view('admin.posthomeworks')->with('classes', $classes)->with('posts', $homeworks);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getPostHomeworkStatus(Request $request) {
+
+        if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $status = $request->get('status_id', '');
+            $section = $request->get('section_id', '');
+            $class_id = $request->get('class_id', '');
+            $search = $request->get('search', '');
+
+            $post_id = $request->get('id');
+            $post  = DB::table('homeworks')->where('id', $post_id)->first();
+
+            $users_qry = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
+                    ->leftjoin('classes', 'students.class_id', 'classes.id')
+                    ->leftjoin('sections', 'students.section_id', 'sections.id')
+                    //->leftjoin('notifications', 'notifications.user_id', 'users.id')
+                    ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
+                    ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                    //->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
+                    //->where('notifications.type_no', 4)->where('notifications.post_id', $post_id)   
+                    ->select('users.id', 'users.name', 'users.mobile',  'users.fcm_id',  'users.is_app_installed',
+                            'classes.class_name', 'sections.section_name'); 
+
+            $filtered_qry = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
+                    ->leftjoin('classes', 'students.class_id', 'classes.id')
+                    ->leftjoin('sections', 'students.section_id', 'sections.id')
+                    //->leftjoin('notifications', 'notifications.user_id', 'users.id')
+                    ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
+                    ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                    // ->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
+                    //->where('notifications.type_no', 4)->where('notifications.post_id', $post_id)   
+                    ->select('users.id', 'users.name', 'users.mobile',  'users.fcm_id',  'users.is_app_installed',
+                            'classes.class_name', 'sections.section_name'); 
+
+            $is_receivers = ''; $section_ids = []; $main_ref_no = '';
+            if(!empty($post)) {
+                $is_all = $post->is_all; 
+                $main_ref_no = $post->main_ref_no; 
+
+                $is_post_receivers = [];  $is_receivers = '';
+                if($is_all == 1) { 
+
+                    $class_id = $post->class_id;
+                    if($class_id > 0) { 
+                        $is_receivers = DB::table('sections')
+                            ->leftjoin('classes', 'classes.id', 'sections.class_id')
+                            ->where('sections.status','ACTIVE')->where('sections.class_id',$class_id)
+                            ->select('sections.id', 'section_name as name1', 'classes.class_name as name')->orderby('name', 'asc')->get(); 
+                         
+                    }
+                      
+                } else {
+                    $section_id = $post->section_id;
+                    if($section_id > 0) { 
+                        $is_receivers = DB::table('sections')
+                            ->leftjoin('classes', 'classes.id', 'sections.class_id')
+                            ->where('sections.status','ACTIVE')->where('sections.id',$section_id)
+                            ->select('sections.id', 'section_name as name1', 'classes.class_name as name')->orderby('name', 'asc')->get(); 
+                         
+                    }
+                }
+
+                if(!empty($is_receivers) && $is_receivers->isNotEmpty()) {
+                    foreach($is_receivers as $rec)  {
+                        $section_ids[] = $rec->id;
+                    } 
+
+                    $users_qry->whereIn('students.section_id',$section_ids);
+                    $filtered_qry->whereIn('students.section_id',$section_ids);
+                } 
+
+            } 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'users.status') {
+                            $users_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $users_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if(!empty(trim($search['value']))) { 
+                $search = $search['value'];
+                $users_qry->whereRaw(' ( users.name like "%'.$search.'%" or users.mobile like "%'.$search.'%"  or classes.class_name like "%'.$search.'%"  or sections.section_name like "%'.$search.'%") '); 
+                $filtered_qry->whereRaw(' ( users.name like "%'.$search.'%" or users.mobile like "%'.$search.'%"  or classes.class_name like "%'.$search.'%"  or sections.section_name like "%'.$search.'%") '); 
+            }
+
+            if(!empty($status)){
+                $users_qry->where('users.status',$status);
+                $filtered_qry->where('users.status',$status);
+            }
+            if(!empty($section)){
+                $users_qry->where('students.section_id',$section);
+                $filtered_qry->where('students.section_id',$section);
+            }
+            if(!empty($class_id)){
+                $users_qry->where('students.class_id',$class_id);
+                $filtered_qry->where('students.class_id',$class_id);
+            }
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'students.user_id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $users = $users_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+            if($users->isNotEmpty()) {
+                foreach($users as $uk=>$usr) {
+                    $notify = DB::table('notifications')->where('type_no', 7)->where('main_ref_no', $main_ref_no)
+                        ->where('user_id', $usr->id)->first();
+                    $users[$uk]->notify = $notify;
+
+                    $submissions = HomeworkSubmissions::where('status', 'ACTIVE')->where('main_ref_no', $main_ref_no)
+                        ->where('user_id', $usr->id)->first();
+                    $users[$uk]->submissions = $submissions;
+                }
+            }
+            /*$totalData = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
+                    ->where('users.user_type', 'STUDENT')
+                    ->where('users.status', 'ACTIVE')->where('users.delete_status', 0) 
+                    ->select('users.id', 'users.fcm_id');*/
+
+            $totalData = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
+                    ->leftjoin('classes', 'students.class_id', 'classes.id')
+                    ->leftjoin('sections', 'students.section_id', 'sections.id')
+                    ->leftjoin('notifications', 'notifications.user_id', 'users.id') 
+                    ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
+                    //->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                    // ->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
+                    ->where('notifications.type_no', 7)->where('notifications.main_ref_no', $main_ref_no)  
+                    ->select('users.id', 'users.fcm_id'); 
+
+            //if(Auth::User()->user_type == 'SCHOOL') {
+            $totalData->where('users.school_college_id', $school_id); 
+            //}
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($users)) {
+                $users = $users->toArray();
+                foreach ($users as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+    } 
+
+    public function getPostHomeworkStatusExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $status = $request->get('status_id', '');
+            $section = $request->get('section_id', '');
+            $class_id = $request->get('class_id', '');
+            $search = $request->get('search', '');
+
+            $post_id = $request->get('id');
+            $post  = DB::table('homeworks')->where('id', $post_id)->first();
+
+            $users_qry = DB::table('users')->leftjoin('students', 'students.user_id', 'users.id')
+                    ->leftjoin('classes', 'students.class_id', 'classes.id')
+                    ->leftjoin('sections', 'students.section_id', 'sections.id')
+                    //->leftjoin('notifications', 'notifications.user_id', 'users.id')
+                    ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
+                    ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
+                    //->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
+                    //->where('notifications.type_no', 4)->where('notifications.post_id', $post_id)   
+                    ->select('users.id', 'users.name', 'users.mobile',  'users.fcm_id',  'users.is_app_installed',
+                            'classes.class_name', 'sections.section_name');  
+
+            $is_receivers = ''; $section_ids = []; $main_ref_no = '';
+            if(!empty($post)) {
+                $is_all = $post->is_all; 
+                $main_ref_no = $post->main_ref_no; 
+
+                $is_post_receivers = [];  $is_receivers = '';
+                if($is_all == 1) { 
+
+                    $class_id = $post->class_id;
+                    if($class_id > 0) { 
+                        $is_receivers = DB::table('sections')
+                            ->leftjoin('classes', 'classes.id', 'sections.class_id')
+                            ->where('sections.status','ACTIVE')->where('sections.class_id',$class_id)
+                            ->select('sections.id', 'section_name as name1', 'classes.class_name as name')->orderby('name', 'asc')->get(); 
+                         
+                    }
+                      
+                } else {
+                    $section_id = $post->section_id;
+                    if($section_id > 0) { 
+                        $is_receivers = DB::table('sections')
+                            ->leftjoin('classes', 'classes.id', 'sections.class_id')
+                            ->where('sections.status','ACTIVE')->where('sections.id',$section_id)
+                            ->select('sections.id', 'section_name as name1', 'classes.class_name as name')->orderby('name', 'asc')->get(); 
+                         
+                    }
+                }
+
+                if(!empty($is_receivers) && $is_receivers->isNotEmpty()) {
+                    foreach($is_receivers as $rec)  {
+                        $section_ids[] = $rec->id;
+                    } 
+
+                    $users_qry->whereIn('students.section_id',$section_ids); 
+                } 
+
+            } 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'users.status') {
+                            $users_qry->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $users_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            } 
+
+            if(!empty(trim($search['value']))) { 
+                $search = $search['value'];
+                $users_qry->whereRaw(' ( users.name like "%'.$search.'%" or users.mobile like "%'.$search.'%"  or classes.class_name like "%'.$search.'%"  or sections.section_name like "%'.$search.'%") ');  
+            }
+
+            if(!empty($status)){
+                $users_qry->where('users.status',$status); 
+            }
+            if(!empty($section)){
+                $users_qry->where('students.section_id',$section); 
+            }
+            if(!empty($class_id)){
+                $users_qry->where('students.class_id',$class_id); 
+            }
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'students.user_id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $users = $users_qry->orderBy($orderby, $dir)->get();
+            $users_excel = [];
+            if ($users->isNotEmpty()) { 
+                foreach($users as $uk=>$usr) {
+                    $notify = DB::table('notifications')->where('type_no', 4)->where('post_id', $post_id)
+                        ->where('user_id', $usr->id)->first();
+                    $users[$uk]->notify = $notify;
+
+                    $submissions = DB::table('homework_submissions')->where('status', 'ACTIVE')->where('main_ref_no', $main_ref_no)
+                        ->where('user_id', $usr->id)->first();
+                    $users[$uk]->submissions = $submissions;
+                }
+
+                $users = $users->toArray(); 
+                foreach ($users as $rev) {    
+
+                    if(isset($rev->notify) && !empty($rev->notify) && !empty($rev->notify->created_at)) { 
+                        $cdate = $rev->notify->created_at; 
+                        $cdate =  $tdate; 
+                    }   else {
+                        $cdate =  '-';
+                    }
+
+
+                    if(isset($rev->notify) && !empty($rev->notify) && !empty($rev->notify->read_status)) {
+                        $tid = $rev->notify->read_status;
+                        $tdate = $rev->notify->read_date;
+                        if($tid == 1)
+                            $tdate =  $tdate;
+                        else 
+                           $tdate =  '-';
+                    }   else {
+                        $tdate =  '-';
+                    }
+
+                    if(isset($rev->notify) && !empty($rev->notify) && !empty($rev->notify->is_acknowledged)) { 
+                        $tid = $rev->notify->is_acknowledged; 
+                        if($tid == 1)
+                            $is_acknowledged = 'Acknowledged';
+                        else 
+                            $is_acknowledged = 'Not Acknowledged';
+                    }   else {
+                        $is_acknowledged = '-';
+                    }
+
+                    if($rev->is_app_installed == 1){ 
+                        $is_app_installed = 'Installed'; 
+                    }   else {
+                        $is_app_installed = 'Not Installed';
+                    }
+
+                    if(isset($rev->submissions) && !empty($rev->submissions) && !empty($rev->submissions->created_at)) { 
+                        $sdate = $rev->submissions->created_at; 
+                        $sdate =  $tdate; 
+                    }   else {
+                        $sdate =  '-';
+                    }
+
+                    $users_excel[] = [
+                        "Name" => $rev->name,
+                        "Read Date" => $tdate,
+                        "Sent Date" => $cdate,
+                        "Acknowledged Status" => $is_acknowledged,
+                        "Submission Date" => $sdate,
+                        "App Installed" => $is_app_installed,
+                        "Mobile" => $rev->mobile,
+                        "Class" => $rev->class_name,
+                        "Section" => $rev->section_name,
+                    ];
+                }
+            }    
+             
+            header("Content-Type: text/plain");
+            $flag = false;
+            foreach ($users_excel as $row) {
+                if (! $flag) {
+                      // display field/column names as first row
+                      echo implode("\t", array_keys($row)) . "\r\n";
+                      $flag = true;
+                }
+                echo implode("\t", array_values($row)) . "\r\n";
+            }
+            exit();
+
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }  
+
+    public function viewPostHomeworks_old(Request $request)  {
         if (Auth::check()) { 
             $limit = 50;  $page_no = 0;  $school_id = (new AdminRoleController())->getSchoolId(); 
 
@@ -21728,6 +24680,8 @@ foreach($students as $k=>$v){
                 ->select('ref_no', 'created_by', 'created_at', 'approve_status', 'id')->groupby('ref_no')->orderby('id', 'desc')
                 ->paginate($limit, ['homeworks.*'], 'page', $page_no);
 
+            //echo "<pre>"; print_r($homeworks->toArray()); exit;
+
                 /*Homeworks::leftjoin('classes', 'classes.id', 'homeworks.class_id')
                 ->leftjoin('sections', 'sections.id', 'homeworks.section_id')
                 ->leftjoin('subjects', 'subjects.id', 'homeworks.subject_id')
@@ -21741,6 +24695,482 @@ foreach($students as $k=>$v){
             return redirect('/admin/login');
         }
     }
+
+    // Communication posts  Staffs
+    public function viewPostsStaffs(Request $request)  {
+        if (Auth::check()) { 
+            $limit = 50;  $page_no = 0;  $school_id = (new AdminRoleController())->getSchoolId(); 
+            $categories = Category::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'asc')->get(); 
+            $posts = CommunicationPostStaff::where('delete_status', 0)
+                            ->whereIn('status', ['PENDING', "ACTIVE"])->where('posted_by', $school_id)
+            ->orderby('id', 'desc')
+            ->paginate($limit, ['communication_posts_staff.*'], 'page', $page_no);
+ 
+            return view('admin.posts_staff')->with('categories', $categories)->with('posts', $posts);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function addPostsStaff()
+    {
+        if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $get_category=Category::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','name', 'background_theme_id', 'text_color')->orderBy('position',"ASC")->get();
+
+            $get_background=BackgroundTheme::where('status','ACTIVE')->where('school_id', $school_id)->select('id','name','theme','image')->get();
+
+            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
+                ->whereRAW('(staff_members != "" OR staff_members != NULL)') 
+                ->select('id','group_name')->get();
+
+
+            $teacher_role = UserRoles::where('school_id', $school_id)->where('user_role', 'TEACHER')->select('id','user_role'); 
+            $get_roles= UserRoles::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','user_role')
+                ->union($teacher_role)
+                ->get();
+
+            $get_departments = Departments::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','department_name')->get();
+
+            $get_staff = Teacher::leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    //->where('users.user_type','TEACHER')
+                    ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                    ->where('users.school_college_id', $school_id)->get();
+
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            } else {
+                if(Auth::User()->user_type == 'TEACHER') {
+                    $classes->whereIn('id', [0]);
+                }
+            }
+            $classes = $classes->orderby('position', 'Asc')->get();  
+ 
+            $get_sections=Sections::where('status','ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $get_sections->whereIn('class_id', $classids);
+            }
+            if(Auth::User()->user_type == 'TEACHER') {
+                $sectionids = (new AdminRoleController())->getSchoolTeacherSections(Auth::User()->id);
+                if(count($sectionids)>0) {
+                    $get_sections->whereIn('id', $sectionids);
+                } else {
+                    $get_sections->whereIn('id', [0]);
+                }
+            }
+            $get_sections = $get_sections->get(); 
+
+            //echo "<pre>"; print_r($get_sections->toArray()); exit;
+
+            $get_batches = $this->getBatches(); 
+
+            $acadamic_year = date('Y');
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+            if(!empty($settings)) {
+                $acadamic_year = trim($settings->acadamic_year);
+            }
+            if(empty($acadamic_year)) {  $acadamic_year = date('Y'); }
+            
+            $editor = 1;
+            /*return view('admin.editor',compact('get_category','get_background','get_groups','get_student','get_sections', 'classes', 'get_batches', 'acadamic_year', 'editor'));*/
+
+
+            return view('admin.communicationscholar_staff',compact('get_category','get_background','get_groups','get_staff','get_sections', 'classes', 'get_batches', 'acadamic_year', 'editor', 'get_roles', 'get_departments'));
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function postLoadModalContentStaffs(Request $request) {
+        if (Auth::check()) { 
+            $batch = $request->get('batch'); 
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+
+            $get_staff = DB::table('teachers')->leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','TEACHER')->where('users.school_college_id', $school_id)
+                    ->select('users.id', 'users.name', 'teachers.emp_no')->get(); 
+
+            if($get_staff->isNotEmpty()) {
+                return response()->json([ 'status' => 1, 'message' => 'Students', 'data' => $get_staff]); 
+            } else {
+                return response()->json([ 'status' => 0, 'message' => 'No Students']); 
+            }
+        } else{
+            return response()->json([ 'status' => 0, 'message' => 'Session Logged Out']); 
+        }
+    }
+
+        public function postCommunicationStaff(Request $request){
+
+        if (Auth::check()) {
+            $user_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $post_id   = $request->post_id;  
+            //$input = $request->all(); echo "<pre>"; print_r($input); exit;
+            $title=$request->title;
+            $message=$request->message;
+            $title_push=$request->title_push;
+            $message_push=$request->message_push;
+            $category=$request->category;
+            $batch=$request->batch;
+            $post_type=$request->post_type;
+            $bg_color=$request->bg_color;
+            $req_ack=$request->req_ack;
+            $receiver_end=0;
+            $youtube_link = $request->youtube_link;
+            $class_post = $request->class_post;
+            $group_post = $request->group_post;
+            $student_post = $request->student_post;
+            $section_post = $request->section_post;
+            
+            $sendLaterCheckbox = $request->has('sendLaterCheckbox') ? 1 : 0;
+            $schedule_date = $request->has('schedule_date') ? $request->schedule_date : now();
+            if($sendLaterCheckbox == 0) {
+                $schedule_date = now();
+            }
+            $validator= Validator::make($request->all(), [
+                    'title' => 'required',
+                    'message' => 'required',
+                    'title_push' => 'required',
+                    'message_push' => 'required',
+            ],[]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => 0,
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            } 
+            
+            $inarr = ['post_id' => $post_id,'user_id' => $user_id,'title' => $title,'message' => $message,
+                'title_push' => $title_push,'message_push' => $message_push,'category' => $category,'batch' => $batch,
+                'post_type' => $post_type,'receiver_end' => $receiver_end,'bg_color' => $bg_color,'req_ack' => $req_ack,
+                'schedule_date' => $schedule_date,'school_id' => $school_id,'youtube_link' => $youtube_link, 
+                'class_post' => $class_post, 'section_post' => $section_post, 'student_post' => $student_post, 
+                'group_post' => $group_post
+            ];
+
+            $retresponse = $this->createPostStaff($request, $inarr); 
+
+            return $retresponse; // response()->json(['status'=>1,'message'=>'Post Created Successfully']);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function createPostStaff($request, $inarr=[]) {
+            $post_type = $inarr['post_type'];
+            $school_id = $inarr['school_id'];
+
+            $user_type = DB::table('users')->where('id', $inarr['user_id'])->value('user_type');
+            $receiver_end = '';
+            $save_post_type = $post_type;
+
+            // Group
+            if ($post_type == 4) {
+                $group_post = $request->get('group_post');
+                // Check if 'group_post' is an array
+                if (is_array($group_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end = implode(',', $group_post);
+                } else {
+                    // Handle the case where 'group_post' is not an array (optional)
+                    $receiver_end = '';
+                }
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Groups Mapped']);
+                }
+            }
+
+            // Department
+            if ($post_type == 5) {
+                $department_post = $request->get('department_post');
+                // Check if 'department_post' is an array
+                if (is_array($department_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end = implode(',', $department_post);
+                } else {
+                    // Handle the case where 'department_post' is not an array (optional)
+                    $receiver_end = '';
+                }
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Departments Mapped']);
+                }
+            }
+
+            // Specific Staff
+            if ($post_type == 6) {
+                $student_post = $request->get('student_post');
+                // Check if 'student_post' is an array
+                if (is_array($student_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end = implode(',', $student_post);
+                } else {
+                    // Handle the case where 'student_post' is not an array (optional)
+                    $receiver_end = '';
+                }
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Staffs Mapped']);
+                }
+            }
+            
+            // All Staff
+            if ($post_type == 3) {
+
+                if($user_type == "SCHOOL" ) {
+                    $receiver_end = 0;
+                }   else {
+                    $classids = (new AdminRoleController())->getSchoolRoleClasses();
+                    $mapped_sections = DB::table('sections')->leftjoin('classes', 'classes.id', 'sections.class_id')
+                        ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                        ->where('sections.status','=','ACTIVE')->whereIn('sections.class_id', $classids)
+                        ->select('sections.id')->get();
+                    if($mapped_sections->isNotEmpty()) {
+                        foreach($mapped_sections as $mc) {
+                            $receiver_arr[] = $mc->id;
+                        }
+
+                        $receiver_arr = array_unique($receiver_arr); 
+                        $receiver_arr = array_filter($receiver_arr); 
+                        $receiver_end = implode(',', $receiver_arr);
+                    } else {
+                        return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                    } 
+                }   
+                /*if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                }*/
+
+            } 
+
+            // Role
+            if ($post_type == 2) {
+                $role_post = $request->get('role_post');
+                // Check if 'group_post' is an array
+                if (is_array($role_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end = implode(',', $role_post);
+                } else {
+                    // Handle the case where 'role_post' is not an array (optional)
+                    $receiver_end = '';
+                }
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Roles Mapped']);
+                }
+            }
+
+            // Class Teacher
+            if ($post_type == 1) { 
+                $section_post = $request->get('section_post');
+                $class_post = $request->get('class_post');
+                // Check if 'group_post' is an array 
+
+                $receiver_arr = [];
+                if (is_array($section_post)) {
+                    $receiver_arr = array_merge($receiver_arr, $section_post);
+                }  
+
+                if (is_array($class_post)) {
+                    $class_post = $class_post;
+                    $classes = implode(',', $class_post);
+                    if(is_array($class_post) && count($class_post)>0) { 
+                        $get_sections = Sections::where('status','ACTIVE')->whereIn('class_id',$class_post)
+                            ->where('school_id', $school_id);
+
+                        if($user_type == "TEACHER" ) {
+                            $sectionids = (new AdminRoleController())->getSchoolTeacherSections($inarr['user_id']);
+                            if(count($sectionids)>0) {
+                                $get_sections->whereIn('sections.id', $sectionids);
+                            }
+                        }
+
+                        $get_sections = $get_sections->select('id')->get();
+                        if($get_sections->isNotEmpty()) {
+                            foreach($get_sections as $sec) {
+                                $receiver_arr[] = $sec->id; 
+                            }
+                        }
+                    }
+                }  
+                $receiver_arr = array_unique($receiver_arr); 
+                $receiver_arr = array_filter($receiver_arr); 
+                $receiver_end = implode(',', $receiver_arr);
+
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Class / Sections Mapped']);
+                }
+            } 
+
+            if($post_type != 3 && empty($receiver_end)) {
+                return response()->json(['status'=>0,'message'=>'No Receivers Mapped']);
+            }
+
+            if($inarr['post_id'] > 0) {
+                $post_new= CommunicationPostStaff::find($inarr['post_id']);
+            } else {
+                $post_new= new CommunicationPostStaff;
+                $post_new->created_by=$inarr['user_id'];
+            }
+
+            $post_new->title=$inarr['title'];
+            $post_new->message=$inarr['message'];
+            $post_new->title_push=$inarr['title_push'];
+            $post_new->message_push=$inarr['message_push'];
+            $post_new->category_id=$inarr['category'];
+            $post_new->batch=$inarr['batch'];
+            $post_new->post_type=$save_post_type; //$inarr['post_type'];
+            $post_new->receiver_end=$receiver_end;
+            $post_new->background_id=$inarr['bg_color'];
+            $post_new->request_acknowledge=$inarr['req_ack'];
+            $post_new->notify_datetime=$inarr['schedule_date'];
+            $post_new->posted_by = $inarr['school_id'];
+            $post_new->youtube_link=$inarr['youtube_link']; 
+            
+            if($user_type == "SCHOOL" ) {
+                $post_new->status='ACTIVE';
+            }   else {
+                $post_new->status='PENDING';
+            }
+
+            $maxsize    = 2097152;
+
+            $images = $request->file('image_attachment'); $files = [];
+            if(is_array($images) && count($images)>0) {
+                $allowedExtensions = [ 'jpg', 'jpeg', 'png' ];
+                foreach($images as $image) {
+                    if (!empty($image) && $image != 'null') { 
+                        $ext = $image->getClientOriginalExtension();
+                        $ext = strtolower($ext);
+                        if(!in_array($ext, $allowedExtensions)) {
+                            return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload jpeg,jpg,png']);
+                        }
+
+                        $size = $image->getSize();  
+                        if($size < $maxsize) { // < 2mb can allow 
+                        } else {
+                            return response()->json(['status' => 0, 'message' => 'Please upload the image file size less than 2 MB']);
+                        } 
+                    }
+                }
+
+                foreach($images as $image) {
+                    if (!empty($image) && $image != 'null') { 
+                        $ext = $image->getClientOriginalExtension();
+                        $ext = strtolower($ext);
+                        $image1_name = rand() . time() . '.' . $ext; 
+                        $image->move(public_path('uploads/media/'), $image1_name); 
+                        $files[] = $image1_name;
+                    }
+                    $post_new->image_attachment = implode(',', $files);
+                }
+            } 
+
+            $image = $request->file('media_attachment'); 
+            if (!empty($image) && $image != 'null') { 
+                $allowedExtensions = [ 'mp3', 'wav' ];  
+                $ext = $image->getClientOriginalExtension();
+                $ext = strtolower($ext);
+                if(!in_array($ext, $allowedExtensions)) {
+                    return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload mp3,wav']);
+                } 
+
+                $size = $image->getSize();  
+                if($size < $maxsize) { // < 2mb can allow 
+                } else {
+                    return response()->json(['status' => 0, 'message' => 'Please upload the audio file size less than 2 MB']);
+                } 
+
+                $image1_name = rand() . time() . '.' . $ext; 
+                $image->move(public_path('uploads/media/'), $image1_name);  
+                $post_new->media_attachment = $image1_name; 
+            } 
+
+            $image = $request->file('video_attachment'); 
+            if (!empty($image) && $image != 'null') { 
+                $allowedExtensions = [ 'mp4', 'wmv' ];  
+                $ext = $image->getClientOriginalExtension();
+                $ext = strtolower($ext);
+                if(!in_array($ext, $allowedExtensions)) {
+                    return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload mp4,wmv']);
+                } 
+                $size = $image->getSize();  
+                
+                $vmaxsize = '25000000'; // for video alone 25 mb
+
+                if($size < $vmaxsize) { // < 25mb can allow 
+                } else {
+                    return response()->json(['status' => 0, 'message' => 'Please upload the video file size less than 25 MB']);
+                } 
+
+                $image1_name = rand() . time() . '.' . $ext; 
+                $image->move(public_path('uploads/media/'), $image1_name);  
+                $post_new->video_attachment = $image1_name; 
+            } 
+
+            $images = $request->file('files_attachment'); $files = [];
+            if(is_array($images) && count($images)>0) {
+                $allowedExtensions = [ 'doc', 'pdf', 'xls', 'ppt', 'pptx', 'xlsx', 'docx' ];
+                foreach($images as $image) {
+                    if (!empty($image) && $image != 'null') { 
+                        $ext = $image->getClientOriginalExtension();
+                        $ext = strtolower($ext);
+                        if(!in_array($ext, $allowedExtensions)) {
+                            return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload doc,pdf,xls,pptx']);
+                        }
+                        $size = $image->getSize();  
+                        if($size < $maxsize) { // < 2mb can allow 
+                        } else {
+                            return response()->json(['status' => 0, 'message' => 'Please upload the file attachments size less than 2 MB']);
+                        } 
+                    }
+                }
+
+                foreach($images as $image) {
+                    if (!empty($image) && $image != 'null') { 
+                        $ext = $image->getClientOriginalExtension();
+                        $ext = strtolower($ext);
+                        $image1_name = rand() . time() . '.' . $ext; 
+                        $image->move(public_path('uploads/media/'), $image1_name); 
+                        $files[] = $image1_name;
+                    }
+                    $post_new->files_attachment = implode(',', $files);
+                }
+            } 
+            //echo "<pre>"; print_r($post_new); exit;
+            $post_new->save();
+
+            return response()->json(['status'=>1,'message'=>'Post Created Successfully']);
+    }
+
+
+    // Delete Staff posts 
+    public function deletePostsStaffs(Request $request) {
+
+        if (Auth::check()) {
+            DB::table('communication_posts_staff')->where('id', $request->get('post_id'))
+                ->update(['status' => 'INACTIVE', 'delete_status'=>1, 'updated_by'=>Auth::User()->id, 'updated_at'=>date('Y-m-d H:i:s')]);
+
+            return response()->json([ 'status' => 1, 'message' => 'Post deleted successfully']); 
+        } else {
+            return response()->json([ 'status' => 0, 'message' => 'Session Logged Out']); 
+        }    
+    } 
 
     // Communication posts 
     public function viewPosts(Request $request)  {
@@ -21767,7 +25197,7 @@ foreach($students as $k=>$v){
             $from_date = $request->get('filter_from_date', '');
             $to_date = $request->get('filter_to_date', ''); 
             $search = $request->get('filter_search', ''); 
-            $filter_category_id = $request->get('filter_category_id', ''); 
+            $filter_category_id = $request->get('filter_category_id'); 
 
             $school_id = (new AdminRoleController())->getSchoolId(); 
 
@@ -21777,8 +25207,7 @@ foreach($students as $k=>$v){
                 switch ($filter_pagename) {
                     case 'communcation_posts':  
                         $page_no = $filter_page;  
-                        $posts = CommunicationPost::where('delete_status', 0)
-                            ->whereIn('status', ['PENDING', "ACTIVE"])->where('posted_by', $school_id);
+                        $posts = CommunicationPost::where('posted_by', $school_id);
 
                         if(!empty(trim($from_date))) {
                             $from_date = date('Y-m-d', strtotime($from_date));
@@ -21790,8 +25219,15 @@ foreach($students as $k=>$v){
                             $posts->whereRaw('communication_posts.notify_datetime <= ?', [$to_date]); 
                         }
                         if($filter_category_id > 0) { 
-                            $posts->where('communication_posts.category_id', $filter_category_id); 
-                        } 
+                            $posts->where('communication_posts.category_id', $filter_category_id)
+                                ->whereIn('status', ['PENDING', "ACTIVE"]); 
+                        } else if($filter_category_id == 'Deleted') { 
+                            $posts->where('communication_posts.status', 'DELETED')->where('delete_status', 1); 
+                        } else if($filter_category_id == 'Inactive') { 
+                            $posts->where('communication_posts.status', 'INACTIVE'); 
+                        } else {
+                            $posts->where('delete_status', 0)->whereIn('status', ['PENDING', "ACTIVE"]);
+                        }
                         if(!empty(trim($search))) { 
                             $posts->whereRaw(' ( title like "%'.$search.'%" or message like "%'.$search.'%" ) '); 
                         }
@@ -21819,9 +25255,17 @@ foreach($students as $k=>$v){
                             $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
                             $posts->whereRaw('communication_sms.notify_datetime <= ?', [$to_date]); 
                         }
+                        
                         if($filter_category_id > 0) { 
-                            $posts->where('communication_sms.category_id', $filter_category_id); 
-                        } 
+                            $posts->where('communication_sms.category_id', $filter_category_id)
+                                ->whereIn('status', ['PENDING', "ACTIVE"]); 
+                        } else if($filter_category_id == 'Deleted') { 
+                            $posts->where('communication_sms.status', 'DELETED')->where('delete_status', 1); 
+                        } else if($filter_category_id == 'Inactive') { 
+                            $posts->where('communication_sms.status', 'INACTIVE'); 
+                        } else {
+                            $posts->where('delete_status', 0)->whereIn('status', ['PENDING', "ACTIVE"]);
+                        }
                         if(!empty(trim($search))) { 
                             $posts->whereRaw(' ( content like "%'.$search.'%" ) '); 
                         }
@@ -21871,11 +25315,108 @@ foreach($students as $k=>$v){
                             $posts->where('homeworks.subject_id', $filter_subject_id); 
                         }
 
-                        $posts = $posts->groupby('ref_no')->orderby('id', 'desc')
+                        $posts = $posts->groupby('main_ref_no')->orderby('id', 'desc')
                             ->paginate($limit, ['homeworks.*'], 'page', $page_no);
-                        $content =  view('admin.posthomeworks_list')->with('posts',$posts)->render(); 
+                        $content =  view('admin.post_homeworks_list')->with('posts',$posts)->render(); 
 
                         return response()->json(['status'=>1, 'message' => 'Homeworks list','data'=>$content]);
+
+                    break;  
+                    
+                    case 'communication_posts_staff':  
+                        $page_no = $filter_page;  
+                        $posts = CommunicationPostStaff::where('delete_status', 0)
+                            ->whereIn('status', ['PENDING', "ACTIVE"])->where('posted_by', $school_id);
+
+                        if(!empty(trim($from_date))) {
+                            $from_date = date('Y-m-d', strtotime($from_date));
+                            $posts->whereRaw('communication_posts_staff.notify_datetime >= ?', [$from_date]); 
+                
+                        }
+                        if(!empty(trim($to_date))) {
+                            $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
+                            $posts->whereRaw('communication_posts_staff.notify_datetime <= ?', [$to_date]); 
+                        }
+                        if($filter_category_id > 0) { 
+                            $posts->where('communication_posts_staff.category_id', $filter_category_id); 
+                        } 
+                        if(!empty(trim($search))) { 
+                            $posts->whereRaw(' ( title like "%'.$search.'%" or message like "%'.$search.'%" ) '); 
+                        }
+
+                        $posts = $posts->orderby('id', 'desc')
+                            ->paginate($limit, ['communication_posts_staff.*'], 'page', $page_no);
+                        $content =  view('admin.posts_staff_list')->with('posts',$posts)->render(); 
+
+                        return response()->json(['status'=>1, 'message' => 'Posts list','data'=>$content]);
+
+
+                    break;
+
+                    case 'staff_notifications':  
+                        $page_no = $filter_page;  
+                        $posts = StaffNotifications::where('user_id', Auth::User()->id)->orderby('id', 'desc');
+
+                        if(!empty(trim($from_date))) {
+                            $from_date = date('Y-m-d', strtotime($from_date));
+                            $posts->whereRaw('staff_notifications.notify_date >= ?', [$from_date]); 
+                
+                        }
+                        if(!empty(trim($to_date))) {
+                            $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
+                            $posts->whereRaw('staff_notifications.notify_date <= ?', [$to_date]); 
+                        }
+                        if($filter_category_id > 0) { 
+                           // $posts->where('staff_notifications.category_id', $filter_category_id); 
+                        } 
+                        if(!empty(trim($search))) { 
+                            $posts->whereRaw(' ( title like "%'.$search.'%" or message like "%'.$search.'%" ) '); 
+                        }
+
+                        $posts = $posts->orderby('id', 'desc')
+                            ->paginate($limit, ['staff_notifications.*'], 'page', $page_no);
+                        $content =  view('admin.postnotifications_list')->with('posts',$posts)->render(); 
+
+                        $ids = [];
+                        if($posts->isNotEmpty()) {
+                            foreach($posts as $post) {
+                                $ids[] = $post->id;
+                            }
+                            StaffNotifications::whereIn('id', $ids)->update(['read_status'=>1, 'read_date' => date('Y-m-d H:i:s')]);
+
+                        }
+
+                        return response()->json(['status'=>1, 'message' => 'Posts list','data'=>$content]);
+
+
+                    break; 
+
+                    case 'communcation_survey':  
+                        $page_no = $filter_page;  
+                        $school_id = (new AdminRoleController())->getSchoolId();  
+                        $posts = $posts = Survey::where('status','!=', 'DELETED')->where('school_id', $school_id);
+
+                        if(!empty(trim($from_date))) {
+                            $from_date = date('Y-m-d', strtotime($from_date));
+                            $posts->whereRaw('survey.expiry_date >= ?', [$from_date]); 
+                
+                        }
+                        if(!empty(trim($to_date))) {
+                            $to_date = date('Y-m-d', strtotime('+1 day'.$to_date));
+                            $posts->whereRaw('survey.expiry_date <= ?', [$to_date]); 
+                        }
+                        if($filter_category_id > 0) { 
+                           // $posts->where('staff_notifications.category_id', $filter_category_id); 
+                        } 
+                        if(!empty(trim($search))) { 
+                            $posts->whereRaw(' ( survey_question like "%'.$search.'%" or survey_option1 like "%'.$search.'%"  or survey_option2 like "%'.$search.'%" ) '); 
+                        }
+
+                        $posts = $posts->orderby('id', 'desc')
+                            ->paginate($limit, ['survey.*'], 'page', $page_no);
+                        $content =  view('admin.postsurvey_list')->with('posts',$posts)->render();   
+                        return response()->json(['status'=>1, 'message' => 'Posts list','data'=>$content]);
+
 
                     break; 
                 }
@@ -21900,12 +25441,18 @@ foreach($students as $k=>$v){
                 ->where('student_class_mappings.school_id', $school_id);
             if(count($classids)>0) {
                 $get_student->whereIn('students.class_id', $classids);
+            } else {
+                if(Auth::User()->user_type == 'TEACHER') {
+                    $get_student->whereIn('students.class_id', [0]);
+                }
             }
 
             if(Auth::User()->user_type == 'TEACHER') {
                 $sectionids = (new AdminRoleController())->getSchoolTeacherSections(Auth::User()->id);
                 if(count($sectionids)>0) {
                     $get_student->whereIn('students.section_id', $sectionids);
+                } else {
+                    $get_student->whereIn('students.section_id', [0]);
                 }
             }
             $get_student = $get_student->select('students.*')->get(); 
@@ -21926,12 +25473,18 @@ foreach($students as $k=>$v){
 
             $school_id = (new AdminRoleController())->getSchoolId(); 
 
-            $get_category=Category::where('status','ACTIVE')->where('school_id', $school_id)->select('id','name')->orderBy('position',"ASC")->get();
+            $get_category=Category::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','name', 'background_theme_id', 'text_color')->orderBy('position',"ASC")->get();
 
             $get_background=BackgroundTheme::where('status','ACTIVE')->where('school_id', $school_id)->select('id','name','theme','image')->get();
 
             $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
-                ->select('id','group_name')->get();
+                ->whereRAW('(members != "" OR members != NULL)');
+
+            if(Auth::User()->user_type == 'TEACHER') {
+                $get_groups->whereRAW(' FIND_IN_SET('.Auth::User()->id.', staff_members) ');
+            }
+            $get_groups = $get_groups->select('id','group_name', 'members')->get(); 
 
             $get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
                     ->where('users.status','ACTIVE')->where('users.delete_status','0')
@@ -21942,6 +25495,79 @@ foreach($students as $k=>$v){
             $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
             if(count($classids)>0) {
                 $classes->whereIn('id', $classids);
+            } else {
+                if(Auth::User()->user_type == 'TEACHER') {
+                    $classes->whereIn('id', [0]);
+                }
+            }
+            $classes = $classes->orderby('position', 'Asc')->get();  
+ 
+            $get_sections=Sections::where('status','ACTIVE')->where('school_id', $school_id);
+
+            if(count($classids)>0) {
+                $get_sections->whereIn('class_id', $classids);
+            }
+            if(Auth::User()->user_type == 'TEACHER') {
+                $sectionids = (new AdminRoleController())->getSchoolTeacherSections(Auth::User()->id);
+  
+                if(count($sectionids)>0) {
+                    $get_sections->whereIn('id', $sectionids);
+                } else {
+                    $get_sections->whereIn('id', [0]);
+                }
+            }
+            $get_sections = $get_sections->get();  
+            $get_batches = $this->getBatches(); 
+
+            $acadamic_year = date('Y');
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+            if(!empty($settings)) {
+                $acadamic_year = trim($settings->acadamic_year);
+            }
+            if(empty($acadamic_year)) {  $acadamic_year = date('Y'); }
+            
+            $editor = 1;
+
+            $get_staff = Teacher::leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','TEACHER')->where('users.school_college_id', $school_id)->get();
+            /*return view('admin.editor',compact('get_category','get_background','get_groups','get_student','get_sections', 'classes', 'get_batches', 'acadamic_year', 'editor'));*/
+
+
+            return view('admin.communicationscholar',compact('get_category','get_background','get_groups','get_student','get_sections', 'classes', 'get_batches', 'acadamic_year', 'editor', 'get_staff'));
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function editPosts(Request $request)
+    {
+        if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $get_category=Category::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','name', 'background_theme_id', 'text_color')->orderBy('position',"ASC")->get();
+
+            $get_background=BackgroundTheme::where('status','ACTIVE')->where('school_id', $school_id)->select('id','name','theme','image')->get();
+
+            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
+                ->whereRAW('(members != "" OR members != NULL)')
+                ->select('id','group_name', 'members')->get(); 
+
+            $get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','STUDENT')->where('users.school_college_id', $school_id)->get();
+
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            } else {
+                if(Auth::User()->user_type == 'TEACHER') {
+                    $classes->whereIn('id', [0]);
+                }
             }
             $classes = $classes->orderby('position', 'Asc')->get();  
  
@@ -21951,7 +25577,11 @@ foreach($students as $k=>$v){
             }
             if(Auth::User()->user_type == 'TEACHER') {
                 $sectionids = (new AdminRoleController())->getSchoolTeacherSections(Auth::User()->id);
-                $get_sections->whereIn('id', $sectionids);
+                if(count($sectionids)>0) {
+                    $get_sections->whereIn('id', $sectionids);
+                } else {
+                    $get_sections->whereIn('id', [0]);
+                }
             }
             $get_sections = $get_sections->get(); 
 
@@ -21965,51 +25595,13 @@ foreach($students as $k=>$v){
             if(empty($acadamic_year)) {  $acadamic_year = date('Y'); }
             
             $editor = 1;
-            /*return view('admin.editor',compact('get_category','get_background','get_groups','get_student','get_sections', 'classes', 'get_batches', 'acadamic_year', 'editor'));*/
-
-
-            return view('admin.communicationscholar',compact('get_category','get_background','get_groups','get_student','get_sections', 'classes', 'get_batches', 'acadamic_year', 'editor'));
-        } else {
-            return redirect('/admin/login');
-        }
-    }
-
-    public function editPosts(Request $request)
-    {
-        if (Auth::check()) {
-
-            $school_id = (new AdminRoleController())->getSchoolId(); 
-
-            $get_category=Category::where('status','ACTIVE')->where('school_id', $school_id)->select('id','name')->orderBy('position',"ASC")->get();
-
-            $get_background=BackgroundTheme::where('status','ACTIVE')->where('school_id', $school_id)->select('id','name','theme','image')->get();
-
-            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)->select('id','group_name')->get();
-
-            $get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
-                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
-                    ->where('users.user_type','STUDENT')->where('users.school_college_id', $school_id)->get();  
-
-            $classids = (new AdminRoleController())->getSchoolRoleClasses();
-
-            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
-            if(count($classids)>0) {
-                $classes->whereIn('id', $classids);
-            }
-            $classes = $classes->orderby('position', 'Asc')->get();  
-
-            $get_sections=Sections::where('status','ACTIVE')->where('school_id', $school_id);
-            if(count($classids)>0) {
-                $get_sections->whereIn('class_id', $classids);
-            }
-            $get_sections = $get_sections->get(); 
 
             $post = CommunicationPost::where('id', $request->get('id'))->get();
             if($post->isNotEmpty()) {
                 $post = $post[0]->toArray();
             }
             return view('admin.communicationscholaredit',compact('get_category','get_background','get_groups','get_student',
-                    'get_sections', 'post', 'classes'));
+                    'get_sections', 'post', 'classes', 'get_batches', 'acadamic_year', 'editor'));
         } else {
             return redirect('/admin/login');
         }
@@ -22053,7 +25645,8 @@ foreach($students as $k=>$v){
                     //->leftjoin('notifications', 'notifications.user_id', 'users.id')
                     ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
                     ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
-                    ->where('users.fcm_id', '!=', '')
+                    //->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
                     //->where('notifications.type_no', 4)->where('notifications.post_id', $post_id)   
                     ->select('users.id', 'users.name', 'users.mobile',  'users.fcm_id',  'users.is_app_installed',
                             'classes.class_name', 'sections.section_name'); 
@@ -22064,7 +25657,8 @@ foreach($students as $k=>$v){
                     //->leftjoin('notifications', 'notifications.user_id', 'users.id')
                     ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
                     ->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
-                     ->where('users.fcm_id', '!=', '')
+                    // ->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
                     //->where('notifications.type_no', 4)->where('notifications.post_id', $post_id)   
                     ->select('users.id', 'users.name', 'users.mobile',  'users.fcm_id',  'users.is_app_installed',
                             'classes.class_name', 'sections.section_name'); 
@@ -22181,7 +25775,8 @@ foreach($students as $k=>$v){
                     ->leftjoin('notifications', 'notifications.user_id', 'users.id')
                     ->where('users.user_type', 'STUDENT')->where('users.school_college_id', $school_id)
                     //->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
-                     ->where('users.fcm_id', '!=', '')
+                    // ->where('users.fcm_id', '!=', '')
+                    ->whereNotNULL('users.topics_subscribed')
                     ->where('notifications.type_no', 4)->where('notifications.post_id', $post_id)  
                     ->select('users.id', 'users.fcm_id'); 
 
@@ -22446,6 +26041,7 @@ foreach($students as $k=>$v){
             $group_post = $request->group_post;
             $student_post = $request->student_post;
             $section_post = $request->section_post;
+            $staff_post = $request->get('staff_post', []);
             
             $sendLaterCheckbox = $request->has('sendLaterCheckbox') ? 1 : 0;
             $schedule_date = $request->has('schedule_date') ? $request->schedule_date : now();
@@ -22475,7 +26071,7 @@ foreach($students as $k=>$v){
                 'post_type' => $post_type,'receiver_end' => $receiver_end,'bg_color' => $bg_color,'req_ack' => $req_ack,
                 'schedule_date' => $schedule_date,'school_id' => $school_id,'youtube_link' => $youtube_link, 
                 'class_post' => $class_post, 'section_post' => $section_post, 'student_post' => $student_post, 
-                'group_post' => $group_post
+                'group_post' => $group_post, 'staff_post' => $staff_post
             ];
 
             $retresponse = $this->createPost($request, $inarr); 
@@ -22492,8 +26088,19 @@ foreach($students as $k=>$v){
             $school_id = $inarr['school_id'];
 
             $user_type = DB::table('users')->where('id', $inarr['user_id'])->value('user_type');
-            $receiver_end = '';
+            $receiver_end = ''; $cc_ids = '';
             $save_post_type = $post_type;
+
+
+            $staff_post = $request->get('staff_post');
+            // Check if 'staff_post' is an array
+            if (is_array($staff_post)) {
+                // Convert the array to a comma-separated string
+                $cc_ids = implode(',', $staff_post);
+            } else {
+                // Handle the case where 'staff_post' is not an array (optional)
+                $cc_ids = '';
+            }  
 
             if ($post_type == 4) {
                 $group_post = $request->get('group_post');
@@ -22628,6 +26235,10 @@ foreach($students as $k=>$v){
                 $post_new->created_by=$inarr['user_id'];
             }
 
+            if(strtotime($inarr['schedule_date']) < strtotime(date('Y-m-d H:i:s'))) {
+                $inarr['schedule_date'] = date('Y-m-d H:i:s');
+            }
+
             $post_new->title=$inarr['title'];
             $post_new->message=$inarr['message'];
             $post_new->title_push=$inarr['title_push'];
@@ -22636,6 +26247,7 @@ foreach($students as $k=>$v){
             $post_new->batch=$inarr['batch'];
             $post_new->post_type=$save_post_type; //$inarr['post_type'];
             $post_new->receiver_end=$receiver_end;
+            $post_new->cc_ids=$cc_ids;
             $post_new->background_id=$inarr['bg_color'];
             $post_new->request_acknowledge=$inarr['req_ack'];
             $post_new->notify_datetime=$inarr['schedule_date'];
@@ -22710,9 +26322,12 @@ foreach($students as $k=>$v){
                     return response()->json(['status' => 0, 'message' => 'File format wrong. Please upload mp4,wmv']);
                 } 
                 $size = $image->getSize();  
-                if($size < $maxsize) { // < 2mb can allow 
+                
+                $vmaxsize = '25000000'; // for video alone 25 mb
+
+                if($size < $vmaxsize) { // < 25mb can allow 
                 } else {
-                    return response()->json(['status' => 0, 'message' => 'Please upload the video file size less than 2 MB']);
+                    return response()->json(['status' => 0, 'message' => 'Please upload the video file size less than 25 MB']);
                 } 
 
                 $image1_name = rand() . time() . '.' . $ext; 
@@ -22755,11 +26370,91 @@ foreach($students as $k=>$v){
             return response()->json(['status'=>1,'message'=>'Post Created Successfully']);
     }
 
+    public function postCommunicationUpdate(Request $request){
+
+        if (Auth::check()) {
+            $user_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $post_id   = $request->post_id;  
+
+            $title=$request->title;
+            $message=$request->message;
+            $title_push=$request->title_push;
+            $message_push=$request->message_push;
+            $category=$request->category;  
+            $bg_color=$request->bg_color;
+            $req_ack=$request->req_ack; 
+            $youtube_link = $request->youtube_link; 
+
+            $validator= Validator::make($request->all(), [
+                    'title' => 'required',
+                    'message' => 'required', 
+                    'category' => 'required', 
+            ],[]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => 0,
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }  
+
+            if($post_id > 0) {  
+
+                $post_new = DB::table('communication_posts')->where('id', $post_id)->where('posted_by', $school_id)->first();
+
+                if(!empty($post_new)) {
+             
+                    //$schedule_date = $request->has('schedule_date') ? $request->schedule_date : $post_new->notify_datetime; 
+                    $schedule_date = $post_new->notify_datetime; 
+
+                    if($request->has('schedule_date')) {
+                        $schedule_date = $request->schedule_date;
+                        if(strtotime($schedule_date) < strtotime(date('Y-m-d H:i:s'))) {
+                            $schedule_date = date('Y-m-d H:i:s');
+                        }
+                    }
+                    $data = [
+                        'title' => $title,
+                        'message' => $message,
+                        'title_push' => $title_push,
+                        'message_push' => $message_push,
+                        'category_id' => $category,
+                        'background_id' => $bg_color,
+                        'request_acknowledge' => $req_ack,
+                        'youtube_link' => $youtube_link,
+                        'notify_datetime' => $schedule_date,
+                        'updated_by' => Auth::User()->id,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]; 
+
+                    DB::table('communication_posts')->where('id', $post_id)->where('posted_by', $school_id)
+                        ->update($data);
+
+                    return  response()->json(['status'=>1,'message'=>'Post updated Successfully']);
+
+                } else {
+                    return response()->json(['status'=>0,'message'=>'Invalid Post']);
+                }
+  
+            }   else {
+                return response()->json(['status'=>0,'message'=>'Invalid Post']);
+            }
+
+        } else {
+            return response()->json(['status'=>0,'message'=>'Session Logged Out']);
+        }
+    }
+
     public function deletePosts(Request $request) {
 
         if (Auth::check()) {
             DB::table('communication_posts')->where('id', $request->get('post_id'))
-                ->update(['delete_status'=>1, 'updated_by'=>Auth::User()->id, 'updated_at'=>date('Y-m-d H:i:s')]);
+                ->update(['status' => 'DELETED', 'delete_status'=>1, 'updated_by'=>Auth::User()->id, 'updated_at'=>date('Y-m-d H:i:s')]);
 
             return response()->json([ 'status' => 1, 'message' => 'Post deleted successfully']); 
         } else {
@@ -23089,6 +26784,10 @@ foreach($students as $k=>$v){
 
             $post_new= new CommunicationSms;
 
+            if(strtotime($schedule_date) < strtotime(date('Y-m-d H:i:s'))) {
+                $schedule_date = date('Y-m-d H:i:s');
+            }
+
             $post_new->template_id=$inarr['template_id'];
             $post_new->category_id=$inarr['category'];
             $post_new->batch=$inarr['batch'];
@@ -23102,12 +26801,111 @@ foreach($students as $k=>$v){
             $post_new->posted_by=$school_id;
             $post_new->created_by=$inarr['user_id'];
 
+            if($user_type == "SCHOOL" ) {
+                $post_new->status='ACTIVE';
+            }   else {
+                $post_new->status='PENDING';
+            }
+
 
              //echo "<pre>"; print_r($post_new);
 
             $post_new->save();
 
             return response()->json(['status'=>1,'message'=>'Sms Created Successfully']);
+    }
+
+        public function postCommunicationUpdateSmsScholar(Request $request){
+
+        if (Auth::check()) {
+            $user_id = Auth::User()->id;
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $post_id   = $request->post_id;  
+            //$input = $request->all(); echo "<pre>"; print_r($input); exit;
+            $template_id=$request->template;
+            $category_id=$request->category;
+            $final_content=$request->final_content;
+            $smart_sms=$request->smart_sms;
+            $send_type=$request->send_type;  
+            $schedule_date=$request->schedule_date;
+            $batch=$request->batch;  
+            $vars = $request->vars;
+
+            $validator= Validator::make($request->all(), [
+                    'template' => 'required',
+                    'final_content' => 'required', 
+                    'category' => 'required', 
+                    'vars' => 'required', 
+            ],[]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => 0,
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }  
+
+            if($post_id > 0) {  
+
+                $post_new = DB::table('communication_sms')->where('id', $post_id)->where('posted_by', $school_id)->first();
+
+                if(!empty($post_new)) {
+
+                    $user_type = DB::table('users')->where('id', $user_id)->value('user_type');
+             
+                    //$schedule_date = $request->has('schedule_date') ? $request->schedule_date : $post_new->notify_datetime;  
+
+                    if($request->has('schedule_date')) {
+                        $schedule_date = $request->schedule_date;
+                        if(strtotime($schedule_date) < strtotime(date('Y-m-d H:i:s'))) {
+                            $schedule_date = date('Y-m-d H:i:s');
+                        }
+                    }
+
+                    if($user_type == "SCHOOL" ) {
+                        $status = 'ACTIVE';
+                    }   else {
+                        $status = 'PENDING';
+                    }
+
+                    $content_vars = '';
+                    if(count($vars) > 0) {
+                        $content_vars = serialize($vars);
+                    }
+
+                    $data = [
+                        'template_id' => $template_id,
+                        'category_id' => $category_id,
+                        'batch' => $batch,
+                        'smart_sms' => $smart_sms,
+                        'send_type' => $send_type,
+                        'content' => $final_content,
+                        'content_vars' => $content_vars, 
+                        'notify_datetime' => $schedule_date,
+                        'status' => $status,
+                        'updated_by' => Auth::User()->id,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ];    
+
+                    DB::table('communication_sms')->where('id', $post_id)->update($data);
+
+                    return  response()->json(['status'=>1,'message'=>'Post updated Successfully']);
+
+                } else {
+                    return response()->json(['status'=>0,'message'=>'Invalid Post']);
+                }
+  
+            }   else {
+                return response()->json(['status'=>0,'message'=>'Invalid Post']);
+            }
+
+        } else {
+            return response()->json(['status'=>0,'message'=>'Session Logged Out']);
+        }
     }
 
     public function editPostSms(Request $request)
@@ -23143,7 +26941,7 @@ foreach($students as $k=>$v){
 
         if (Auth::check()) {
             DB::table('communication_sms')->where('id', $request->get('post_id'))
-                ->update(['delete_status'=>1, 'updated_by'=>Auth::User()->id, 'updated_at'=>date('Y-m-d H:i:s')]);
+                ->update(['status' => 'DELETED', 'delete_status'=>1, 'updated_by'=>Auth::User()->id, 'updated_at'=>date('Y-m-d H:i:s')]);
 
             return response()->json([ 'status' => 1, 'message' => 'Post SMS deleted successfully']); 
         } else {
@@ -23551,11 +27349,12 @@ foreach($students as $k=>$v){
     }  
 
     //view SMS Credits
-    public function viewSMSCredits()
+    public function viewSMSCredits(Request $request)
     {
         if (Auth::check()) {
+            $school_id = $request->get('id', 0);
             $schools =  User::where('user_type', 'SCHOOL')->where('status','ACTIVE')->where('delete_status',0)->get();
-            return view('admin.smscredits')->with('schools', $schools);
+            return view('admin.smscredits')->with('schools', $schools)->with('school_id', $school_id);
         } else {
             return redirect('/admin/login');
         }
@@ -23563,25 +27362,94 @@ foreach($students as $k=>$v){
 
     public function getSMSCredits(Request $request)
     {
-
         if (Auth::check()) {
-            $school_id = (new AdminRoleController())->getSchoolId(); 
-            $status = $request->get('status',0);
-           if($status != ''){
-            $mclass = SMSCredits::leftjoin('users', 'users.id', 'communication_sms_credits.school_id')
-                ->where('communication_sms_credits.status','=',$status)
-                ->select('users.name','communication_sms_credits.*')->get();//->where('school_id', $school_id)
-           }else{
-            $mclass = SMSCredits::leftjoin('users', 'users.id', 'communication_sms_credits.school_id')
-                ->select('users.name','communication_sms_credits.*')->get(); //where('school_id', $school_id)->
-           }
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
 
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $school_id = $request->get('school_id',0);
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+ 
+            $creditsqry = SMSCredits::leftjoin('users', 'communication_sms_credits.school_id', 'users.id') 
+                ->select('users.name','communication_sms_credits.*');
+            $filteredqry = SMSCredits::leftjoin('users', 'communication_sms_credits.school_id', 'users.id') 
+                ->select('users.name','communication_sms_credits.*');
 
-            return Datatables::of($mclass)->make(true);
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $creditsqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $creditsqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $creditsqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR communication_sms_credits.total_credits like "%'.$search['value'] . '%" ) ');
+                    
+                    $filteredqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR communication_sms_credits.total_credits like "%'.$search['value'] . '%" ) ');
+                }
+            }
+
+            if(!empty($status)){
+                $creditsqry->where('status',$status);
+                $filteredqry->where('status',$status);
+            }
+
+            if($school_id > 0){
+                $creditsqry->where('communication_sms_credits.school_id',$school_id);
+                $filteredqry->where('communication_sms_credits.school_id',$school_id);
+            }
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'communication_sms_credits.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $credits = $creditsqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = SMSCredits::orderby('id', 'asc');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($credits)) {
+                foreach ($credits as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
         } else {
             return redirect('/admin/login');
-        }
-
+        } 
     }
 
     public function postSMSCredits(Request $request)
@@ -23657,12 +27525,121 @@ foreach($students as $k=>$v){
         }
     }
 
+    //view SMS Consolidated School Credits
+    public function viewSMSSchoolCredits()
+    {
+        if (Auth::check()) {
+            $schools =  DB::table('users')->where('user_type', 'SCHOOL')->where('status','ACTIVE')->where('delete_status',0)
+                ->select('id', 'name')->get();
+            return view('admin.smsschoolcredits')->with('schools', $schools);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getSMSSchoolCredits(Request $request)
+    {
+
+        if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $school_id = $request->get('school_id',0);
+            $search = $request->get('search');
+
+            $creditsqry = SMSCredits::leftjoin('users', 'communication_sms_credits.school_id', 'users.id')
+                ->where('communication_sms_credits.status', 'YES')
+                ->whereRAW(" communication_sms_credits.id IN (SELECT MAX(communication_sms_credits.id) AS id FROM communication_sms_credits WHERE status = 'YES' GROUP BY communication_sms_credits.school_id) ")
+                ->select('communication_sms_credits.school_id', 'users.name', DB::RAW('sum(total_credits) as total_credits'), 
+                    'available_credits'
+                )->groupby('communication_sms_credits.school_id');
+            $filteredqry = SMSCredits::leftjoin('users', 'communication_sms_credits.school_id', 'users.id')
+                ->where('communication_sms_credits.status', 'YES')
+                ->whereRAW(" communication_sms_credits.id IN (SELECT MAX(communication_sms_credits.id) AS id FROM communication_sms_credits WHERE status = 'YES' GROUP BY communication_sms_credits.school_id) ")
+                ->select('communication_sms_credits.school_id', 'users.name', DB::RAW('sum(total_credits) as total_credits'), 
+                    'available_credits'
+                )->groupby('communication_sms_credits.school_id');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $creditsqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $creditsqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $creditsqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%" ) ');
+                    
+                    $filteredqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%" ) ');
+                }
+            }
+
+            if($school_id > 0){
+                $creditsqry->where('school_id',$school_id);
+                $filteredqry->where('school_id',$school_id);
+            }
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'communication_sms_credits.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $credits = $creditsqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = SMSCredits::orderby('id', 'asc');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($credits)) {
+                foreach ($credits as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }
+
     //view Categories
     public function viewCategories()
     {
         if (Auth::check()) {
-
-            return view('admin.categories');
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+            $bgthemes = BackgroundTheme::where('school_id', $school_id)->get();
+            return view('admin.categories')->with('bgthemes', $bgthemes);
         } else {
             return redirect('/admin/login');
         }
@@ -23672,16 +27649,92 @@ foreach($students as $k=>$v){
     {
 
         if (Auth::check()) {
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $status = $request->get('status', ''); 
+            $search = $request->get('search');
             $school_id = (new AdminRoleController())->getSchoolId(); 
-            $status = $request->get('status',0);
-           if($status != ''){
-            $mclass = Category::where('status','=',$status)->where('school_id', $school_id)->get();
-           }else{
-            $mclass = Category::where('school_id', $school_id)->get();
-           }
+
+            $users_qry = Category::leftjoin('background_themes', 'background_themes.id', 'categories.background_theme_id')
+                ->where('categories.status','!=', 'DELETED')->where('categories.school_id', $school_id) 
+                ->select('categories.*', 'background_themes.name as bg_name');
+            $filtered_qry = Category::leftjoin('background_themes', 'background_themes.id', 'categories.background_theme_id')
+                ->where('categories.status','!=', 'DELETED')->where('categories.school_id', $school_id);
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'users.status') {
+                            $users_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $users_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( categories.name like "%'.$search['value'] . '%" OR background_themes.name like "%'.$search['value'] . '%" )');
+                    $filtered_qry->whereRaw('( categories.name like "%'.$search['value'] . '%" OR background_themes.name like "%'.$search['value'] . '%" )');
+                }
+            }
+
+            if(!empty($status)){
+                $users_qry->where('categories.status',$status);
+                $filtered_qry->where('categories.status',$status);
+            }  
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'categories.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $users = $users_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+            $totalData = DB::table('categories')->leftjoin('background_themes', 'background_themes.id', 'categories.background_theme_id')->where('categories.status','!=', 'DELETED')
+                ->where('categories.school_id', $school_id);
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
 
 
-            return Datatables::of($mclass)->make(true);
+            $data = [];
+            if (!empty($users)) {
+                $users = $users->toArray();
+                foreach ($users as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);  
         } else {
             return redirect('/admin/login');
         }
@@ -23693,6 +27746,8 @@ foreach($students as $k=>$v){
         if (Auth::check()) {
             $id = $request->id;
             $name = $request->name; 
+            $background_theme_id = $request->background_theme_id; 
+            $text_color = $request->text_color; 
             $position = $request->position;
             $status = $request->status; 
             $school_id = (new AdminRoleController())->getSchoolId(); 
@@ -23738,6 +27793,8 @@ foreach($students as $k=>$v){
 
             $cat->school_id = $school_id; 
             $cat->name = $name; 
+            $cat->background_theme_id = $background_theme_id;
+            $cat->text_color = $text_color;
             $cat->position = $position;
             $cat->status = $status; 
 
@@ -23764,6 +27821,20 @@ foreach($students as $k=>$v){
         }
     }
 
+    public function deleteCategories(Request $request)   {
+        if (Auth::check()) {
+             $get_data = Category::where('id', $request->id)->get();
+             if ($get_data->isNotEmpty()) {
+                Category::where('id', $request->id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
+                 return response()->json(['status' => 1, 'message' => 'Category Deleted Successfully']);
+             } else {
+                 return response()->json(['status' => 0, 'data' => [], 'message' => 'No Category']);
+             }
+        } else {
+             return redirect('/admin/login');
+        }
+    } 
+
     //view Background Themes
     public function viewBackgroundThemes()
     {
@@ -23779,16 +27850,87 @@ foreach($students as $k=>$v){
     {
 
         if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $subject = $request->get('subject', '0');
+            $status = $request->get('status','0');
+            $search = $request->get('search','');
+
             $school_id = (new AdminRoleController())->getSchoolId(); 
-            $status = $request->get('status',0);
-           if($status != ''){
-            $mclass = BackgroundTheme::where('status','=',$status)->where('school_id', $school_id)->get();
-           }else{
-            $mclass = BackgroundTheme::where('school_id', $school_id)->get();
-           }
 
+            $sectionsqry = BackgroundTheme::where('status','!=','DELETED')->where('school_id', $school_id)
+                ->select('background_themes.*'); 
 
-            return Datatables::of($mclass)->make(true);
+            $filteredqry = BackgroundTheme::where('status','!=','DELETED')->where('school_id', $school_id); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $sectionsqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $sectionsqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $sectionsqry->whereRaw('( background_themes.name like "%'.$search['value'] . '%" )');
+                    $filteredqry->whereRaw('( background_themes.name like "%'.$search['value'] . '%" )');
+                }
+            }
+
+            if(!empty($status)){
+                $sectionsqry->where('background_themes.status',$status);
+                $filteredqry->where('background_themes.status',$status);
+            } 
+
+            if ($order>0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'background_themes.id';
+            }
+            if (empty($dir)) {
+                $dir = 'ASC';
+            } 
+
+            $sections = $sectionsqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('background_themes.id')->count();
+
+            $totalDataqry = DB::table('background_themes')->where('status','!=','DELETED')->where('school_id', $school_id)
+                ->orderby('id', 'asc'); 
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($sections)) {
+                foreach ($sections as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data); 
         } else {
             return redirect('/admin/login');
         }
@@ -23889,20 +28031,53 @@ foreach($students as $k=>$v){
         }
     }  
 
+    public function deleteBackgroundThemes(Request $request)   {
+        if (Auth::check()) {
+             $get_data = BackgroundTheme::where('id', $request->id)->get();
+             if ($get_data->isNotEmpty()) {
+                BackgroundTheme::where('id', $request->id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
+                 return response()->json(['status' => 1, 'message' => 'Background Theme Deleted Successfully']);
+             } else {
+                 return response()->json(['status' => 0, 'data' => [], 'message' => 'No Background Theme ']);
+             }
+        } else {
+             return redirect('/admin/login');
+        }
+    } 
+
     //view Group
     public function viewGroup()
     {
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId(); 
             $classids = (new AdminRoleController())->getSchoolRoleClasses();
-            $get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
+            /*$get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
                     ->where('users.status','ACTIVE')->where('users.delete_status','0')
                     ->where('users.user_type','STUDENT')->where('users.school_college_id',$school_id);
                     if(is_array($classids) && (count($classids)>0)){
                         $get_student->whereIn('students.class_id',$classids);
                     }
+            $get_student = $get_student->get(); */
+
+            $get_student = DB::table('students')->leftjoin('users', 'users.id', 'students.user_id')
+                    ->leftjoin('classes', 'classes.id', 'students.class_id')
+                    ->leftjoin('sections', 'sections.id', 'students.section_id') 
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','STUDENT')->where('users.school_college_id',$school_id)
+                    ->select('users.name as is_student_name', 'users.id as user_id', 
+                            'classes.class_name as is_class_name', 'sections.section_name as is_section_name');
+                    if(is_array($classids) && (count($classids)>0)){
+                        $get_student->whereIn('students.class_id',$classids);
+                    }
             $get_student = $get_student->get(); 
-            return view('admin.group')->with('get_student',$get_student);
+
+            $get_staff = DB::table('teachers')->leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','TEACHER')->where('users.school_college_id',$school_id)
+                    ->select('users.id', 'users.name', 'users.mobile')->orderby('users.name'); 
+            $get_staff = $get_staff->get(); 
+
+            return view('admin.group')->with('get_student',$get_student)->with('get_staff',$get_staff);
         } else {
             return redirect('/admin/login');
         }
@@ -23922,6 +28097,7 @@ foreach($students as $k=>$v){
             $order = $request->input('order.0.column');
             $subject = $request->get('subject', '0');
             $status = $request->get('status','0');
+            $search = $request->get('search','');
 
             $school_id = (new AdminRoleController())->getSchoolId(); 
 
@@ -23944,6 +28120,18 @@ foreach($students as $k=>$v){
                     }
                 }
             } 
+
+            if(!empty($status)){
+                $sectionsqry->where('communication_groups.status',$status);
+                $filteredqry->where('communication_groups.status',$status);
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $sectionsqry->whereRaw('( communication_groups.group_name like "%'.$search['value'] . '%" )');
+                    $filteredqry->whereRaw('( communication_groups.group_name like "%'.$search['value'] . '%" )');
+                }
+            }
 
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
@@ -24010,12 +28198,13 @@ foreach($students as $k=>$v){
             $id = $request->id;
             $group_name = $request->group_name; 
             $student_id = $request->student_id;
+            $staff_id = $request->staff_id;
             $status = $request->status; 
             $school_id = (new AdminRoleController())->getSchoolId(); 
 
             $validator = Validator::make($request->all(), [
                 'group_name' => 'required',
-                'student_id' => 'required',
+                //'student_id' => 'required',
                 'status' => 'required',
             ]);
 
@@ -24044,12 +28233,27 @@ foreach($students as $k=>$v){
                 ]);
             }
 
+            $empty_students = 0;
             if(is_array($student_id) && count($student_id) > 0) {
                 $student_id = implode(',', $student_id);
+                $empty_students = 1; 
             }   else {
+                $student_id = '';
+                $empty_students = 0; 
+            }
+
+            $empty_staffs = 0;
+            if(is_array($staff_id) && count($staff_id) > 0) {
+                $staff_id = implode(',', $staff_id);
+                $empty_staffs = 1;
+            }   else {
+                $staff_id = '';
+                $empty_staffs = 0;
+            }
+            if($empty_students != 1 && $empty_staffs != 1) {
                 return response()->json([
                     'status' => "FAILED",
-                    'message' => "Please select the Scholars.",
+                    'message' => "Please select the Scholars / Staffs.",
                 ]);
             }
 
@@ -24064,6 +28268,7 @@ foreach($students as $k=>$v){
             $cat->school_id = $school_id; 
             $cat->group_name = $group_name; 
             $cat->members = $student_id;
+            $cat->staff_members = $staff_id;
             $cat->status = $status; 
 
             $cat->save();
@@ -24105,11 +28310,104 @@ foreach($students as $k=>$v){
         }
     }
 
+    //view Notifications
+    public function viewNotifications() {
+        if (Auth::check()) {
+            $limit = 50;  $page_no = 0;  $school_id = (new AdminRoleController())->getSchoolId();  
+            $user_id = Auth::User()->id;
+            $posts = StaffNotifications::where('user_id', $user_id)->orderby('id', 'desc')
+            ->paginate($limit, ['staff_notifications.*'], 'page', $page_no);
+
+            $ids = [];
+            if($posts->isNotEmpty()) {
+                foreach($posts as $post) {
+                    $ids[] = $post->id;
+                }
+                StaffNotifications::whereIn('id', $ids)->update(['read_status'=>1, 'read_date' => date('Y-m-d H:i:s')]);
+
+            }
+
+            return view('admin.notification_list')->with('posts', $posts);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
     //view viewSurvey
     public function viewSurvey() {
         if (Auth::check()) {
+            $limit = 50;  $page_no = 0;  $school_id = (new AdminRoleController())->getSchoolId();  
+            $posts = Survey::where('status','!=', 'DELETED')->where('school_id', $school_id)
+            ->orderby('id', 'desc')
+            ->paginate($limit, ['survey.*'], 'page', $page_no);
+            return view('admin.survey_list')->with('posts', $posts);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
 
-            return view('admin.survey');
+    public function viewAddSurvey() {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
+                ->whereRAW('(members != "" OR members != NULL)')
+                ->select('id','group_name', 'members')->get(); 
+
+            $get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->where('users.user_type','STUDENT')->where('users.school_college_id', $school_id)->get();
+
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            } else {
+                if(Auth::User()->user_type == 'TEACHER') {
+                    $classes->whereIn('id', [0]);
+                }
+            }
+            $classes = $classes->orderby('position', 'Asc')->get();  
+ 
+            $get_sections=Sections::where('status','ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $get_sections->whereIn('class_id', $classids);
+            }
+            if(Auth::User()->user_type == 'TEACHER') {
+                $sectionids = (new AdminRoleController())->getSchoolTeacherSections(Auth::User()->id);
+                if(count($sectionids)>0) {
+                    $get_sections->whereIn('id', $sectionids);
+                } else {
+                    $get_sections->whereIn('id', [0]);
+                }
+            }
+            $get_sections = $get_sections->get(); 
+
+            $get_batches = $this->getBatches(); 
+
+            $acadamic_year = date('Y');
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+            if(!empty($settings)) {
+                $acadamic_year = trim($settings->acadamic_year);
+            }
+            if(empty($acadamic_year)) {  $acadamic_year = date('Y'); }
+
+            $teacher_role = UserRoles::where('school_id', $school_id)->where('user_role', 'TEACHER')->select('id','user_role'); 
+            $get_roles= UserRoles::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','user_role')
+                ->union($teacher_role)
+                ->get();
+
+            $get_departments = Departments::where('status','ACTIVE')->where('school_id', $school_id)
+                ->select('id','department_name')->get();
+
+            $get_staff = Teacher::leftjoin('users', 'users.id', 'teachers.user_id')
+                    ->where('users.status','ACTIVE')->where('users.delete_status','0')
+                    ->whereNotIn('user_type', ['SUPER_ADMIN', 'GUESTUSER', 'STUDENT', 'SCHOOL'])
+                    ->where('users.school_college_id', $school_id)->get(); 
+
+            return view('admin.addsurvey',compact( 'get_groups','get_student','get_sections', 'classes', 'get_batches', 'acadamic_year', 'get_roles', 'get_departments', 'get_staff'));
         } else {
             return redirect('/admin/login');
         }
@@ -24198,22 +28496,48 @@ foreach($students as $k=>$v){
     {
         if (Auth::check()) {
             $id = $request->id;
+            $user_id = Auth::User()->id;
             $survey_question = $request->survey_question; 
             $survey_option1 = $request->survey_option1;
             $survey_option2 = $request->survey_option2;
             $survey_option3 = $request->survey_option3;
             $survey_option4 = $request->survey_option4;
-            $status = $request->status; 
+            $expiry_date = $request->expiry_date;
+
+            $post_type = $request->post_type;
+            $post_type_staff = $request->post_type_staff;
+
+            if(empty($post_type)) {
+                $post_type = 0;
+            }
+
+            if(empty($post_type_staff)) {
+                $post_type_staff = 0;
+            }
+
+            $class_post = $request->class_post;
+            $section_post = $request->section_post;
+            $staff_class_post = $request->staff_class_post;
+            $staff_section_post = $request->staff_section_post;
+            $student_post  = $request->student_post;
+            $staff_post = $request->staff_post;
+            $group_post = $request->group_post;
+            $staff_group_post = $request->staff_group_post;
+            $role_post  = $request->role_post;
+            $department_post  = $request->department_post;
+
+            $status = 'ACTIVE'; // $request->status; 
             $school_id = (new AdminRoleController())->getSchoolId(); 
 
             $validator = Validator::make($request->all(), [
                 'survey_question' => 'required',
                 'survey_option1' => 'required',
                 'survey_option2' => 'required',
-                'status' => 'required',
+                'expiry_date' => 'required',
+                //'status' => 'required',
             ]);
 
-            if ($id > 0) {
+            /*if ($id > 0) {
                 $exists = DB::table('survey')->where('survey_question', $survey_question)->where('school_id', $school_id)->whereNotIn('id', [$id])->first();
             } else {
                 $exists = DB::table('survey')->where('survey_question', $survey_question)->where('school_id', $school_id)->first();
@@ -24224,7 +28548,7 @@ foreach($students as $k=>$v){
                     'status' => "FAILED",
                     'message' => "Survey Already Exists.",
                 ]);
-            }
+            }*/
 
 
             if ($validator->fails()) {
@@ -24238,42 +28562,346 @@ foreach($students as $k=>$v){
                 ]);
             }
 
-            if ($id > 0) {
-                $survey = Survey::find($id);
-                $survey->updated_at = date('Y-m-d H:i:s');
-                $survey->updated_by = Auth::User()->id;
-            } else {
-                $survey = new Survey;
-                $survey->created_at = date('Y-m-d H:i:s');
-                $survey->created_by = Auth::User()->id;
-            }
+            //$input = $request->all(); echo "<pre>"; print_r($input); exit;
+                           
+            $inarr = ['school_id' => $school_id, 'survey_id' => $id,'user_id' => $user_id,'survey_question' => $survey_question,
+                'survey_option1' => $survey_option1, 'survey_option2' => $survey_option2,
+                'survey_option3' => $survey_option3,'survey_option4' => $survey_option4,
+                'expiry_date' => $expiry_date, 'post_type' => $post_type,'post_type_staff' => $post_type_staff,
 
-            $survey->school_id = $school_id; 
-            $survey->survey_question = $survey_question; 
-            $survey->survey_option1 = $survey_option1;
-            $survey->survey_option2 = $survey_option2;
-            $survey->survey_option3 = $survey_option3;
-            $survey->survey_option4 = $survey_option4;
-            $survey->status = $status; 
+                'class_post' => $class_post,'section_post' => $section_post,
+                'staff_class_post' => $staff_class_post,'staff_section_post' => $staff_section_post, 
+                'student_post' => $student_post, 'staff_post' => $staff_post, 'group_post' => $group_post, 
+                'staff_group_post' => $staff_group_post, 'role_post' => $role_post, 'department_post' => $department_post, 
+                'status' => $status
+            ];
 
-            $survey->save();
-            return response()->json(['status' => 'SUCCESS', 'message' => 'Survey Saved Successfully']);
+            $retresponse = $this->createSurvey($request, $inarr);  
+            
+            return $retresponse;
         } else {
             return redirect('/admin/login');
         }
+    }
+
+    public function createSurvey($request, $inarr=[]) {
+            $school_id = $inarr['school_id'];
+            $survey_id = $inarr['survey_id'];
+            $post_type = $inarr['post_type'];
+
+            $user_type = DB::table('users')->where('id', $inarr['user_id'])->value('user_type');
+            $receiver_end = ''; $receiver_end_staff = '';
+            $save_post_type = $post_type;  
+
+            /*  Scholar   */
+            if ($post_type == 4) { // Scholar group 
+                $group_post = $request->get('group_post');
+                // Check if 'group_post' is an array
+                if (is_array($group_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end = implode(',', $group_post);
+                } else {
+                    // Handle the case where 'group_post' is not an array (optional)
+                    $receiver_end = '';
+                }
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Scholar Groups Mapped']);
+                }
+            }
+
+            if ($post_type == 3) {  // All Scholar
+
+                if($user_type == "SCHOOL" ) {
+                    $receiver_end = 0;
+                }   elseif($user_type == "TEACHER" ) {
+                    $save_post_type = 1;
+                    $receiver_arr = [];  
+                    $mapped_sections = DB::table('subject_mapping')
+                        ->leftjoin('classes', 'classes.id', 'subject_mapping.class_id')
+                        ->leftjoin('sections', 'sections.id', 'subject_mapping.section_id')
+                        ->where('subject_mapping.teacher_id', $inarr['user_id'])
+                        ->where('subject_mapping.status', 'ACTIVE')
+                        ->where('classes.status', 'ACTIVE')->where('sections.status', 'ACTIVE')
+                        ->select('subject_mapping.class_id', 'subject_mapping.section_id')
+                        ->groupby('subject_mapping.section_id')->get();
+
+                    if($mapped_sections->isNotEmpty()) {
+                        foreach($mapped_sections as $mc) {
+                            $receiver_arr[] = $mc->section_id;
+                        }
+
+                        $receiver_arr = array_unique($receiver_arr); 
+                        $receiver_arr = array_filter($receiver_arr); 
+                        $receiver_end = implode(',', $receiver_arr);
+                    } else {
+                        return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                    } 
+                } else {
+                    $classids = (new AdminRoleController())->getSchoolRoleClasses();
+                    $mapped_sections = DB::table('sections')->leftjoin('classes', 'classes.id', 'sections.class_id')
+                        ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                        ->where('sections.status','=','ACTIVE')->whereIn('sections.class_id', $classids)
+                        ->select('sections.id')->get();
+                    if($mapped_sections->isNotEmpty()) {
+                        foreach($mapped_sections as $mc) {
+                            $receiver_arr[] = $mc->id;
+                        }
+
+                        $receiver_arr = array_unique($receiver_arr); 
+                        $receiver_arr = array_filter($receiver_arr); 
+                        $receiver_end = implode(',', $receiver_arr);
+                    } else {
+                        return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                    } 
+                }   
+                /*if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                }*/
+
+            } 
+
+            if ($post_type == 2) {  // specific scholar
+                $student_post = $request->get('student_post');
+                // Check if 'group_post' is an array
+                if (is_array($student_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end = implode(',', $student_post);
+                } else {
+                    // Handle the case where 'student_post' is not an array (optional)
+                    $receiver_end = '';
+                }
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Students Mapped']);
+                }
+            }
+
+            if ($post_type == 1) { // Class and section scholar
+                $section_post = $request->get('section_post');
+                $class_post = $request->get('class_post');
+                // Check if 'group_post' is an array 
+
+                $receiver_arr = [];
+                if (is_array($section_post)) {
+                    $receiver_arr = array_merge($receiver_arr, $section_post);
+                }  
+
+                if (is_array($class_post)) {
+                    $class_post = $class_post;
+                    $classes = implode(',', $class_post);
+                    if(is_array($class_post) && count($class_post)>0) { 
+                        $get_sections = Sections::where('status','ACTIVE')->whereIn('class_id',$class_post)
+                            ->where('school_id', $school_id);
+
+                        if($user_type == "TEACHER" ) {
+                            $sectionids = (new AdminRoleController())->getSchoolTeacherSections($inarr['user_id']);
+                            if(count($sectionids)>0) {
+                                $get_sections->whereIn('sections.id', $sectionids);
+                            }
+                        }
+
+                        $get_sections = $get_sections->select('id')->get();
+                        if($get_sections->isNotEmpty()) {
+                            foreach($get_sections as $sec) {
+                                $receiver_arr[] = $sec->id; 
+                            }
+                        }
+                    }
+                }  
+                $receiver_arr = array_unique($receiver_arr); 
+                $receiver_arr = array_filter($receiver_arr); 
+                $receiver_end = implode(',', $receiver_arr);
+
+                if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Class / Sections Mapped']);
+                }
+            } 
+
+            $post_type_staff  = $inarr['post_type_staff'];
+
+            /*  Staff   */
+            if ($post_type_staff == 4) {
+                $group_post = $request->get('staff_group_post');
+                // Check if 'group_post' is an array
+                if (is_array($group_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end_staff = implode(',', $group_post);
+                } else {
+                    // Handle the case where 'group_post' is not an array (optional)
+                    $receiver_end_staff = '';
+                }
+                if(empty($receiver_end_staff)) {
+                    return response()->json(['status'=>0,'message'=>'No Staff Groups Mapped']);
+                }
+            }
+
+            // Department
+            if ($post_type_staff == 5) {
+                $department_post = $request->get('department_post');
+                // Check if 'department_post' is an array
+                if (is_array($department_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end_staff = implode(',', $department_post);
+                } else {
+                    // Handle the case where 'department_post' is not an array (optional)
+                    $receiver_end_staff = '';
+                }
+                if(empty($receiver_end_staff)) {
+                    return response()->json(['status'=>0,'message'=>'No Departments Mapped']);
+                }
+            }
+
+            // Specific Staff
+            if ($post_type_staff == 6) {
+                $staff_post = $request->get('staff_post');
+                // Check if 'student_post' is an array
+                if (is_array($staff_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end_staff = implode(',', $staff_post);
+                } else {
+                    // Handle the case where 'student_post' is not an array (optional)
+                    $receiver_end_staff = '';
+                }
+                if(empty($receiver_end_staff)) {
+                    return response()->json(['status'=>0,'message'=>'No Staffs Mapped']);
+                }
+            }
+            
+            // All Staff
+            if ($post_type_staff == 3) {
+
+                if($user_type == "SCHOOL" ) {
+                    $receiver_end_staff = 0;
+                }   else {
+                    $classids = (new AdminRoleController())->getSchoolRoleClasses();
+                    $mapped_sections = DB::table('sections')->leftjoin('classes', 'classes.id', 'sections.class_id')
+                        ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                        ->where('sections.status','=','ACTIVE')->whereIn('sections.class_id', $classids)
+                        ->select('sections.id')->get();
+                    if($mapped_sections->isNotEmpty()) {
+                        foreach($mapped_sections as $mc) {
+                            $receiver_arr[] = $mc->id;
+                        }
+
+                        $receiver_arr = array_unique($receiver_arr); 
+                        $receiver_arr = array_filter($receiver_arr); 
+                        $receiver_end_staff = implode(',', $receiver_arr);
+                    } else {
+                        return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                    } 
+                }   
+                /*if(empty($receiver_end)) {
+                    return response()->json(['status'=>0,'message'=>'No Sections Mapped']);
+                }*/
+
+            } 
+
+            // Role
+            if ($post_type_staff == 2) {
+                $role_post = $request->get('role_post');
+                // Check if 'group_post' is an array
+                if (is_array($role_post)) {
+                    // Convert the array to a comma-separated string
+                    $receiver_end_staff = implode(',', $role_post);
+                } else {
+                    // Handle the case where 'role_post' is not an array (optional)
+                    $receiver_end_staff = '';
+                }
+                if(empty($receiver_end_staff)) {
+                    return response()->json(['status'=>0,'message'=>'No Roles Mapped']);
+                }
+            }
+
+            // Class Teacher
+            if ($post_type_staff == 1) { 
+                $staff_section_post = $request->get('staff_section_post');
+                $staff_class_post = $request->get('staff_class_post');
+                // Check if 'group_post' is an array 
+
+                $receiver_arr = [];
+                if (is_array($staff_section_post)) {
+                    $receiver_arr = array_merge($receiver_arr, $staff_section_post);
+                }  
+
+                if (is_array($staff_class_post)) {
+                    $class_post = $staff_class_post;
+                    $classes = implode(',', $staff_class_post);
+                    if(is_array($staff_class_post) && count($staff_class_post)>0) { 
+                        $get_sections = Sections::where('status','ACTIVE')->whereIn('class_id',$staff_class_post)
+                            ->where('school_id', $school_id);
+
+                        if($user_type == "TEACHER" ) {
+                            $sectionids = (new AdminRoleController())->getSchoolTeacherSections($inarr['user_id']);
+                            if(count($sectionids)>0) {
+                                $get_sections->whereIn('sections.id', $sectionids);
+                            }
+                        }
+
+                        $get_sections = $get_sections->select('id')->get();
+                        if($get_sections->isNotEmpty()) {
+                            foreach($get_sections as $sec) {
+                                $receiver_arr[] = $sec->id; 
+                            }
+                        }
+                    }
+                }  
+                $receiver_arr = array_unique($receiver_arr); 
+                $receiver_arr = array_filter($receiver_arr); 
+                $receiver_end_staff = implode(',', $receiver_arr);
+
+                if(empty($receiver_end_staff)) {
+                    return response()->json(['status'=>0,'message'=>'No Class / Sections Mapped']);
+                }
+            } 
+ 
+
+            if(($post_type != 3 && empty($receiver_end)) && ($post_type_staff != 3 && empty($receiver_end_staff))) {
+                return response()->json(['status'=>0,'message'=>'No Receivers Mapped']);
+            }
+            //echo "<pre>"; print_r($inarr); exit;
+            if ($survey_id > 0) {
+                $survey = Survey::find($survey_id);
+                $survey->updated_at = date('Y-m-d H:i:s');
+                $survey->updated_by = $inarr['user_id'];
+            } else {
+                $survey = new Survey;
+                $survey->created_at = date('Y-m-d H:i:s');
+                $survey->created_by = $inarr['user_id'];
+            }
+
+            $survey->school_id = $school_id; 
+            $survey->survey_question = $inarr['survey_question']; 
+            $survey->survey_option1 = $inarr['survey_option1'];
+            $survey->survey_option2 = $inarr['survey_option2'];
+            $survey->survey_option3 = $inarr['survey_option3'];
+            $survey->survey_option4 = $inarr['survey_option4'];
+            $survey->expiry_date = $inarr['expiry_date'];
+            $survey->scholar_post_type = $post_type;
+            $survey->scholar_receiver_end = $receiver_end;
+            $survey->staff_post_type = $post_type_staff;
+            $survey->staff_receiver_end = $receiver_end_staff;
+
+            if($user_type == "SCHOOL" ) {
+                $survey->status='ACTIVE';
+            }   else {
+                $survey->status='PENDING';
+            }
+
+            //$survey->status = $inarr['status'];  
+
+            $survey->save(); 
+
+            return response()->json(['status'=>1,'message'=>'Survey Created Successfully']);
     }
 
     public function editSurvey(Request $request)
     {
 
         if (Auth::check()) {
-            $survey = Survey::where('id', $request->code)->get();
+  
+            $school_id = (new AdminRoleController())->getSchoolId();    
+            $survey = Survey::where('id', $request->id)->first();
 
-            if ($survey->isNotEmpty()) {
-                return response()->json(['status' => 'SUCCESS', 'data' => $survey[0], 'message' => 'Survey Detail']);
-            } else {
-                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Survey Detail']);
-            }
+            return view('admin.editsurvey',compact( 'survey' )); 
         } else {
             return redirect('/admin/login');
         }
@@ -24281,9 +28909,9 @@ foreach($students as $k=>$v){
 
     public function deleteSurvey(Request $request)   {
         if (Auth::check()) {
-             $get_data = Survey::where('id', $request->id)->get();
+             $get_data = Survey::where('id', $request->post_id)->get();
              if ($get_data->isNotEmpty()) { 
-                Survey::where('id', $request->id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
+                Survey::where('id', $request->post_id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
                     return response()->json(['status' => 1, 'message' => 'Survey Deleted Successfully']); 
              } else {
                  return response()->json(['status' => 0, 'data' => [], 'message' => 'No Survey']);
@@ -24292,6 +28920,91 @@ foreach($students as $k=>$v){
              return redirect('/admin/login');
         }
     } 
+
+    public function updateStaffSurvey(Request $request) {
+        if (Auth::check()) {
+            $survey = DB::table('staff_notifications')->where('id', $request->post_id)->get();
+
+            if ($survey->isNotEmpty()) {
+
+                DB::table('staff_notifications')->where('id', $request->post_id)
+                    ->update(['notify_response' => $request->option_id]);
+
+                return response()->json(['status' => 'SUCCESS',  'message' => 'Survey saved successfully']);
+            } else {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Survey Detail']);
+            }
+        } else {
+            return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'Session Logged Out. Please Login Again']);
+        }
+    }
+
+    public function updateSurveyPost(Request $request)
+    {
+        if (Auth::check()) {
+            $survey_id = $request->id;
+            $user_id = Auth::User()->id;
+            $survey_question = $request->survey_question; 
+            $survey_option1 = $request->survey_option1;
+            $survey_option2 = $request->survey_option2;
+            $survey_option3 = $request->survey_option3;
+            $survey_option4 = $request->survey_option4;
+            $expiry_date = $request->expiry_date;
+  
+            $status = 'ACTIVE'; // $request->status; 
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $validator = Validator::make($request->all(), [
+                'survey_question' => 'required',
+                'survey_option1' => 'required',
+                'survey_option2' => 'required',
+                'expiry_date' => 'required',
+                //'status' => 'required',
+            ]); 
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => "FAILED",
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }
+
+            //$input = $request->all(); echo "<pre>"; print_r($input); exit;
+                            
+            if ($survey_id > 0) {
+                $survey = Survey::find($survey_id);
+                $survey->updated_at = date('Y-m-d H:i:s');
+                $survey->updated_by = Auth::User()->id;
+
+                $survey->school_id = $school_id; 
+                $survey->survey_question = $survey_question; 
+                $survey->survey_option1 = $survey_option1;
+                $survey->survey_option2 = $survey_option2;
+                $survey->survey_option3 = $survey_option3;
+                $survey->survey_option4 = $survey_option4;
+                $survey->expiry_date = $expiry_date; 
+
+                $user_type = Auth::User()->user_type;
+                if($user_type == "SCHOOL" ) {
+                    $survey->status='ACTIVE';
+                }   else {
+                    $survey->status='PENDING';
+                } 
+
+                $survey->save(); 
+
+                return response()->json(['status'=>1,'message'=>'Survey Saved Successfully']);
+            }  
+            
+            return response()->json(['status'=>0,'message'=>'Invalid Survey']);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
 
     public function FeeTermsMaster()
     {
@@ -24770,7 +29483,98 @@ foreach($students as $k=>$v){
          }
      }
      public function getWavierCategory(Request $request)
-     {   $school_id = (new AdminRoleController())->getSchoolId(); 
+     {   
+
+        if (Auth::check()) {
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $status = $request->get('status', ''); 
+            $search = $request->get('search');
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $users_qry = WaiverCategory::where('school_id', $school_id)->where('status', '!=', 'DELETED');
+            $filtered_qry = WaiverCategory::where('school_id', $school_id)->where('status', '!=', 'DELETED');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'waiver_categories.status') {
+                            $users_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $users_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $users_qry->whereRaw('( waiver_categories.name like "%'.$search['value'] . '%" )');
+                    $filtered_qry->whereRaw('( waiver_categories.name like "%'.$search['value'] . '%" )');
+                }
+            }
+
+            if(!empty($status)){
+                $users_qry->where('waiver_categories.status',$status);
+                $filtered_qry->where('waiver_categories.status',$status);
+            }  
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'waiver_categories.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $users = $users_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+            $totalData = DB::table('waiver_categories')->where('waiver_categories.status','!=', 'DELETED')
+                ->where('waiver_categories.school_id', $school_id);
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($users)) {
+                $users = $users->toArray();
+                foreach ($users as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);  
+        } else {
+            return redirect('/admin/login');
+        }
+        /*
+
+        $school_id = (new AdminRoleController())->getSchoolId(); 
          $status = $request->input('status');
          $wavier_category = WaiverCategory::where('school_id', $school_id)->where('status', '!=', 'DELETED')
                             ->orderBy('position', 'ASC')
@@ -24778,7 +29582,7 @@ foreach($students as $k=>$v){
                                  return $query->where('status', $status);
                              })
                              ->get();
-           return Datatables::of($wavier_category)->make(true);
+           return Datatables::of($wavier_category)->make(true);*/
       }
       public function editWavierCategory(Request $request)
       {
@@ -25151,9 +29955,112 @@ foreach($students as $k=>$v){
         }
     }
 
-    public function getFeeCategory(Request $request)
-    
-    {
+    public function getFeeCategory(Request $request) {
+        if (Auth::check()) {
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $status = $request->get('status', ''); 
+            $search = $request->get('search');
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $fee_category = FeeCategory::leftjoin('accounts', 'accounts.id', 'fee_categories.account_id')
+                ->leftjoin('receipt_heads', 'receipt_heads.id',  'accounts.recepit_id')
+                ->where('fee_categories.status', '!=', 'DELETED')->where('accounts.status', 'ACTIVE')
+                ->where('receipt_heads.status', 'ACTIVE')
+                ->where('fee_categories.school_id', $school_id)->orderBy('fee_categories.position', 'ASC')
+                ->select('fee_categories.*', 'accounts.account_name');
+
+            $filtered_qry = FeeCategory::leftjoin('accounts', 'accounts.id', 'fee_categories.account_id')
+                ->leftjoin('receipt_heads', 'receipt_heads.id',  'accounts.recepit_id')
+                ->where('fee_categories.status', '!=', 'DELETED')->where('accounts.status', 'ACTIVE')
+                ->where('receipt_heads.status', 'ACTIVE')
+                ->where('fee_categories.school_id', $school_id)->orderBy('fee_categories.position', 'ASC')
+                ->select('fee_categories.*', 'accounts.account_name');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fee_categories.status') {
+                            $fee_category->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $fee_category->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_category->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR accounts.account_name like "%'.$search['value'] . '%" )');
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR accounts.account_name like "%'.$search['value'] . '%" )');
+                }
+            }
+
+            if(!empty($status)){
+                $fee_category->where('fee_categories.status',$status);
+                $filtered_qry->where('fee_categories.status',$status);
+            }  
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fee_categories.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $category = $fee_category->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+            $totalData = FeeCategory::leftjoin('accounts', 'accounts.id', 'fee_categories.account_id')
+                ->leftjoin('receipt_heads', 'receipt_heads.id',  'accounts.recepit_id')
+                ->where('fee_categories.status', '!=', 'DELETED')->where('accounts.status', 'ACTIVE')
+                ->where('receipt_heads.status', 'ACTIVE')
+                ->where('fee_categories.school_id', $school_id)->orderBy('fee_categories.position', 'ASC');
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($category)) {
+                $category = $category->toArray();
+                foreach ($category as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);  
+        } else {
+            return redirect('/admin/login');
+        }
+
+        /*
+
+
         $status = $request->input('status');
         $school_id = (new AdminRoleController())->getSchoolId(); 
         $fee_category = FeeCategory::leftjoin('accounts', 'accounts.id', 'fee_categories.account_id')
@@ -25166,7 +30073,7 @@ foreach($students as $k=>$v){
             })->select('fee_categories.*', 'accounts.account_name')
             ->get();
           
-          return Datatables::of($fee_category)->make(true);
+          return Datatables::of($fee_category)->make(true);*/
       
      }
 
@@ -25474,8 +30381,32 @@ foreach($students as $k=>$v){
     public function feeStructureListPage()
     {
         if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+
+            $get_batches = $this->getBatches(); 
+
+            $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
+
+            $get_fee_category = FeeCategory::leftjoin('accounts', 'accounts.id',  'fee_categories.account_id')
+                        ->leftjoin('receipt_heads', 'receipt_heads.id',  'accounts.recepit_id')
+                        ->where('fee_categories.status','ACTIVE')->where('accounts.status','ACTIVE')
+                        ->where('receipt_heads.status','ACTIVE')
+                        ->where('fee_categories.school_id', $school_id)->orderBy('fee_categories.position','ASC')
+                        ->select('fee_categories.*')->get();
+
+            $get_sections=Sections::where('status','ACTIVE')->where('school_id', $school_id)->get();
+
+            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
+                ->whereRAW(' (members != "" OR members != null) ')->select('id','group_name')->get();
+
+            $get_fee_terms = DB::table('fee_terms')->where('status','ACTIVE')
+                ->where('school_id', $school_id)->orderby('name', 'ASC')->select('id', 'name')->get();
+
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');  
            
-            return view('admin.fee_structure_list');
+            return view('admin.fee_structure_list',compact('get_classes','get_sections','get_groups','get_fee_category', 
+                'get_batches', 'get_fee_terms', 'batch'));
         } else {
             return redirect('/admin/login');
         }
@@ -25513,14 +30444,23 @@ foreach($students as $k=>$v){
 
             $get_sections=Sections::where('status','ACTIVE')->where('school_id', $school_id)->get();
 
-            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)->select('id','group_name')->get();
+            $get_groups=CommunicationGroup::where('status','ACTIVE')->where('school_id', $school_id)
+                ->whereRAW(' (members != "" OR members != null) ')->select('id','group_name')->get();
 
             $get_fee_terms = DB::table('fee_terms')->where('status','ACTIVE')
                 ->where('school_id', $school_id)->orderby('name', 'ASC')->select('id', 'name')->get();
 
-            $batch = DB::table('admin_settings')->where('school_id', Auth::User()->id)->value('acadamic_year'); 
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
+            $get_student = Student::leftjoin('users', 'users.id', 'students.user_id')
+                ->leftjoin('student_class_mappings', 'students.user_id', 'student_class_mappings.user_id')
+                ->where('users.status','ACTIVE')->where('users.delete_status',0)
+                ->where('student_class_mappings.academic_year', $batch)
+                ->where('users.user_type','STUDENT')->where('users.school_college_id', $school_id)
+                ->where('student_class_mappings.school_id', $school_id)
+                ->select('students.*', 'users.name', 'users.mobile')->get();  
            
-            return view('admin.fee_structure_add',compact('get_classes','get_sections','get_groups','get_fee_category', 'get_batches', 'get_fee_terms', 'batch'));
+            return view('admin.fee_structure_add',compact('get_classes','get_sections','get_groups','get_fee_category', 'get_batches', 'get_fee_terms', 'batch', 'get_student'));
         } else {
             return redirect('/admin/login');
         }
@@ -25546,9 +30486,9 @@ foreach($students as $k=>$v){
 
         if (Auth::check()) {
 
-       // Auth::User()->id;
-     //  date('Y-m-d H:i:s', strtotime($request->enq_date));
-
+        // Auth::User()->id;
+        //  date('Y-m-d H:i:s', strtotime($request->enq_date));
+           // $input = $request->all(); echo "<pre>"; print_r($input); exit;
 
        $batch=$request->batch;
        $category_id=$request->category_id;
@@ -25577,6 +30517,12 @@ foreach($students as $k=>$v){
            case 4:
                if (is_array($request->group_list)) {
                    $class_list = implode(',', $request->group_list);
+               }
+               break;
+
+           case 5:
+               if ($request->scholar_list>0) {
+                   $class_list = $request->scholar_list;
                }
                break;
        }
@@ -25754,9 +30700,23 @@ foreach($students as $k=>$v){
             $columns = $request->get('columns');
             $order = $request->input('order.0.column');
             $input = $request->all();
-            $status = $request->get('status_id', '');
+
+            $search = $request->get('search', '');
+
+            $batch = $request->get('batch', '');
+            $fee_term_id = $request->get('fee_term_id', '');
+            $fee_category = $request->get('fee_category', '');
+            $fee_filters = $request->get('fee_filters', '');
+            $fee_type = $request->get('fee_type', '');
+            $fee_post_type = $request->get('fee_post_type', '');
+            $class_list = $request->get('class_list', '');
+            $section_list = $request->get('section_list', '');
+            $group_list = $request->get('group_list', '');   
+            $scholar_list = $request->get('scholar_list', '');   
+
+            /*$status = $request->get('status_id', '');
             $section = $request->get('section_id', '');
-            $class_id = $request->get('class_id', '');
+            $class_id = $request->get('class_id', '');*/
 
             $users_qry = FeeStructureItem::leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
                 ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id') 
@@ -25797,18 +30757,52 @@ foreach($students as $k=>$v){
                 $filtered_qry->where('fee_structure_items.school_id', $school_id);
             //}
 
-            if(!empty($status)){
-                $users_qry->where('users.status',$status);
-                $filtered_qry->where('users.status',$status);
+            if(!empty($batch)) {
+                $users_qry->where('fee_structure_lists.batch', $batch);
+                $filtered_qry->where('fee_structure_lists.batch', $batch);
             }
-            /*if(!empty($section)){
-                $users_qry->where('students.section_id',$section);
-                $filtered_qry->where('students.section_id',$section);
+
+            if($fee_category > 0) {
+                $users_qry->where('fee_structure_lists.fee_category_id', $fee_category);
+                $filtered_qry->where('fee_structure_lists.fee_category_id', $fee_category);
             }
-            if(!empty($class_id)){
-                $users_qry->where('students.class_id',$class_id);
-                $filtered_qry->where('students.class_id',$class_id);
-            }*/
+
+            if($fee_term_id > 0) {
+                $users_qry->where('fee_structure_items.fee_term_id', $fee_term_id);
+                $filtered_qry->where('fee_structure_items.fee_term_id', $fee_term_id);
+            }
+
+            if($fee_filters > 0){
+                $users_qry->where('fee_structure_items.fee_item_id',$fee_filters);
+                $filtered_qry->where('fee_structure_items.fee_item_id',$fee_filters);
+            }  
+
+            if($fee_type > 0){
+                $users_qry->where('fee_structure_lists.fee_type',$fee_type);
+                $filtered_qry->where('fee_structure_lists.fee_type',$fee_type);
+            }
+
+            if($fee_post_type > 0){
+                $users_qry->where('fee_structure_lists.fee_post_type',$fee_post_type);
+                $filtered_qry->where('fee_structure_lists.fee_post_type',$fee_post_type);
+            }
+
+            if($fee_post_type > 0){ 
+                $idslist = '';
+                if($fee_post_type  == 1){
+                    $idslist = $class_list;
+                } else if($fee_post_type  == 2){
+                    $idslist = $section_list;
+                } else if($fee_post_type  == 4){
+                    $idslist = $group_list;
+                }  else if($fee_post_type  == 4){
+                    $idslist = $scholar_list;
+                } 
+                if(!empty($idslist)) {
+                    $users_qry->whereRAW(' FIND_IN_SET('.$idslist.', fee_structure_lists.class_list) ');
+                    $filtered_qry->whereRAW(' FIND_IN_SET('.$idslist.', fee_structure_lists.class_list) ');
+                }
+            } 
 
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
@@ -26246,9 +31240,9 @@ foreach($students as $k=>$v){
             $student_text = '';
             $student_id = $request->get('student_id', 0);
             $batch = $request->get('batch', 0);
-            if($batch == 0) {
-                $batch = DB::table('admin_settings')->where('school_id', Auth::User()->id)->value('acadamic_year'); 
-            }
+            if($batch == 0 || empty($batch)) {
+                $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year'); 
+            }  
 
             if($student_id > 0) {
                 $student = DB::table('students')->leftjoin('users', 'users.id', 'students.user_id')
@@ -26293,7 +31287,17 @@ foreach($students as $k=>$v){
         $school_id = (new AdminRoleController())->getSchoolId(); 
         $name = $request->input('name');
         $class_id = $request->input('class_id');
+        $section_id = $request->input('section_id');
         $batch = $request->input('batch');
+        $gender = $request->input('gender', '');
+        $is_absentees = $request->input('is_absentees', 0);
+
+        if(empty($batch)) {
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year'); 
+        }
+        if(empty($is_absentees)) {
+            $is_absentees = 0; 
+        }
 
         $students = DB::table('students')->leftjoin('users', 'users.id', 'students.user_id')
             ->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'students.user_id')
@@ -26301,18 +31305,33 @@ foreach($students as $k=>$v){
             ->leftjoin('sections', 'students.section_id', 'sections.id')
             ->where('user_type', 'STUDENT')->where('users.status', 'ACTIVE')->where('users.delete_status', 0)
             ->where('students.school_id', $school_id);
+
+        if($is_absentees == 1) {
+            $students->leftjoin('attendance_approval', 'attendance_approval.user_id', 'students.user_id')
+                ->whereRAW(' (attendance_approval.fn_status = 2 or attendance_approval.an_status = 2) ')
+                ->whereDate('attendance_approval.date', date('Y-m-d'));
+        }
+
         if($batch>0) {
             $students->where('student_class_mappings.academic_year', $batch);
         }
         if($class_id>0) {
             $students->where('students.class_id', $class_id);
         }
+        if($section_id>0) {
+            $students->where('students.section_id', $section_id);
+        }
+        if(!empty($gender)) {
+            $students->where('users.gender',$gender);
+        }
+
         $name = trim($name);
         if(!empty($name)) {
             $students->whereRaw('( users.name like "%'.$name.'%" or users.last_name like "%'.$name.'%" or users.mobile like "%'.$name.'%" or users.admission_no like "%'.$name.'%" )');
         }
         $students = $students->select('users.id', 'users.name as is_student_name', 'users.admission_no', 'students.user_id', 
-                'classes.class_name as is_class_name', 'sections.section_name as is_section_name')->get();
+                'classes.class_name as is_class_name', 'sections.section_name as is_section_name', 'users.mobile', 
+                'students.father_name')->get();
         return response()->json(['students' => $students]);
         // Fetch all relevant students from the database
         /*$students = Student::query()
@@ -26451,7 +31470,12 @@ foreach($students as $k=>$v){
     }*/
 
     public function filterFeeCollections(Request $request) {  
-        $school_id = (new AdminRoleController())->getSchoolId();
+
+        $school_id = $request->get('school_id', 0);
+        if($school_id > 0) { } else {
+            $school_id = (new AdminRoleController())->getSchoolId();
+        } 
+        
         $studentId = $request->input('student_id');
         $batch = $request->input('batch');
 
@@ -26472,7 +31496,7 @@ foreach($students as $k=>$v){
         // Retrieve fee structures
         $feeStructures = FeeStructureList::with(['feeItems.feeItem'])->where('cancel_status','0')
             ->where('school_id', $school_id)->where('fee_type',1)
-            ->where('batch', $batch)->orderby('id', 'asc')->get();
+            ->where('batch', $batch)->orderby('fee_structure_lists.fee_category_id', 'asc')->get();
 
         // Retrieve cancelled fee structures with cancel_status = 1
         $cancelledFeeStructures = FeeStructureList::with(['feeItems.feeItem'])
@@ -26979,7 +32003,7 @@ foreach($students as $k=>$v){
                 $new_receipt->amount = 0; // This will be updated after calculating total payment
                 $new_receipt->payment_mode = $payment_mode;
                 $new_receipt->receipt_date = date('Y-m-d');
-                $new_receipt->posted_by = Auth::User()->id;
+                $new_receipt->posted_by = $school_id;
                 $new_receipt->account_id = $account_id; // Ensure you have account_id field in the receipt table
                 $new_receipt->save();
 
@@ -26997,7 +32021,7 @@ foreach($students as $k=>$v){
                         $batch = DB::table('fee_structure_lists')->where('id', $fee_structure_id)->value('batch');
                     }
                     //echo $fee_structure_item_id."==".$batch."==".$student_id."==".Auth::User()->id."==";
-                    $fee_amount = FeeStructureItem::getBalance($fee_structure_item_id, $batch, $student_id, Auth::User()->id);  
+                    $fee_amount = FeeStructureItem::getBalance($fee_structure_item_id, $batch, $student_id, $school_id);  
                     if($fee_amount > 0) {
                         $amount_to_pay = min($fee_amount, $paid_amount);
                     }   else {
@@ -27026,7 +32050,7 @@ foreach($students as $k=>$v){
                     $post_new->amount_paid = $amount_to_pay;
                     $post_new->payment_mode = $payment_mode;
                     $post_new->payment_remarks = $payment_remark;
-                    $post_new->posted_by = $school_id;
+                    $post_new->posted_by = Auth::User()->id;
                     $post_new->payment_status = $payment_status;
                     $post_new->receipt_id = $new_receipt->id;
 
@@ -27048,6 +32072,24 @@ foreach($students as $k=>$v){
                 
                 $this->generateReceiptPdf($new_receipt->id, $student_id);
             }
+
+            $type_no = 8; $notify_date = date('Y-m-d H:i:s');
+            $title = 'Fees Paid';
+            $message = 'Payment of Rs.'.CommonController::price_format($total_amount_paid). '/- has been Received.';
+
+            $fcmMsg = array("fcm" => array("notification" => array(
+                "title" => $title,
+                "body" => $message,
+                "type" => $type_no,
+            )));
+
+            $topicname = CommonController::$topic_scholar.$student_id;
+            if($_SERVER['HTTP_HOST'] != "localhost") {
+            CommonController::push_notification_topic($topicname, $type_no, $student_id, $fcmMsg, 0, '', $student_id, $notify_date);
+            } 
+
+            CommonController::push_notification_table($student_id, $type_no, $student_id, $fcmMsg, 0, '', $student_id, $notify_date); 
+
             return response()->json(['status' => 1, 'message' => 'Payment Updated Successfully']);
         } else {
             return redirect('/admin/login');
@@ -27219,6 +32261,108 @@ foreach($students as $k=>$v){
         }
     }
 
+    public function postPayFeesWaiver(Request $request){
+
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $input = $request->all(); //echo "<pre>"; print_r($input); exit;
+            $feebalance_amount = $request->get('feebalance_amount', 0);
+            $feeconcession_student_id = $request->get('feewaiver_student_id', 0);
+            $feeconcession_item_id = $request->get('feeconcession_item_id', 0);
+            $concession_amount  = $request->get('concession_amount', 0);
+            $concession_category = $request->get('concession_category', 0);
+            $concession_remarks = $request->get('concession_remarks', ''); 
+
+            if($concession_category >0) {} else {
+                return response()->json([  'status' => 'FAILED',     'message' => "Please select the Waiver Category", ]);
+            }
+
+            $get_data = FeeStructureItem::where('id',$feeconcession_item_id)->first();
+             // echo "<pre>"; print_r($get_data);exit;
+            if (!$get_data) {
+                return response()->json([  'status' => 'FAILED',  'message' => "Invalid Item ",  ]);
+            }
+
+            $fee_structure_id = $get_data->fee_structure_id;
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year'); 
+            if($fee_structure_id > 0) {
+                $batch = DB::table('fee_structure_lists')->where('id', $fee_structure_id)->value('batch');
+            }
+
+            $fee_balance_amount = FeeStructureItem::getBalance($feeconcession_item_id, $batch, $feeconcession_student_id, $school_id);
+
+            if($concession_amount > $fee_balance_amount) {
+                return response()->json(['status' => 'FAILED', 'message' => 'Waiver amount must be lesser or equal to Rs. '.$fee_balance_amount]);
+            }
+
+            $validator= Validator::make($request->all(),
+            [
+                'feewaiver_student_id' => 'required',
+                'feeconcession_item_id.*' => 'required',
+                'concession_amount' => 'required|numeric', 
+                'concession_category' => 'required',
+
+            ],[]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => 'FAILED',
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            } 
+
+            $fee_amount = $get_data->amount;
+            $class_id = DB::table('students')->where('user_id', $feeconcession_student_id)->value('class_id');
+            $section_id = DB::table('students')->where('user_id', $feeconcession_student_id)->value('section_id'); 
+
+            // Calculate the amount to be paid for this fee structure item
+            $amount_to_pay = $concession_amount;
+
+            // Determine the payment status
+            $payment_status = $concession_amount >= $feebalance_amount ? 'PAID' : 'PARTIAL';
+
+            // Create a new FeesPaymentDetail instance for each fee structure item ID
+            $post_new = new FeesPaymentDetail;
+
+            $post_new->fee_structure_item_id = $feeconcession_item_id;
+
+            $post_new->student_id = $feeconcession_student_id;
+            $post_new->school_id = $school_id;
+            
+            $post_new->batch = $batch;
+            $post_new->class_id = $class_id;
+            $post_new->section_id = $section_id;
+            $post_new->fee_structure_id = $fee_structure_id;
+
+            $post_new->paid_date = null;
+            $post_new->amount_paid = 0;
+            $post_new->payment_mode = 0;
+            $post_new->payment_remarks = '';
+            $post_new->is_waiver = 1;
+            $post_new->is_waiver_category = $concession_category;
+            $post_new->is_waiver_remarks = $concession_remarks;
+            $post_new->concession_amount = $concession_amount;
+            $post_new->is_waiver_date = date('Y-m-d');
+
+            $post_new->posted_by = Auth::User()->id;
+            $post_new->payment_status = '';
+
+            // Save the new instance
+            $post_new->save();
+
+            return response()->json([  'status' => 'SUCCESS', 
+                 'message' => "Waiver added" ,
+            ]);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
     public function postFeeWaiver(Request $request) {
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId();
@@ -27353,6 +32497,7 @@ foreach($students as $k=>$v){
             $input = $request->all();
             $batch = $request->get('batch', date('Y'));
             $student_id = $request->get('student_id', 0); 
+            $search = $request->get('search', '');
             $school_id = (new AdminRoleController())->getSchoolId();
 
             $feesummary_qry = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
@@ -27361,8 +32506,7 @@ foreach($students as $k=>$v){
             ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
             ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
             ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id)
-            ->where('fees_payment_details.batch', $batch)
-            ->orderby('fees_payment_details.id','asc')
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0) 
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -27375,8 +32519,125 @@ foreach($students as $k=>$v){
             ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
             ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
             ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id)
-            ->where('fees_payment_details.batch', $batch)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0) 
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'creator.name as creator_name'); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_payment_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%" OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%"  OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" )');
+                }
+            } 
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_payment_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+
+            $totalData = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0)
             ->orderby('fees_payment_details.id','asc')
+            ->select('fees_payment_details.id');
+
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($feesummary)) {
+                $feesummary = $feesummary->toArray();
+                foreach ($feesummary as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getFeeSummaryDeletedLists(Request $request)
+    {
+        if (Auth::check()) {
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $search = $request->get('search', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $feesummary_qry = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 1) 
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'creator.name as creator_name'
+            ); 
+
+            $filtered_qry = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 1) 
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -27396,7 +32657,16 @@ foreach($students as $k=>$v){
                 }
             } 
 
-            if (!empty($order)) {
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%"  OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%"  OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" )');
+                }
+            } 
+
+
+            if ($order >= 0) {
                 $orderby = $columns[$order]['name'];
             } else {
                 $orderby = 'fees_payment_details.id';
@@ -27412,7 +32682,7 @@ foreach($students as $k=>$v){
             ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
             ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
             ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id)
-            ->where('fees_payment_details.batch', $batch)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 1)
             ->orderby('fees_payment_details.id','asc')
             ->select('fees_payment_details.id');
 
@@ -27710,6 +32980,7 @@ foreach($students as $k=>$v){
             $concession_amount = $request->get('concession_amount', []);
             $concession_remarks = $request->get('concession_remarks', []);
             $feeconcession_student_id = $request->get('feeconcession_student_id', 0);
+            $concession_category = $request->get('concession_category');
 
             if(count($concessions) > 0) {
                 foreach($concessions as $feeconcession_item_id=>$itemval) {
@@ -27755,6 +33026,7 @@ foreach($students as $k=>$v){
                     $post_new->payment_mode = 0;
                     $post_new->payment_remarks = '';
                     $post_new->is_concession = 1;
+                    $post_new->concession_category = $concession_category;
                     $post_new->concession_amount = $concession_amount[$feeconcession_item_id];
                     $post_new->concession_date = date('Y-m-d');
                     $post_new->concession_remarks = $concession_remarks[$feeconcession_item_id];
@@ -28399,7 +33671,7 @@ foreach($students as $k=>$v){
                         'amount_to_pay' => 0,
                         'is_waiver' => 1,
                         'concession_amount' => $concession_amount,
-                        'is_waiver_date' => date('Y-m-d H:i:s'),
+                        'is_waiver_date' => date('Y-m-d'),
                         'is_waiver_remarks' => 'deleted',
                         'posted_by' => $school_id,
                         'updated_by' => Auth::User()->id,
@@ -28718,6 +33990,7 @@ foreach($students as $k=>$v){
             $fee_item_id = $request->get('fee_item_id', '');
             $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
             $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search','');
 
             $school_id = (new AdminRoleController())->getSchoolId();
 
@@ -28730,7 +34003,7 @@ foreach($students as $k=>$v){
             ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
             ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
             ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id) 
-            ->orderby('fees_payment_details.id','asc')
+            ->where('fees_payment_details.cancel_status', 0) 
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -28777,8 +34050,157 @@ foreach($students as $k=>$v){
                 $fee_summary_list->where('fees_payment_details.created_at', '<=', $maxdate); 
             }
 
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%"  OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" )'); 
+                }
+            } 
 
-            if (!empty($order)) {
+
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_payment_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $fee_collection = $fee_summary_list->orderBy($orderby, $dir)->get();
+         
+            $fee_collection_excel = [];
+
+            if (! empty($fee_collection)) {
+                $i = 1;
+                foreach ($fee_collection as $rev) {
+                    $fee_collection_excel[] = [
+                         "Batch" => $rev->batch,
+                         "Class" => $rev->class_name,
+                         "Section" => $rev->section_name,
+                         "Scholar" => $rev->scholar_name,
+                         "Admission Number" => $rev->admission_no,
+                         "Category" => $rev->name,
+                         "Item" => $rev->item_name,
+                         "Amount" => $rev->amount,
+                         "Due Date" => $rev->due_date,
+                         "Paid Amount" => $rev->amount_paid,
+                         "Paid Date" => $rev->paid_date,
+                         "Payment Remarks" => $rev->payment_remarks,
+                         "Concession Amount" => $rev->concession_amount,
+                         "Concession Date" => $rev->concession_date,
+                         "Collected By" => $rev->creator_name,
+                         "Collected Date" => $rev->created_at,
+                    ];
+
+                    $i++;
+                }
+            }
+
+   
+             header("Content-Type: text/plain");
+             $flag = false;
+             foreach ($fee_collection_excel as $row) {
+                 if (! $flag) {
+                     // display field/column names as first row
+                     echo implode("\t", array_keys($row)) . "\r\n";
+                     $flag = true;
+                 }
+                 echo implode("\t", array_values($row)) . "\r\n";
+             }
+             exit();
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getScholarFeeSummaryDeletedExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+           $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+
+            $batch = $request->get('batch', '');  
+            $class_id = $request->get('class_id', '');
+            $section_id = $request->get('section_id', '');
+            $student_id = $request->get('student_id', '');
+            $fee_category = $request->get('fee_category', '');
+            $fee_item_id = $request->get('fee_item_id', '');
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search','');
+
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+            ->where('fees_payment_details.school_id', $school_id)->where('fees_payment_details.student_id', $student_id) 
+            ->where('fees_payment_details.cancel_status', 1) 
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name',
+                'creator.name as creator_name');
+           
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_payment_details.status') {
+                            $fee_summary_list->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $fee_summary_list->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            }                 
+
+            if($batch > 0){
+                $fee_summary_list->where('fees_payment_details.batch',$batch); 
+            }
+            if($class_id > 0){
+                $fee_summary_list->where('fees_payment_details.class_id',$class_id); 
+            }
+            if($section_id > 0){
+                $fee_summary_list->where('fees_payment_details.section_id',$section_id); 
+            }
+            if($student_id > 0){
+                $fee_summary_list->where('fees_payment_details.student_id',$student_id); 
+            }
+            if($fee_category > 0){
+                $fee_summary_list->where('fee_categories.id',$fee_category); 
+            }
+            if($fee_item_id > 0){
+                $fee_summary_list->where('fees_payment_details.fee_structure_item_id',$fee_item_id); 
+            }
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $fee_summary_list->where('fees_payment_details.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $fee_summary_list->where('fees_payment_details.created_at', '<=', $maxdate); 
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%"  OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" )'); 
+                }
+            } 
+
+
+            if ($order >= 0) {
                 $orderby = $columns[$order]['name'];
             } else {
                 $orderby = 'fees_payment_details.id';
@@ -28843,6 +34265,8 @@ foreach($students as $k=>$v){
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId();
 
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
             $get_batches = $this->getBatches(); 
 
             $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
@@ -28850,7 +34274,7 @@ foreach($students as $k=>$v){
             $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
            
             return view('admin.fee_report_collection')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
-                'get_fee_category' => $get_fee_category]);
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
 
         } else {
             return redirect('/admin/login');
@@ -28874,6 +34298,7 @@ foreach($students as $k=>$v){
             $student_id = $request->get('student_id', '');
             $fee_category = $request->get('fee_category', '');
             $fee_item_id = $request->get('fee_item_id', '');
+            $search = $request->get('search', '');
             $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
             $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
 
@@ -28890,8 +34315,7 @@ foreach($students as $k=>$v){
             ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
-            ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc'); 
+            ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status'); 
 
             $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
             ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
@@ -28905,7 +34329,6 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
             ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc')
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -28924,7 +34347,6 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
             ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc')
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -28945,7 +34367,15 @@ foreach($students as $k=>$v){
                         }
                     }
                 }
-            }                 
+            }   
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $overall_fee_collected->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                }
+            }
 
             if($batch > 0){
                 $fee_summary_list->where('fees_payment_details.batch',$batch);
@@ -29076,6 +34506,7 @@ foreach($students as $k=>$v){
             $student_id = $request->get('student_id', '');
             $fee_category = $request->get('fee_category', '');
             $fee_item_id = $request->get('fee_item_id', '');
+            $search = $request->get('search', '');
             $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
             $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
 
@@ -29111,7 +34542,14 @@ foreach($students as $k=>$v){
                         }
                     }
                 }
-            }                 
+            }       
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")'); 
+                }
+            }
+          
 
             if($batch > 0){
                 $fee_summary_list->where('fees_payment_details.batch',$batch); 
@@ -29205,6 +34643,8 @@ foreach($students as $k=>$v){
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId();
 
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
             $get_batches = $this->getBatches(); 
 
             $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
@@ -29212,7 +34652,7 @@ foreach($students as $k=>$v){
             $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
            
             return view('admin.conwai_fee_report_collection')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
-                'get_fee_category' => $get_fee_category]);
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
 
         } else {
             return redirect('/admin/login');
@@ -29238,6 +34678,7 @@ foreach($students as $k=>$v){
             $fee_item_id = $request->get('fee_item_id', '');
             $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
             $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
 
             $school_id = (new AdminRoleController())->getSchoolId();
 
@@ -29253,9 +34694,8 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             //->whereRAW(' (fees_payment_details.is_concession = 1 OR fees_payment_details.is_waiver = 1) ') 
             ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
-            ->where('fees_payment_details.cancel_status', '0')
-            ->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc'); 
+            ->where('fees_payment_details.cancel_status', '0');
+            //->whereNuLL('users.alumni_status'); 
 
             $cancelled_fee_concession = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
             ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
@@ -29268,9 +34708,8 @@ foreach($students as $k=>$v){
             ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
-            ->where('fees_payment_details.cancel_status', '2')
-            ->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc'); 
+            ->where('fees_payment_details.cancel_status', '2');
+            //->whereNuLL('users.alumni_status'); 
 
             $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
             ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
@@ -29284,8 +34723,7 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
             //->where('fees_payment_details.cancel_status', '0')
-            ->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc')
+            //->whereNuLL('users.alumni_status')
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -29304,8 +34742,7 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 1 AND fees_payment_details.is_waiver = 0) ') 
             //->where('fees_payment_details.cancel_status', '0')
-            ->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc')
+            //->whereNuLL('users.alumni_status') 
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -29328,7 +34765,16 @@ foreach($students as $k=>$v){
                         }
                     }
                 }
-            }                 
+            }           
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $overall_fee_concession->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $cancelled_fee_concession->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                }
+            }      
 
             if($batch > 0){
                 $fee_summary_list->where('fees_payment_details.batch',$batch);
@@ -29632,6 +35078,8 @@ foreach($students as $k=>$v){
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId();
 
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
             $get_batches = $this->getBatches(); 
 
             $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
@@ -29639,7 +35087,7 @@ foreach($students as $k=>$v){
             $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
            
             return view('admin.waiver_fee_report_collection')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
-                'get_fee_category' => $get_fee_category]);
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
 
         } else {
             return redirect('/admin/login');
@@ -29663,6 +35111,7 @@ foreach($students as $k=>$v){
             $student_id = $request->get('student_id', '');
             $fee_category = $request->get('fee_category', '');
             $fee_item_id = $request->get('fee_item_id', '');
+            $search = $request->get('search', '');
             $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
             $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
 
@@ -29680,7 +35129,7 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
             ->where('fees_payment_details.cancel_status', '0')
-            ->whereNuLL('users.alumni_status')
+            //->whereNuLL('users.alumni_status')
             ->orderby('fees_payment_details.id','desc'); 
 
             $cancelled_fee_concession = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
@@ -29695,7 +35144,7 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
             ->where('fees_payment_details.cancel_status', '2')
-            ->whereNuLL('users.alumni_status')
+            //->whereNuLL('users.alumni_status')
             ->orderby('fees_payment_details.id','desc'); 
 
             $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
@@ -29710,8 +35159,7 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
             //->where('fees_payment_details.cancel_status', '0')
-            ->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc')
+            //->whereNuLL('users.alumni_status') 
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -29730,8 +35178,7 @@ foreach($students as $k=>$v){
             ->where('users.delete_status',0)->where('users.status','ACTIVE')
             ->whereRAW(' (fees_payment_details.is_concession = 0 AND fees_payment_details.is_waiver = 1) ') 
             //->where('fees_payment_details.cancel_status', '0')
-            ->whereNuLL('users.alumni_status')
-            ->orderby('fees_payment_details.id','desc')
+            //->whereNuLL('users.alumni_status') 
             ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
                 'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
                 'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
@@ -29754,7 +35201,16 @@ foreach($students as $k=>$v){
                         }
                     }
                 }
-            }                 
+            }          
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_summary_list->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $overall_fee_concession->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                    $cancelled_fee_concession->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR fee_items.item_code like "%'.$search['value'] . '%" OR users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" OR creator.name like "%'.$search['value'] . '%")');
+                }
+            }             
 
             if($batch > 0){
                 $fee_summary_list->where('fees_payment_details.batch',$batch);
@@ -30091,6 +35547,7 @@ foreach($students as $k=>$v){
             $student_id = $request->get('student_id', '');
             $fee_category = $request->get('fee_category', '');
             $fee_item_id = $request->get('fee_item_id', '');
+            $search = $request->get('search', '');
             $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
             $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
 
@@ -30101,7 +35558,7 @@ foreach($students as $k=>$v){
             ->leftjoin('classes', 'classes.id', 'student_class_mappings.class_id')
             ->leftjoin('sections', 'sections.id', 'student_class_mappings.section_id')
             ->where('student_class_mappings.school_id', $school_id)->where('users.school_college_id', $school_id)
-            ->where('users.delete_status',0)->where('users.status','ACTIVE')->whereNuLL('users.alumni_status')
+            ->where('users.delete_status',0)->where('users.status','ACTIVE')//->whereNuLL('users.alumni_status')
             ->where('student_class_mappings.balance_fees', '>', 0)
             ->orderby('student_class_mappings.id','desc'); 
 
@@ -30110,7 +35567,7 @@ foreach($students as $k=>$v){
             ->leftjoin('classes', 'classes.id', 'student_class_mappings.class_id')
             ->leftjoin('sections', 'sections.id', 'student_class_mappings.section_id')
             ->where('student_class_mappings.school_id', $school_id)->where('users.school_college_id', $school_id)
-            ->where('users.delete_status',0)->where('users.status','ACTIVE')->whereNuLL('users.alumni_status')
+            ->where('users.delete_status',0)->where('users.status','ACTIVE')//->whereNuLL('users.alumni_status')
             ->where('student_class_mappings.balance_fees', '>', 0)
             ->select('student_class_mappings.*', 'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name' );
 
@@ -30119,7 +35576,7 @@ foreach($students as $k=>$v){
             ->leftjoin('classes', 'classes.id', 'student_class_mappings.class_id')
             ->leftjoin('sections', 'sections.id', 'student_class_mappings.section_id')
             ->where('student_class_mappings.school_id', $school_id)->where('users.school_college_id', $school_id)
-            ->where('users.delete_status',0)->where('users.status','ACTIVE')->whereNuLL('users.alumni_status')
+            ->where('users.delete_status',0)->where('users.status','ACTIVE')//->whereNuLL('users.alumni_status')
             ->where('student_class_mappings.balance_fees', '>', 0)
             ->select('student_class_mappings.*', 'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name' );
 
@@ -30137,7 +35594,15 @@ foreach($students as $k=>$v){
                         }
                     }
                 }
-            }                 
+            }      
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $fee_pending->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%")');
+                    $filtered_qry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%")');
+                    $overall_fee_pending->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.admission_no like "%'.$search['value'] . '%"  OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%")'); 
+                }
+            }                     
 
             if($batch > 0){
                 $fee_pending->where('student_class_mappings.academic_year',$batch);
@@ -30966,9 +36431,9 @@ foreach($students as $k=>$v){
                 ->leftjoin('classes', 'classes.id', 'pre_admission_students.class_id')
                 ->leftjoin('sections', 'sections.id', 'pre_admission_students.section_id') 
                 ->where('pre_admission_students.delete_status',0)->select('pre_admission_students.id');
-            if(Auth::User()->user_type == 'SCHOOL') {
+            //if(Auth::User()->user_type == 'SCHOOL') {
                 $totalData->where('pre_admission_students.school_college_id', $school_id); 
-            }
+            //}
             $totalData = $totalData->get();
 
             if (!empty($totalData)) {
@@ -31706,6 +37171,7 @@ foreach($students as $k=>$v){
     {
 
         if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
             $input = $request->all();
             $start = $input['start'];
             $length = $input['length'];
@@ -31750,10 +37216,10 @@ foreach($students as $k=>$v){
                 }
             }
 
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $sectionsqry->where('sections.school_id', Auth::User()->id);
-                $filteredqry->where('sections.school_id', Auth::User()->id);
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $sectionsqry->where('sections.school_id', $school_id);
+                $filteredqry->where('sections.school_id', $school_id);
+            //}
 
             if (!empty($order)) {
                 $orderby = $columns[$order]['name'];
@@ -31769,9 +37235,9 @@ foreach($students as $k=>$v){
 
             $totalDataqry = Sections::leftjoin('classes', 'classes.id', 'sections.class_id')
                 ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')->orderby('id', 'asc');
-            if(Auth::User()->user_type == 'SCHOOL') {
-                $totalDataqry->where('sections.school_id', Auth::User()->id); 
-            }
+            //if(Auth::User()->user_type == 'SCHOOL') {
+                $totalDataqry->where('sections.school_id', $school_id); 
+            //}
             $totalData = $totalDataqry->select('id')->count();
 
             $totalFiltered = $totalData;
@@ -31804,7 +37270,7 @@ foreach($students as $k=>$v){
     {
         if (Auth::check()) {
             $school_id = (new AdminRoleController())->getSchoolId();
-            $batch = DB::table('admin_settings')->where('school_id', Auth::User()->id)->value('acadamic_year'); 
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year'); 
             $section_id =  $request->code;
             if($section_id > 0) {
                 $students = DB::table('student_class_mappings')->where('academic_year', $batch)->where('section_id', $section_id)
@@ -31829,6 +37295,3323 @@ foreach($students as $k=>$v){
  
             return response()->json(['status' => 1, 'message' => 'Fee Detail Updated']);
              
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    //view Departments
+    public function viewDepartments()
+    {
+        if (Auth::check()) {
+
+            return view('admin.departments');
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getDepartments(Request $request)
+    {
+
+        if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $departmentsqry = Departments::where('id', '>', 0)->where('school_id', $school_id);
+            $filteredqry = Departments::where('id', '>', 0)->where('school_id', $school_id);
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $departmentsqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $departmentsqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $departmentsqry->whereRaw('( departments.department_name like "%'.$search['value'] . '%"  )');
+                    
+                    $filteredqry->whereRaw('( departments.department_name like "%'.$search['value'] . '%"  )');
+                }
+            }
+
+            if(!empty($status)){
+                $departmentsqry->where('status',$status);
+                $filteredqry->where('status',$status);
+            }
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'department_name';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $departments = $departmentsqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = Departments::orderby('id', 'asc');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($departments)) {
+                foreach ($departments as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }
+
+    public function postDepartments(Request $request)
+    {
+        if (Auth::check()) {
+
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $id = $request->id;
+            $department_name = $request->department_name;  
+            $status = $request->status; 
+
+            $validator = Validator::make($request->all(), [
+                'department_name' => 'required', 
+                'status' => 'required',
+            ]);
+
+            if ($id > 0) {
+                $exists = DB::table('departments')->where('department_name', $department_name)
+                    ->where('school_id', $school_id)->whereNotIn('id', [$id])->first();
+            } else {
+                $exists = DB::table('departments')->where('department_name', $department_name)
+                    ->where('school_id', $school_id)->first();
+            }
+
+            if (!empty($exists)) {
+                return response()->json([
+                    'status' => "FAILED",
+                    'message' => "Department Name Already Exists.",
+                ]);
+            }
+
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => "FAILED",
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }
+
+            if ($id > 0) {
+                $department = Departments::find($id);
+                $department->updated_by = Auth::User()->id;
+                $department->updated_at = date('Y-m-d H:i:s');
+            } else {
+                $department = new Departments;
+                $department->created_at = date('Y-m-d H:i:s');
+                $department->created_by = Auth::User()->id;
+            }
+
+            $department->school_id = $school_id;
+            $department->department_name = $department_name;  
+            $department->status = $status; 
+
+            $department->save();
+            return response()->json(['status' => 'SUCCESS', 'message' => 'Department Saved Successfully']);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function editDepartments(Request $request)
+    {
+
+        if (Auth::check()) {
+            $department = Departments::where('id', $request->code)->get();
+
+            if ($department->isNotEmpty()) {
+                return response()->json(['status' => 'SUCCESS', 'data' => $department[0], 'message' => 'Department Detail']);
+            } else {
+                return response()->json(['status' => 'FAILED', 'data' => [], 'message' => 'No Department Detail']);
+            }
+        } else {
+            return redirect('/admin/login');
+        }
+    } 
+
+    //Gallery
+    /* Function: viewGallery
+     */
+    public function viewGallery()
+    {
+        if (Auth::check()) { 
+            return view('admin.gallery');
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    /* Function: getEvents
+    Datatable Load
+     */
+    public function getGallery(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $status = $request->get('status','0');  
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search','');
+
+            $school_id = (new AdminRoleController())->getSchoolId();  
+
+            $sectionsqry = Gallery::where('school_id', $school_id)->select('gallery.*')->where('status', '!=', 'DELETED'); 
+
+            $filteredqry = Gallery::where('school_id', $school_id)->select('gallery.*')->where('status', '!=', 'DELETED'); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'gallery.status') {
+                            $sectionsqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $sectionsqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $sectionsqry->whereRaw('( gallery.gallery_title like "%'.$search['value'] . '%"  )');
+                    
+                    $filteredqry->whereRaw('( gallery.gallery_title like "%'.$search['value'] . '%"  )');
+                }
+            }  
+
+            if($status != '' || $status != 0){
+                $sectionsqry->where('status',$status);
+                $filteredqry->where('status',$status);
+            } 
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $sectionsqry->where('gallery.created_at', '>=', $mindate);
+                $filteredqry->where('gallery.created_at', '>=', $mindate);
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $sectionsqry->where('gallery.created_at', '<=', $maxdate);
+                $filteredqry->where('gallery.created_at', '<=', $maxdate);
+            }
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'gallery.id';
+            }
+            if (empty($dir)) {
+                $dir = 'ASC';
+            }
+
+            $circulars = $sectionsqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('events.id')->count();
+
+            $totalDataqry = Gallery::where('school_id', $school_id)->where('status', '!=', 'DELETED'); 
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($circulars)) {
+                foreach ($circulars as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    /* Function: postEvents
+    Save into em_countries table
+     */
+    public function postGallery(Request $request)
+    {
+        if (Auth::check()) {
+            $id = $request->id; 
+            $gallery_title = $request->gallery_title; 
+            $status = $request->status; 
+
+            $validator = Validator::make($request->all(), [ 
+                'gallery_title' => 'required', 
+                'status' => 'required', 
+            ]);
+
+            if ($validator->fails()) {
+
+                $msg = $validator->errors()->all();
+
+                return response()->json([
+
+                    'status' => 0,
+                    'message' => "Please check your all inputs " . implode(', ', $msg),
+                ]);
+            }
+            if ($id > 0) {
+                $gallery = Gallery::find($id);
+                $gallery->updated_at = date('Y-m-d H:i:s');
+                $gallery->updated_by = Auth::User()->id;
+            } else {
+                $gallery = new Gallery();
+                $gallery->created_at = date('Y-m-d H:i:s');
+                $gallery->created_by = Auth::User()->id;
+            }
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $gallery->school_id = $school_id; 
+            $gallery->gallery_title = $gallery_title; 
+            $images = $request->file('gallery_image',[]); 
+            if (!empty($images)) {
+                $arr = []; $str =  '';
+                if(!empty($gallery->gallery_image)) {
+                    $sarr = explode(';', $gallery->gallery_image);
+                }   else {
+                    $sarr = [];
+                }
+
+                $total_count = count($images)+count($sarr);
+                //if($total_count <= 10){
+                foreach($images as $image) {
+             
+                    $accepted_formats = ['jpeg', 'jpg', 'png'];
+                    $ext = $image->getClientOriginalExtension();
+                    if (!in_array($ext, $accepted_formats)) {
+                        return response()->json(['status' => 0, 'message' => 'File Format Wrong.Please upload Jepg, jpg, Png Format Files']);
+                    }
+             
+                    $countryimg = rand() . time() . '.' . $image->getClientOriginalExtension();
+
+                    $destinationPath = public_path('/uploads/gallery/'.$school_id.'/');
+                  
+                    $image->move($destinationPath, $countryimg);
+
+                    $arr[] = $countryimg;
+                }
+              
+                /*} else{
+                    return response()->json(['status' => 0, 'message' => 'Only 10 images are Allows to Upload']);
+                }*/
+                if(count($arr)>0) {
+                    $arr = array_merge($sarr, $arr);
+                    $str = implode(';', $arr);
+                }
+                $gallery->gallery_image = $str;
+         
+            } 
+            $gallery->status = $status; 
+            $gallery->save();
+            return response()->json(['status' => 1, 'message' => 'Gallery Saved Successfully']);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function editGallery(Request $request)
+    {
+        if (Auth::check()) {
+            $gallery = Gallery::where('id', $request->code)->get();
+            if ($gallery->isNotEmpty()) {
+                return response()->json(['status' => 1, 'data' => $gallery[0], 'message' => 'Gallery Detail']);
+            } else {
+                return response()->json(['status' => 0, 'data' => [], 'message' => 'No Gallery Detail']);
+            }
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function deleteGalleryAttachment(Request $request)   {
+        if (Auth::check()) {
+            $input = $request->all();
+            $galleryid = (isset($input['galleryid'])) ? $input['galleryid'] : 0;
+            $imgid = (isset($input['imgid'])) ? $input['imgid'] : '';
+            if($galleryid > 0 && !empty($imgid)) {
+                $gallery = Gallery::find($galleryid);
+                $arr = explode('/', $imgid);
+                $imgname = array_pop($arr);
+
+                if(!empty($gallery->gallery_image)) {
+                    $imgs = explode(';',$gallery->gallery_image);
+                    if(count($imgs)>0) {
+                        $pos = array_search($imgname, $imgs);
+                        if ($pos !== false) {
+                            unset($imgs[$pos]);
+                            if(count($imgs)>0) {
+                                $imgs = implode(';', $imgs);
+                                $gallery->gallery_image = $imgs;
+                            } else {
+                                $gallery->gallery_image = '';
+                            }
+                            $gallery->save();
+                            return response()->json(['status' => 1, 'data' => [], 'message' => 'Deleted Successfully']);
+                        }
+                    }
+                }
+            }
+            return response()->json(['status' => 0, 'data' => [], 'message' => 'Please select the valid image to delete']);
+        } else {
+            return response()->json(['status' => 0, 'data' => [], 'message' => 'Session Logged Out']);
+        }
+    }
+
+    //view Remarks
+    public function viewRemarks(Request $request)
+    {
+        if (Auth::check()) {  
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            }
+            $classes = $classes->orderby('position', 'Asc')->get(); 
+            return view('admin.remarks')->with('classes', $classes);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getRemarks(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column'); 
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+            $class_id = $request->get('classid',0);
+            $section_id = $request->get('sectionid',0);
+            $student_id = $request->get('student_id',0);
+            $mindate = $request->get('minDateFilter','');
+            $maxdate = $request->get('maxDateFilter','');
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+ 
+            $remarksqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', 'REMARK')
+                ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                        'classes.class_name', 'sections.section_name');
+            $filteredqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', 'REMARK')
+                ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                        'classes.class_name', 'sections.section_name');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $remarksqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $remarksqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $remarksqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR user_remarks.remark_description like "%'.$search['value'] . '%" OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" ) ');
+                    
+                    $filteredqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR user_remarks.remark_description like "%'.$search['value'] . '%" OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" ) ');
+                }
+            }
+
+            if($class_id > 0){
+                $remarksqry->where('students.class_id',$class_id); 
+                $filteredqry->where('students.class_id',$class_id); 
+            }
+            if($section_id > 0){
+                $remarksqry->where('students.section_id',$section_id); 
+                $filteredqry->where('students.section_id',$section_id); 
+            }
+            if($student_id > 0) {
+                $remarksqry->where('students.user_id',$student_id); 
+                $filteredqry->where('students.user_id',$student_id); 
+            }
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $remarksqry->where('user_remarks.created_at', '>=', $mindate);
+                $filteredqry->where('user_remarks.created_at', '>=', $mindate);  
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $remarksqry->where('user_remarks.created_at', '<=', $maxdate); 
+                $filteredqry->where('user_remarks.created_at', '>=', $mindate); 
+            }
+
+            if(!empty($status)){
+                $remarksqry->where('status',$status);
+                $filteredqry->where('status',$status);
+            }
+ 
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'user_remarks.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $credits = $remarksqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = UserRemarks::where('user_remarks.school_id', $school_id)
+                ->where('user_remarks.remark_type', 'REMARK')->where('user_remarks.status', 'ACTIVE')->orderby('id', 'asc');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($credits)) {
+                foreach ($credits as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        } 
+    }
+
+    public function deleteRemarks(Request $request)   {
+        if (Auth::check()) {
+             $get_data = UserRemarks::where('id', $request->id)->get();
+             if ($get_data->isNotEmpty()) { 
+                UserRemarks::where('id', $request->id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
+                    return response()->json(['status' => 1, 'message' => 'Remark Deleted Successfully']); 
+             } else {
+                 return response()->json(['status' => 0, 'data' => [], 'message' => 'No Remark']);
+             }
+        } else {
+             return redirect('/admin/login');
+        }
+    } 
+
+    public function getRemarksExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column'); 
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+            $class_id = $request->get('classid',0);
+            $section_id = $request->get('sectionid',0);
+            $student_id = $request->get('student_id',0);
+            $mindate = $request->get('minDateFilter','');
+            $maxdate = $request->get('maxDateFilter','');
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+ 
+            $remarksqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', 'REMARK')
+                ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                        'classes.class_name', 'sections.section_name'); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $remarksqry->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $remarksqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $remarksqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR user_remarks.remark_description like "%'.$search['value'] . '%" OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" ) '); 
+                }
+            }
+
+            if($class_id > 0){
+                $remarksqry->where('students.class_id',$class_id);  
+            }
+            if($section_id > 0){
+                $remarksqry->where('students.section_id',$section_id);  
+            }
+            if($student_id > 0) {
+                $remarksqry->where('students.user_id',$student_id);  
+            }
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $remarksqry->where('user_remarks.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $remarksqry->where('user_remarks.created_at', '<=', $maxdate);  
+            }
+
+            if(!empty($status)){
+                $remarksqry->where('status',$status); 
+            }
+ 
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'user_remarks.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $remarks = $remarksqry->orderby($orderby, $dir)->get();
+
+            $remarks_excel = [];
+            if ($remarks->isNotEmpty()) {  
+                $remarks = $remarks->toArray(); 
+                foreach ($remarks as $rev) {     
+                    if($rev['remark_notify'] == 1) { $remark_notify = 'Yes'; } else { $remark_notify = 'No'; }
+                    $remarks_excel[] = [
+                        "Date" => $rev['created_at'],
+                        "Class" => $rev['class_name'],
+                        "Section" => $rev['section_name'],
+                        "Scholar" => $rev['name'],
+                        "Description" => $rev['remark_description'],
+                        "Created By" => $rev['posted_user']->name,
+                        "Is Notified" => $remark_notify, 
+                    ];
+                }
+            }    
+             
+            header("Content-Type: text/plain");
+            $flag = false;
+            foreach ($remarks_excel as $row) {
+                if (! $flag) {
+                      // display field/column names as first row
+                      echo implode("\t", array_keys($row)) . "\r\n";
+                      $flag = true;
+                }
+                echo implode("\t", array_values($row)) . "\r\n";
+            }
+            exit();
+
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }  
+
+    //view Rewards
+    public function viewRewards(Request $request)
+    {
+        if (Auth::check()) {  
+            $classids = (new AdminRoleController())->getSchoolRoleClasses();
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id);
+            if(count($classids)>0) {
+                $classes->whereIn('id', $classids);
+            }
+            $classes = $classes->orderby('position', 'Asc')->get();   
+            return view('admin.rewards')->with('classes', $classes);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getRewards(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column'); 
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+            $class_id = $request->get('classid',0);
+            $section_id = $request->get('sectionid',0);
+            $student_id = $request->get('student_id',0);
+            $mindate = $request->get('minDateFilter','');
+            $maxdate = $request->get('maxDateFilter','');
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+ 
+            $remarksqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', 'REWARD')
+                ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                        'classes.class_name', 'sections.section_name');
+            $filteredqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', 'REWARD')
+                ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                        'classes.class_name', 'sections.section_name');
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $remarksqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $remarksqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $remarksqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR user_remarks.remark_description like "%'.$search['value'] . '%" OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" ) ');
+                    
+                    $filteredqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR user_remarks.remark_description like "%'.$search['value'] . '%" OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" ) ');
+                }
+            }
+
+            if($class_id > 0){
+                $remarksqry->where('students.class_id',$class_id); 
+                $filteredqry->where('students.class_id',$class_id); 
+            }
+            if($section_id > 0){
+                $remarksqry->where('students.section_id',$section_id); 
+                $filteredqry->where('students.section_id',$section_id); 
+            }
+            if($student_id > 0) {
+                $remarksqry->where('students.user_id',$student_id); 
+                $filteredqry->where('students.user_id',$student_id); 
+            }
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $remarksqry->where('user_remarks.created_at', '>=', $mindate);
+                $filteredqry->where('user_remarks.created_at', '>=', $mindate);  
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $remarksqry->where('user_remarks.created_at', '<=', $maxdate); 
+                $filteredqry->where('user_remarks.created_at', '>=', $mindate); 
+            }
+
+            if(!empty($status)){
+                $remarksqry->where('status',$status);
+                $filteredqry->where('status',$status);
+            }
+ 
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'user_remarks.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $credits = $remarksqry->skip($start)->take($length)->orderby($orderby, $dir)->get();
+            $filters = $filteredqry->select('id')->count();
+
+            $totalDataqry = UserRemarks::where('user_remarks.school_id', $school_id)
+                ->where('user_remarks.remark_type', 'REWARD')->where('user_remarks.status', 'ACTIVE')->orderby('id', 'asc');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            }
+
+            $data = [];
+            if (!empty($credits)) {
+                foreach ($credits as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered),
+                "data" => $data,
+            );
+
+            echo json_encode($json_data);
+
+        } else {
+            return redirect('/admin/login');
+        } 
+    }
+
+    public function deleteRewards(Request $request)   {
+        if (Auth::check()) {
+             $get_data = UserRemarks::where('id', $request->id)->get();
+             if ($get_data->isNotEmpty()) { 
+                UserRemarks::where('id', $request->id)->update(['status'=>'DELETED', 'updated_at'=>date('Y-m-d H:i:s')]);
+                    return response()->json(['status' => 1, 'message' => 'Reward Deleted Successfully']); 
+             } else {
+                 return response()->json(['status' => 0, 'data' => [], 'message' => 'No Reward']);
+             }
+        } else {
+             return redirect('/admin/login');
+        }
+    } 
+
+    public function getRewardsExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+
+            $input = $request->all();
+            $start = $input['start'];
+            $length = $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column'); 
+            $status = $request->get('status','');
+            $search = $request->get('search','');
+            $class_id = $request->get('classid',0);
+            $section_id = $request->get('sectionid',0);
+            $student_id = $request->get('student_id',0);
+            $mindate = $request->get('minDateFilter','');
+            $maxdate = $request->get('maxDateFilter','');
+
+            $school_id = (new AdminRoleController())->getSchoolId(); 
+ 
+            $remarksqry = UserRemarks::leftjoin('users', 'user_remarks.user_id', 'users.id') 
+                ->leftjoin('students', 'user_remarks.user_id', 'students.user_id') 
+                ->leftjoin('classes', 'students.class_id', 'classes.id') 
+                ->leftjoin('sections', 'students.section_id', 'sections.id') 
+                ->where('user_remarks.school_id', $school_id)->where('user_remarks.remark_type', 'REWARD')
+                ->where('user_remarks.status', 'ACTIVE')->select('users.name','user_remarks.*', 
+                        'classes.class_name', 'sections.section_name'); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) {
+                        if ($value['name'] == 'status') {
+                            $remarksqry->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $remarksqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            }
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $remarksqry->whereRaw('( users.name like "%'.$search['value'] . '%" OR users.mobile like "%'.$search['value'] . '%" OR users.email like "%'.$search['value'] . '%" OR users.name_code like "%'.$search['value'] . '%"  OR user_remarks.remark_description like "%'.$search['value'] . '%" OR classes.class_name like "%'.$search['value'] . '%" OR sections.section_name like "%'.$search['value'] . '%" ) '); 
+                }
+            }
+
+            if($class_id > 0){
+                $remarksqry->where('students.class_id',$class_id);  
+            }
+            if($section_id > 0){
+                $remarksqry->where('students.section_id',$section_id);  
+            }
+            if($student_id > 0) {
+                $remarksqry->where('students.user_id',$student_id);  
+            }
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $remarksqry->where('user_remarks.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $remarksqry->where('user_remarks.created_at', '<=', $maxdate);  
+            }
+
+            if(!empty($status)){
+                $remarksqry->where('status',$status); 
+            }
+ 
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'user_remarks.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            } 
+
+            $remarks = $remarksqry->orderby($orderby, $dir)->get();
+
+            $remarks_excel = [];
+            if ($remarks->isNotEmpty()) {  
+                $remarks = $remarks->toArray(); 
+                foreach ($remarks as $rev) {     
+                    if($rev['remark_notify'] == 1) { $remark_notify = 'Yes'; } else { $remark_notify = 'No'; }
+                    $remarks_excel[] = [
+                        "Date" => $rev['created_at'],
+                        "Class" => $rev['class_name'],
+                        "Section" => $rev['section_name'],
+                        "Scholar" => $rev['name'],
+                        "Description" => $rev['remark_description'],
+                        "Created By" => $rev['posted_user']->name,
+                        "Is Notified" => $remark_notify, 
+                    ];
+                }
+            }    
+             
+            header("Content-Type: text/plain");
+            $flag = false;
+            foreach ($remarks_excel as $row) {
+                if (! $flag) {
+                      // display field/column names as first row
+                      echo implode("\t", array_keys($row)) . "\r\n";
+                      $flag = true;
+                }
+                echo implode("\t", array_values($row)) . "\r\n";
+            }
+            exit();
+
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }  
+
+
+    // Fees Consolidated Report 
+
+    public function viewFeesReport()
+    {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
+            $get_batches = $this->getBatches(); 
+
+            $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
+
+            $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
+           
+            return view('admin.fees_report_consolidated')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getFeesReport(Request $request)
+    {
+
+        if (Auth::check()) {
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+
+            /*$batch = $request->get('batch', '');  
+            $class_id = $request->get('class_id', '');
+            $section_id = $request->get('section_id', '');
+            $student_id = $request->get('student_id', '');
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';*/
+            $fee_filter = $request->get('fee_filter', '');
+            $fee_type = $request->get('fee_type', '');
+            $dateFilter = $request->get('dateFilter', '');
+            $search = $request->get('search', ''); 
+
+            //$dateFilter = "November 1, 2023 - May 28, 2025";
+            if(!empty($dateFilter)) {
+                $dates  = explode(' - ', $dateFilter);
+                $start = date('Y-m-d', strtotime($dates[0]));
+                $end = date('Y-m-d', strtotime($dates[1])); 
+            }
+
+            //echo "<pre>"; print_r($input);  
+
+
+            $final_array = '';
+            $school_id = (new AdminRoleController())->getSchoolId();
+            if(!empty($fee_type)){ 
+                $types = [$fee_type];
+            } else {
+                $types = ['COLLECTED','CONCESSION','WAIVER'];
+            }
+
+            if(!empty($fee_filter)){
+
+                switch($fee_filter) {
+                    case 'ACCOUNT' :   
+
+                        if(empty($fee_type)){  
+
+                            $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $collected_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  )'); 
+                                }
+                            } 
+
+                            $collected_list->select('accounts.account_name', DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $concession_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  )'); 
+                                }
+                            } 
+
+                            $concession_list->select('accounts.account_name', DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',1)->groupby('accounts.id')
+                                ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $waiver_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  )'); 
+                                }
+                            } 
+
+                            $waiver_list->select('accounts.account_name', DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $waiver_list = $waiver_list->orderby($orderby, $dir)->orderby('accounts.account_name', 'asc')->get(); 
+
+                            /*echo "<pre>"; print_r($collected_list->toArray());
+                            echo "<pre>"; print_r($concession_list->toArray());
+                            echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                            $final_array = [];
+
+                            if($collected_list->isNotEmpty()) {
+                                $collected_array = $collected_list->toArray();
+                                $final_array = array_merge($final_array, $collected_array);
+                            }
+                            if($concession_list->isNotEmpty()) {
+                                $concession_array = $concession_list->toArray();
+                                $final_array = array_merge($final_array, $concession_array);
+                            }
+                            if($waiver_list->isNotEmpty()) {
+                                $waiver_array = $waiver_list->toArray();
+                                $final_array = array_merge($final_array, $waiver_array);
+                            }
+                            //echo "<pre>"; print_r($final_array); 
+ 
+
+                        } else {
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->groupby('accounts.id'); 
+
+                            if($fee_type == 'COLLECTED') { 
+                                $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                    ->select('accounts.account_name', DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                            } elseif($fee_type == 'CONCESSION') { 
+                                $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',1)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('accounts.id')
+                                    ->select('accounts.account_name', DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } elseif($fee_type == 'WAIVER') { 
+                                $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',1)->groupby('accounts.id')
+                                    ->select('accounts.account_name', DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } 
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  )'); 
+                                }
+                            }  
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            }  
+
+                            $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+ 
+                            $final_array = [];
+
+                            if($fee_summary_list->isNotEmpty()) {
+                                $fee_summary_list = $fee_summary_list->toArray();
+                                $final_array = array_merge($final_array, $fee_summary_list);
+                            } 
+                        } 
+                         
+                    break;
+
+                    case 'CATEGORY' :   
+
+                        if(empty($fee_type)){  
+
+                            $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $collected_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $collected_list->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $concession_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $concession_list->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',1)->groupby('fee_categories.id')
+                                ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $waiver_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $waiver_list->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $waiver_list = $waiver_list->orderby($orderby, $dir)->get(); 
+
+                            /*echo "<pre>"; print_r($collected_list->toArray());
+                            echo "<pre>"; print_r($concession_list->toArray());
+                            echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                            $final_array = [];
+
+                            if($collected_list->isNotEmpty()) {
+                                $collected_array = $collected_list->toArray();
+                                $final_array = array_merge($final_array, $collected_array);
+                            }
+                            if($concession_list->isNotEmpty()) {
+                                $concession_array = $concession_list->toArray();
+                                $final_array = array_merge($final_array, $concession_array);
+                            }
+                            if($waiver_list->isNotEmpty()) {
+                                $waiver_array = $waiver_list->toArray();
+                                $final_array = array_merge($final_array, $waiver_array);
+                            }
+                            //echo "<pre>"; print_r($final_array); 
+ 
+
+                        } else {
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE'); 
+
+                            if($fee_type == 'COLLECTED') { 
+                                $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                    ->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                            } elseif($fee_type == 'CONCESSION') { 
+                                $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',1)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fee_categories.id')
+                                    ->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } elseif($fee_type == 'WAIVER') { 
+                                $fee_summary_list->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',1)->groupby('fee_categories.id')
+                                    ->select(DB::RAW(' CONCAT(accounts.account_name, " - ", fee_categories.name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } 
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"   OR fee_categories.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            }  
+
+                            $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+ 
+                            $final_array = [];
+
+                            if($fee_summary_list->isNotEmpty()) {
+                                $fee_summary_list = $fee_summary_list->toArray();
+                                $final_array = array_merge($final_array, $fee_summary_list);
+                            } 
+                        } 
+                         
+                    break;
+
+                    case 'ITEM' :   
+
+                        if(empty($fee_type)){  
+
+                            $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id') 
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $collected_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $collected_list->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $concession_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $concession_list->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_item_id')
+                                ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $waiver_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $waiver_list->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $waiver_list = $waiver_list->orderby($orderby, $dir)->get(); 
+
+                            /*echo "<pre>"; print_r($collected_list->toArray());
+                            echo "<pre>"; print_r($concession_list->toArray());
+                            echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                            $final_array = [];
+
+                            if($collected_list->isNotEmpty()) {
+                                $collected_array = $collected_list->toArray();
+                                $final_array = array_merge($final_array, $collected_array);
+                            }
+                            if($concession_list->isNotEmpty()) {
+                                $concession_array = $concession_list->toArray();
+                                $final_array = array_merge($final_array, $concession_array);
+                            }
+                            if($waiver_list->isNotEmpty()) {
+                                $waiver_array = $waiver_list->toArray();
+                                $final_array = array_merge($final_array, $waiver_array);
+                            }
+                            //echo "<pre>"; print_r($final_array); 
+ 
+
+                        } else {
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE'); 
+
+                            if($fee_type == 'COLLECTED') { 
+                                $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                    ->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                            } elseif($fee_type == 'CONCESSION') { 
+                                $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',1)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_item_id')
+                                    ->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } elseif($fee_type == 'WAIVER') { 
+                                $fee_summary_list->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_item_id')
+                                    ->select(DB::RAW(' CONCAT(fee_categories.name, " - ", fee_items.item_name) as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            }  
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"   OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%" )'); 
+                                }
+                            }  
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            }  
+
+                            $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+ 
+                            $final_array = [];
+
+                            if($fee_summary_list->isNotEmpty()) {
+                                $fee_summary_list = $fee_summary_list->toArray();
+                                $final_array = array_merge($final_array, $fee_summary_list);
+                            } 
+                        } 
+                         
+                    break;
+
+                    case 'TERM' :   
+
+                        if(empty($fee_type)){  
+
+                            $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id') 
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $collected_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%"  OR fee_terms.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $collected_list->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $concession_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',1)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                ->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $concession_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%"  OR fee_terms.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $concession_list->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $concession_list = $concession_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $waiver_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_term_id')
+                                ->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $waiver_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%"  OR fee_terms.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $waiver_list->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $waiver_list = $waiver_list->orderby($orderby, $dir)->get(); 
+
+                            /*echo "<pre>"; print_r($collected_list->toArray());
+                            echo "<pre>"; print_r($concession_list->toArray());
+                            echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                            $final_array = [];
+
+                            if($collected_list->isNotEmpty()) {
+                                $collected_array = $collected_list->toArray();
+                                $final_array = array_merge($final_array, $collected_array);
+                            }
+                            if($concession_list->isNotEmpty()) {
+                                $concession_array = $concession_list->toArray();
+                                $final_array = array_merge($final_array, $concession_array);
+                            }
+                            if($waiver_list->isNotEmpty()) {
+                                $waiver_array = $waiver_list->toArray();
+                                $final_array = array_merge($final_array, $waiver_array);
+                            }
+                            //echo "<pre>"; print_r($final_array); 
+ 
+
+                        } else {
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('fee_terms', 'fee_terms.id', 'fee_structure_items.fee_term_id') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE'); 
+
+                            if($fee_type == 'COLLECTED') { 
+                                $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                    ->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+                            } elseif($fee_type == 'CONCESSION') { 
+                                $fee_summary_list->whereRaw(' concession_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',1)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fee_structure_items.fee_term_id')
+                                    ->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Concession" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } elseif($fee_type == 'WAIVER') { 
+                                $fee_summary_list->whereRaw(' is_waiver_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',1)->groupby('fee_structure_items.fee_term_id')
+                                    ->select(DB::RAW(' fee_terms.name as account_name'), DB::RAW('"Waiver" as fee_type'), DB::RAW(' sum(concession_amount) as total_amount')); 
+                            } 
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"   OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%"  OR fee_terms.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            }  
+
+                            if($order == 0) {
+                                $orderby = 'accounts.account_name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'accounts.account_name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            }  
+
+                            $fee_summary_list = $fee_summary_list->orderby($orderby, $dir)->get();
+ 
+                            $final_array = [];
+
+                            if($fee_summary_list->isNotEmpty()) {
+                                $fee_summary_list = $fee_summary_list->toArray();
+                                $final_array = array_merge($final_array, $fee_summary_list);
+                            } 
+                        } 
+                         
+                    break;
+
+                    case 'PAYMENTMODE' :   
+
+                        if(empty($fee_type)){  
+
+                            $collected_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id') 
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('payment_modes', 'payment_modes.id', 'fees_payment_details.payment_mode') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE')->where('fees_payment_details.is_concession',0)
+                                ->where('fees_payment_details.is_waiver',0)->groupby('fees_payment_details.payment_mode')
+                                ->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ');
+
+
+                            if (count($search) > 0) {
+                                if (isset($search['value']) && !empty($search['value'])) {
+                                    $collected_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"  OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%"  OR payment_modes.name like "%'.$search['value'] . '%"  OR payment_modes.name like "%'.$search['value'] . '%" )'); 
+                                }
+                            } 
+
+                            $collected_list = $collected_list->select(DB::RAW(' payment_modes.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount'));
+
+                            if($order == 0) {
+                                $orderby = 'payment_modes.name';
+                            } elseif($order == 2) {
+                                $orderby = 'total_amount';
+                            } else {
+                                $orderby = 'payment_modes.name';
+                            }
+
+                            if (empty($dir)) {
+                                $dir = 'ASC';
+                            } 
+
+                            $collected_list = $collected_list->orderby($orderby, $dir)->get(); 
+
+                            
+                            $concession_list = '';  // // not applicable
+
+                            
+                            $waiver_list = ''; // not applicable
+
+                            /*echo "<pre>"; print_r($collected_list->toArray());
+                            echo "<pre>"; print_r($concession_list->toArray());
+                            echo "<pre>"; print_r($waiver_list->toArray());*/
+
+
+                            $final_array = [];
+
+                            if($collected_list->isNotEmpty()) {
+                                $collected_array = $collected_list->toArray();
+                                $final_array = array_merge($final_array, $collected_array);
+                            } 
+                            //echo "<pre>"; print_r($final_array); 
+ 
+
+                        } else {
+ 
+                            $final_array = [];
+
+                            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+                                ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id') 
+                                ->leftjoin('payment_modes', 'payment_modes.id', 'fees_payment_details.payment_mode') 
+                                ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+                                ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+                                ->leftjoin('accounts', 'accounts.id', 'fee_categories.account_id') 
+                                ->where('fees_payment_details.school_id', $school_id) 
+                                ->where('fees_payment_details.cancel_status',0)->where('fee_structure_items.cancel_status',0)
+                                ->where('fee_structure_lists.cancel_status',0)->where('fee_categories.status','ACTIVE')
+                                ->where('accounts.status','ACTIVE'); 
+
+                            if($fee_type == 'COLLECTED') { 
+                                $fee_summary_list->whereRaw(' paid_date BETWEEN "'.$start.'" AND "'.$end.'" ')
+                                    ->where('fees_payment_details.is_concession',0)
+                                    ->where('fees_payment_details.is_waiver',0)->groupby('fees_payment_details.payment_mode')
+                                    ->select(DB::RAW(' payment_modes.name as account_name'), DB::RAW('"Collected" as fee_type'), DB::RAW(' sum(amount_paid) as total_amount')); 
+
+                                if (count($search) > 0) {
+                                    if (isset($search['value']) && !empty($search['value'])) {
+                                        $fee_summary_list->whereRaw('( accounts.account_name like "%'.$search['value'] . '%"   OR fee_categories.name like "%'.$search['value'] . '%"  OR fee_items.item_name like "%'.$search['value'] . '%"  OR payment_modes.name like "%'.$search['value'] . '%" )'); 
+                                    }
+                                } 
+
+                                if($order == 0) {
+                                    $orderby = 'accounts.account_name';
+                                } elseif($order == 2) {
+                                    $orderby = 'total_amount';
+                                } else {
+                                    $orderby = 'accounts.account_name';
+                                }
+
+                                if (empty($dir)) {
+                                    $dir = 'ASC';
+                                }  
+
+                                $fee_summary_list = $fee_summary_list->orderby($orderby,$dir)->get();
+                                if($fee_summary_list->isNotEmpty()) {
+                                    $fee_summary_list = $fee_summary_list->toArray();
+                                    $final_array = array_merge($final_array, $fee_summary_list);
+                                } 
+                            } elseif($fee_type == 'CONCESSION') { // not applicable
+                            } elseif($fee_type == 'WAIVER') {  // not applicable
+                            }  
+
+                            
+                        } 
+                         
+                    break;
+                }
+
+            }
+
+            //echo "<pre>"; print_r($final_array); exit;
+            $data = []; $recordsTotal = 0; $total_amount = 0;
+            if (!empty($final_array)) {
+                foreach ($final_array as $post) {
+                    $data[] = $post;
+                    $total_amount += $post['total_amount'];
+                }
+                $recordsTotal = count($final_array);
+            } 
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($final_array),
+                "data" => $data,
+                "recordsFiltered" => intval($final_array), 
+                "total_amount" => $total_amount
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }
+
+    public function getFeesReportExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+           $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns', []);
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+
+            $batch = $request->get('batch', '');  
+            $class_id = $request->get('class_id', '');
+            $section_id = $request->get('section_id', '');
+            $student_id = $request->get('student_id', '');
+            $fee_category = $request->get('fee_category', '');
+            $fee_item_id = $request->get('fee_item_id', '');
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $fee_summary_list = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users', 'users.id', 'fees_payment_details.student_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->leftjoin('classes', 'classes.id', 'fees_payment_details.class_id')
+            ->leftjoin('sections', 'sections.id', 'fees_payment_details.section_id')
+            ->where('fees_payment_details.school_id', $school_id)->where('users.school_college_id', $school_id)
+            ->where('users.delete_status',0)->where('users.status','ACTIVE')
+            ->where('fees_payment_details.is_concession', '0')->where('fees_payment_details.is_waiver', '0')
+            ->where('fees_payment_details.cancel_status', '0')->whereNuLL('users.alumni_status')
+            ->orderby('fees_payment_details.id','desc')
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'users.name as scholar_name', 'users.admission_no', 'classes.class_name', 'sections.section_name',
+                'creator.name as creator_name');
+
+           
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_payment_details.status') {
+                            $fee_summary_list->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $fee_summary_list->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            }                 
+
+            /*if($batch > 0){
+                $fee_summary_list->where('fees_payment_details.batch',$batch); 
+            }*/
+            if($class_id > 0){
+                $fee_summary_list->where('fees_payment_details.class_id',$class_id); 
+            }
+            if($section_id > 0){
+                $fee_summary_list->where('fees_payment_details.section_id',$section_id); 
+            }
+            if($student_id > 0){
+                $fee_summary_list->where('fees_payment_details.student_id',$student_id); 
+            }
+            if($fee_category > 0){
+                $fee_summary_list->where('fee_categories.id',$fee_category); 
+            }
+            if($fee_item_id > 0){
+                $fee_summary_list->where('fee_items.id',$fee_item_id); 
+            }
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $fee_summary_list->where('fees_payment_details.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $fee_summary_list->where('fees_payment_details.created_at', '<=', $maxdate); 
+            }
+
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_payment_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $fee_collection = $fee_summary_list->orderBy($orderby, $dir)->get();
+         
+            $fee_collection_excel = [];
+
+            if (! empty($fee_collection)) {
+                $i = 1;
+                foreach ($fee_collection as $rev) {
+                    $fee_collection_excel[] = [
+                         "Batch" => $rev->batch,
+                         "Class" => $rev->class_name,
+                         "Section" => $rev->section_name,
+                         "Scholar" => $rev->scholar_name,
+                         "Admission Number" => $rev->admission_no,
+                         "Category" => $rev->name,
+                         "Item" => $rev->item_name,
+                         "Amount" => $rev->amount,
+                         "Due Date" => $rev->due_date,
+                         "Paid Amount" => $rev->amount_paid,
+                         "Paid Date" => $rev->paid_date,
+                         "Payment Remarks" => $rev->payment_remarks,
+                         "Collected By" => $rev->creator_name,
+                         "Collected Date" => $rev->created_at,
+                    ];
+
+                    $i++;
+                }
+            }
+
+   
+             header("Content-Type: text/plain");
+             $flag = false;
+             foreach ($fee_collection_excel as $row) {
+                 if (! $flag) {
+                     // display field/column names as first row
+                     echo implode("\t", array_keys($row)) . "\r\n";
+                     $flag = true;
+                 }
+                 echo implode("\t", array_values($row)) . "\r\n";
+             }
+             exit();
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    // Fees Summary Report 
+
+    public function viewFeeSummaryReport()
+    {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
+            $get_batches = $this->getBatches(); 
+
+            $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
+
+            $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
+           
+            return view('admin.fees_report_summary')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+
+    public function getFeeSummaryReport(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $class_id = $request->get('class_id', 0); 
+            $section_id = $request->get('section_id', 0); 
+            $fee_category = $request->get('fee_category', 0); 
+            $fee_item_id = $request->get('fee_item_id', 0); 
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
+            $fee_type = $request->get('fee_type', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $feesummary_qry = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_payment_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_payment_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_payment_details.school_id', $school_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0) 
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'creator.name as creator_name', 'classes.class_name', 'sections.section_name', 'scholar.name', 
+                'scholar.admission_no'
+            ); 
+
+            $filtered_qry = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_payment_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_payment_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_payment_details.school_id', $school_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0) 
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'creator.name as creator_name', 'classes.class_name', 'sections.section_name', 'scholar.name', 
+                'scholar.admission_no'
+            ); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_payment_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%" OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%"  OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )');
+                }
+            } 
+
+            if(!empty($fee_type)) {
+                if($fee_type == 'PAID') { 
+                    $feesummary_qry->where('fees_payment_details.is_concession', 0)->where('fees_payment_details.is_waiver', 0);
+                    $filtered_qry->where('fees_payment_details.is_concession', 0)->where('fees_payment_details.is_waiver', 0); 
+                }   else if($fee_type == 'CONCESSION') {
+                    $feesummary_qry->where('fees_payment_details.is_concession', 1)->where('fees_payment_details.is_waiver', 0);
+                    $filtered_qry->where('fees_payment_details.is_concession', 1)->where('fees_payment_details.is_waiver', 0); 
+                }   else if($fee_type == 'WAIVER') {
+                    $feesummary_qry->where('fees_payment_details.is_concession', 0)->where('fees_payment_details.is_waiver', 1);
+                    $filtered_qry->where('fees_payment_details.is_concession', 0)->where('fees_payment_details.is_waiver', 1); 
+                }
+            }
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $feesummary_qry->where('fees_payment_details.created_at', '>=', $mindate);
+                $filtered_qry->where('fees_payment_details.created_at', '>=', $mindate);
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $feesummary_qry->where('fees_payment_details.created_at', '<=', $maxdate);
+                $filtered_qry->where('fees_payment_details.created_at', '<=', $maxdate);
+            }
+
+
+            if($student_id>0) {
+                $feesummary_qry->where('fees_payment_details.student_id', $student_id);
+                $filtered_qry->where('fees_payment_details.student_id', $student_id);
+            }
+
+            if($class_id>0) {
+                $feesummary_qry->where('students.class_id', $class_id);
+                $filtered_qry->where('students.class_id', $class_id);
+            }
+
+            if($section_id>0) {
+                $feesummary_qry->where('students.section_id', $section_id);
+                $filtered_qry->where('students.section_id', $section_id);
+            }
+
+            if($fee_item_id > 0) {
+                $feesummary_qry->where('fee_structure_items.fee_item_id', $fee_item_id);
+                $filtered_qry->where('fee_structure_items.fee_item_id', $fee_item_id);
+            }
+
+            if($fee_category > 0) {
+                $feesummary_qry->where('fee_structure_lists.fee_category_id', $fee_category);
+                $filtered_qry->where('fee_structure_lists.fee_category_id', $fee_category);
+            }
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_payment_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+
+            $totalData = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->where('fees_payment_details.school_id', $school_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0)
+            ->orderby('fees_payment_details.id','asc')
+            ->select('fees_payment_details.id');
+
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($feesummary)) {
+                $feesummary = $feesummary->toArray();
+                foreach ($feesummary as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getFeesSummaryReportExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+            $input = $request->all();
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $class_id = $request->get('class_id', 0); 
+            $section_id = $request->get('section_id', 0); 
+            $fee_category = $request->get('fee_category', 0); 
+            $fee_item_id = $request->get('fee_item_id', 0); 
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
+            $fee_type = $request->get('fee_type', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $feesummary_qry = FeesPaymentDetail::leftjoin('fee_structure_items', 'fee_structure_items.id', 'fees_payment_details.fee_structure_item_id')
+            ->leftjoin('fee_structure_lists', 'fee_structure_lists.id', 'fee_structure_items.fee_structure_id')
+            ->leftjoin('fee_categories', 'fee_categories.id', 'fee_structure_lists.fee_category_id')
+            ->leftjoin('fee_items', 'fee_items.id', 'fee_structure_items.fee_item_id')
+            ->leftjoin('users as creator', 'creator.id', 'fees_payment_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_payment_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_payment_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_payment_details.school_id', $school_id)
+            ->where('fees_payment_details.batch', $batch)->where('fees_payment_details.cancel_status', 0) 
+            ->select('fees_payment_details.*', 'fee_structure_items.fee_item_id', 'fee_structure_items.amount', 
+                'fee_structure_items.due_date', 'fee_structure_lists.batch', 'fee_structure_lists.fee_category_id', 
+                'fee_structure_lists.fee_type', 'fee_categories.name', 'fee_items.item_name', 'fee_items.item_code',
+                'creator.name as creator_name', 'classes.class_name', 'sections.section_name', 'scholar.name', 
+                'scholar.admission_no'
+            );  
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_payment_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( fee_categories.name like "%'.$search['value'] . '%" OR fee_items.item_name like "%'.$search['value'] . '%" OR  fee_items.item_code like "%'.$search['value'] . '%" OR fee_structure_items.amount like "%'.$search['value'] . '%"  OR creator.name like "%'.$search['value'] . '%" OR fee_structure_items.due_date like "%'.$search['value'] . '%" OR fees_payment_details.concession_date like "%'.$search['value'] . '%" OR fees_payment_details.paid_date like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )'); 
+                }
+            } 
+
+            if(!empty($fee_type)) {
+                if($fee_type == 'PAID') { 
+                    $feesummary_qry->where('fees_payment_details.is_concession', 0)->where('fees_payment_details.is_waiver', 0); 
+                }   else if($fee_type == 'CONCESSION') {
+                    $feesummary_qry->where('fees_payment_details.is_concession', 1)->where('fees_payment_details.is_waiver', 0); 
+                }   else if($fee_type == 'WAIVER') {
+                    $feesummary_qry->where('fees_payment_details.is_concession', 0)->where('fees_payment_details.is_waiver', 1); 
+                }
+            }
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $feesummary_qry->where('fees_payment_details.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $feesummary_qry->where('fees_payment_details.created_at', '<=', $maxdate); 
+            }
+
+
+            if($student_id>0) {
+                $feesummary_qry->where('fees_payment_details.student_id', $student_id); 
+            }
+
+            if($class_id>0) {
+                $feesummary_qry->where('students.class_id', $class_id); 
+            }
+
+            if($section_id>0) {
+                $feesummary_qry->where('students.section_id', $section_id); 
+            }
+
+            if($fee_item_id > 0) {
+                $feesummary_qry->where('fee_structure_items.fee_item_id', $fee_item_id); 
+            }
+
+            if($fee_category > 0) {
+                $feesummary_qry->where('fee_structure_lists.fee_category_id', $fee_category); 
+            }
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_payment_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->get();
+         
+            $fee_collection_excel = [];
+
+            if (! empty($feesummary)) {
+                $i = 1;
+                foreach ($feesummary as $rev) {
+                    $fee_collection_excel[] = [
+                         "Batch" => $rev->batch,
+                         "Class" => $rev->class_name,
+                         "Section" => $rev->section_name,
+                         "Scholar" => $rev->scholar_name,
+                         "Admission Number" => $rev->admission_no,
+                         "Category" => $rev->name,
+                         "Item" => $rev->item_name,
+                         "Amount" => $rev->amount,
+                         "Due Date" => $rev->due_date,
+                         "Paid Amount" => $rev->amount_paid,
+                         "Paid Date" => $rev->paid_date,
+                         "Payment Remarks" => $rev->payment_remarks,
+                         "Concession Amount" => $rev->concession_amount,
+                         "Concession Date" => $rev->concession_date,
+                         "Concession Remarks" => $rev->concession_remarks,
+                         "Waiver Amount" => $rev->concession_amount,
+                         "Waiver Date" => $rev->is_waiver_date,
+                         "Waiver Remarks" => $rev->is_waiver_remarks,
+                         "Collected By" => $rev->creator_name,
+                         "Collected Date" => $rev->created_at,
+                    ];
+
+                    $i++;
+                }
+            }
+
+   
+             header("Content-Type: text/plain");
+             $flag = false;
+             foreach ($fee_collection_excel as $row) {
+                 if (! $flag) {
+                     // display field/column names as first row
+                     echo implode("\t", array_keys($row)) . "\r\n";
+                     $flag = true;
+                 }
+                 echo implode("\t", array_values($row)) . "\r\n";
+             }
+             exit();
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function filterExamResults(Request $request) {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();  
+            $batch = $request->get('batch', ''); 
+            $student_id = $request->get('student_id', 0);
+            $student = DB::table('students')->where('user_id', $student_id)->select('class_id', 'section_id')->first();
+            $class_id = $section_id = 0; $html = ''; $exams = '';
+            if(!empty($student)) {
+                $class_id = $student->class_id;
+                $section_id = $student->section_id;
+
+                $exams = DB::table('exams')
+                    ->leftjoin('examinations', 'examinations.id', 'exams.examination_id')
+                    ->leftjoin('exam_sessions', 'exams.id', 'exam_sessions.exam_id')
+                    ->leftjoin('classes', 'classes.id', 'exam_sessions.class_id')
+                    ->where('examinations.batch', $batch)
+                    ->where('exams.class_ids', $class_id)->where('exams.examination_id', '>',0)
+                    ->whereIn('exams.section_ids', [0, $section_id]);
+                
+                $exams = $exams->where('exam_sessions.status', 'ACTIVE')
+                    ->select("examinations.exam_name", "exams.exam_name as exname", "exams.id", "exam_startdate", DB::RAW(' DATE_FORMAT(exam_startdate, "%Y-%m") as monthyear'), 'class_id', 'section_id')
+                    ->groupby('exams.id')->orderby('exams.id', 'asc')->get();
+
+                if($exams->isNotEmpty()) {
+                    foreach($exams as $ek => $ev) {
+
+                        $exam_id = $ev->id;
+                        MarksEntry::$exam_id = $exam_id;
+                        MarksEntry::$class_id = $class_id;
+
+                        User::$monthyear = $ev->monthyear;
+                        User::$class_id = $class_id;
+                        User::$section_id = $section_id;
+                        User::$exam_id = $exam_id;
+
+                        $section_id1 = DB::table('exams')->where('id', $exam_id)->value('section_ids');
+
+                        MarksEntry::$section_id = $section_id;
+                        $students = User::with('marksentry')
+                            ->leftjoin('student_class_mappings', 'student_class_mappings.user_id', 'users.id')
+                            ->leftjoin('students', 'students.user_id', 'users.id')
+                            //->whereRaw( "'".$monthyear."' BETWEEN from_month and to_month ")
+                            ->where('student_class_mappings.class_id', $class_id);
+ 
+                        $students->where('student_class_mappings.section_id', $section_id);  
+                        $students->where('student_class_mappings.user_id',$student_id); 
+
+                        $students = $students->where('student_class_mappings.status', 'ACTIVE')
+                            ->where('user_type', 'STUDENT')
+                            ->where('student_class_mappings.user_id', '>', 0)
+                            ->select('users.id', 'name', 'email', 'mobile', 'students.admission_no')
+                            ->orderby('name')->get();
+                        if($students->isNotEmpty()) {
+                            $exams[$ek]->exam_result = $students->toArray();
+                        }   else {
+                            $exams[$ek]->exam_result = [];
+                        }
+                    }  
+                    $exams = $exams->toArray();
+                }
+
+            }
+            $html = view('admin.profile_examresults')->with(['exams'=>$exams])->render();
+            return response()->json(['status' => 'SUCCESS', 'data' => $html, 'message' => 'Exam Result Detail']);
+
+        } else {
+            return redirect('/admin/login');
+        }
+
+    }
+
+    // Fee Receipts
+    public function viewFeeReceiptsReport()
+    {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
+            $get_batches = $this->getBatches(); 
+
+            $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
+
+            $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
+           
+            return view('admin.fees_report_receipts')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+
+    public function getFeeReceiptsReport(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $class_id = $request->get('class_id', 0); 
+            $section_id = $request->get('section_id', 0); 
+            $fee_category = $request->get('fee_category', 0); 
+            $fee_item_id = $request->get('fee_item_id', 0); 
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
+            $fee_type = $request->get('fee_type', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $fee_receipts = FeesReceiptDetail::where('school_id', $school_id)
+                ->where('batch', $batch)->where('cancel_status','0')
+                ->where('student_id', $student_id)
+                ->select('*', \DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') as formatted_created_at"))
+                ->get();
+
+            $feesummary_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by') 
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 0) 
+            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                'receipt_heads.name as receipt_head_name', 'accounts.account_name'
+            ); 
+
+            $filtered_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 0) 
+            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                'receipt_heads.name as receipt_head_name', 'accounts.account_name'
+            ); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_receipt_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( accounts.account_name like "%'.$search['value'] . '%" OR payment_modes.name like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( accounts.account_name like "%'.$search['value'] . '%" OR payment_modes.name like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )');
+                }
+            }  
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '>=', $mindate);
+                $filtered_qry->where('fees_receipt_details.created_at', '>=', $mindate);
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '<=', $maxdate);
+                $filtered_qry->where('fees_receipt_details.created_at', '<=', $maxdate);
+            }
+
+
+            if($student_id>0) {
+                $feesummary_qry->where('fees_receipt_details.student_id', $student_id);
+                $filtered_qry->where('fees_receipt_details.student_id', $student_id);
+            }
+
+            if($class_id>0) {
+                $feesummary_qry->where('students.class_id', $class_id);
+                $filtered_qry->where('students.class_id', $class_id);
+            }
+
+            if($section_id>0) {
+                $feesummary_qry->where('students.section_id', $section_id);
+                $filtered_qry->where('students.section_id', $section_id);
+            } 
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_receipt_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+
+            $totalData = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 0) 
+            ->orderby('fees_receipt_details.id','asc')
+            ->select('fees_receipt_details.id');
+
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($feesummary)) {
+                $feesummary = $feesummary->toArray();
+                foreach ($feesummary as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getFeesReceiptsReportExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+            $input = $request->all();
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $class_id = $request->get('class_id', 0); 
+            $section_id = $request->get('section_id', 0); 
+            $fee_category = $request->get('fee_category', 0); 
+            $fee_item_id = $request->get('fee_item_id', 0); 
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
+            $fee_type = $request->get('fee_type', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $feesummary_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by') 
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 0) 
+            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                'receipt_heads.name as receipt_head_name', 'accounts.account_name'
+            );  
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_receipt_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( accounts.account_name like "%'.$search['value'] . '%" OR payment_modes.name like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )'); 
+                }
+            }  
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '<=', $maxdate); 
+            }
+
+
+            if($student_id>0) {
+                $feesummary_qry->where('fees_receipt_details.student_id', $student_id); 
+            }
+
+            if($class_id>0) {
+                $feesummary_qry->where('students.class_id', $class_id); 
+            }
+
+            if($section_id>0) {
+                $feesummary_qry->where('students.section_id', $section_id); 
+            } 
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_receipt_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->get();
+         
+            $fee_collection_excel = [];
+
+            if (! empty($feesummary)) {
+                $i = 1;
+                foreach ($feesummary as $rev) {
+                    $fee_collection_excel[] = [
+                         "Batch" => $rev->batch,
+                         "Class" => $rev->class_name,
+                         "Section" => $rev->section_name,
+                         "Scholar" => $rev->name,
+                         "Admission Number" => $rev->admission_no,
+                         "Receipt#" => $rev->receipt_no,
+                         "Receipt Date" => $rev->receipt_date,
+                         "Amount" => $rev->amount,
+                         "Receipt Name" => $rev->receipt_head_name,
+                         "Account" => $rev->account_name,
+                         "Payment Mode" => $rev->payment_name, 
+                         "Created By" => $rev->creator_name, 
+                    ];
+
+                    $i++;
+                }
+            }
+
+   
+             header("Content-Type: text/plain");
+             $flag = false;
+             foreach ($fee_collection_excel as $row) {
+                 if (! $flag) {
+                     // display field/column names as first row
+                     echo implode("\t", array_keys($row)) . "\r\n";
+                     $flag = true;
+                 }
+                 echo implode("\t", array_values($row)) . "\r\n";
+             }
+             exit();
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+
+    // Fee Receipts
+    public function viewFeeReceiptsCancelledReport()
+    {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $batch = DB::table('admin_settings')->where('school_id', $school_id)->value('acadamic_year');
+
+            $get_batches = $this->getBatches(); 
+
+            $get_classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get(); 
+
+            $get_fee_category = FeeCategory::where('status','ACTIVE')->where('school_id', $school_id)->orderBy('position','ASC')->get();
+           
+            return view('admin.fees_receipts_cancelled_report')->with(['get_batches' => $get_batches, 'get_classes'=>$get_classes, 
+                'get_fee_category' => $get_fee_category, 'batch' => $batch]);
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+
+    public function getFeeReceiptsCancelledReport(Request $request)
+    {
+        if (Auth::check()) {
+            $input = $request->all();
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $class_id = $request->get('class_id', 0); 
+            $section_id = $request->get('section_id', 0); 
+            $fee_category = $request->get('fee_category', 0); 
+            $fee_item_id = $request->get('fee_item_id', 0); 
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
+            $fee_type = $request->get('fee_type', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $fee_receipts = FeesReceiptDetail::where('school_id', $school_id)
+                ->where('batch', $batch)->where('cancel_status','0')
+                ->where('student_id', $student_id)
+                ->select('*', \DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') as formatted_created_at"))
+                ->get();
+
+            $feesummary_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('fee_cancel_reasons', 'fee_cancel_reasons.id', 'fees_receipt_details.cancel_reason')
+            ->leftjoin('users as cancellor', 'cancellor.id', 'fees_receipt_details.canceled_by') 
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by') 
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 1) 
+            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                'receipt_heads.name as receipt_head_name', 'accounts.account_name', 
+                'fee_cancel_reasons.cancel_reason as fee_cancel_reason', 'cancellor.name as cancellor_name'
+            ); 
+
+            $filtered_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('fee_cancel_reasons', 'fee_cancel_reasons.id', 'fees_receipt_details.cancel_reason')
+            ->leftjoin('users as cancellor', 'cancellor.id', 'fees_receipt_details.canceled_by') 
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 1) 
+            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                'receipt_heads.name as receipt_head_name', 'accounts.account_name',
+                'fee_cancel_reasons.cancel_reason as fee_cancel_reason', 'cancellor.name as cancellor_name'
+            ); 
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_receipt_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', $value['search']['value'] . '%');
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                            $filtered_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( accounts.account_name like "%'.$search['value'] . '%" OR payment_modes.name like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )');
+                    
+                    $filtered_qry->whereRaw('( accounts.account_name like "%'.$search['value'] . '%" OR payment_modes.name like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )');
+                }
+            }  
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '>=', $mindate);
+                $filtered_qry->where('fees_receipt_details.created_at', '>=', $mindate);
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '<=', $maxdate);
+                $filtered_qry->where('fees_receipt_details.created_at', '<=', $maxdate);
+            }
+
+
+            if($student_id>0) {
+                $feesummary_qry->where('fees_receipt_details.student_id', $student_id);
+                $filtered_qry->where('fees_receipt_details.student_id', $student_id);
+            }
+
+            if($class_id>0) {
+                $feesummary_qry->where('students.class_id', $class_id);
+                $filtered_qry->where('students.class_id', $class_id);
+            }
+
+            if($section_id>0) {
+                $feesummary_qry->where('students.section_id', $section_id);
+                $filtered_qry->where('students.section_id', $section_id);
+            } 
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_receipt_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->offset($start)->limit($limit)->get();
+
+            $totalData = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by')
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 1) 
+            ->orderby('fees_receipt_details.id','asc')
+            ->select('fees_receipt_details.id');
+
+            $totalData = $totalData->get();
+
+            if (!empty($totalData)) {
+                $totalData = count($totalData);
+            }
+            $totalfiltered = $totalData;
+            $filtered = $filtered_qry->get()->toArray();
+            if (!empty($filtered)) {
+                $totalfiltered = count($filtered);
+            }
+
+
+            $data = [];
+            if (!empty($feesummary)) {
+                $feesummary = $feesummary->toArray();
+                foreach ($feesummary as $post) {
+                    $nestedData = [];
+                    foreach ($post as $k => $v) {
+                        $nestedData[$k] = $v;
+                    }
+                    $data[] = $nestedData;
+                }
+            }
+
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "data" => $data,
+                "recordsFiltered" => intval($totalfiltered),
+            );
+
+            echo json_encode($json_data);
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+    public function getFeesCancelledReportExcel(Request $request)
+    {
+
+        if (Auth::check()) {
+            $input = $request->all();
+            $limit = $request->get('length', '10');
+            $start = $request->get('start', '0');
+            $dir = $request->input('order.0.dir');
+            $columns = $request->get('columns');
+            $order = $request->input('order.0.column');
+            $input = $request->all();
+            $batch = $request->get('batch', date('Y'));
+            $student_id = $request->get('student_id', 0); 
+            $class_id = $request->get('class_id', 0); 
+            $section_id = $request->get('section_id', 0); 
+            $fee_category = $request->get('fee_category', 0); 
+            $fee_item_id = $request->get('fee_item_id', 0); 
+            $mindate = isset($input['minDateFilter']) ? $input['minDateFilter'] : '';
+            $maxdate = isset($input['maxDateFilter']) ? $input['maxDateFilter'] : '';
+            $search = $request->get('search', '');
+            $fee_type = $request->get('fee_type', '');
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $fee_receipts = FeesReceiptDetail::where('school_id', $school_id)
+                ->where('batch', $batch)->where('cancel_status','0')
+                ->where('student_id', $student_id)
+                ->select('*', \DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') as formatted_created_at"))
+                ->get();
+
+            $feesummary_qry = FeesReceiptDetail::leftjoin('accounts', 'accounts.id', 'fees_receipt_details.account_id')
+            ->leftjoin('receipt_heads', 'receipt_heads.id', 'accounts.recepit_id')
+            ->leftjoin('payment_modes', 'payment_modes.id', 'fees_receipt_details.payment_mode')
+            ->leftjoin('fee_cancel_reasons', 'fee_cancel_reasons.id', 'fees_receipt_details.cancel_reason')
+            ->leftjoin('users as cancellor', 'cancellor.id', 'fees_receipt_details.canceled_by') 
+            ->leftjoin('users as creator', 'creator.id', 'fees_receipt_details.posted_by') 
+            ->leftjoin('users as scholar', 'scholar.id', 'fees_receipt_details.student_id')
+            ->leftjoin('students', 'students.user_id', 'fees_receipt_details.student_id')
+            ->leftjoin('classes', 'classes.id', 'students.class_id')
+            ->leftjoin('sections', 'sections.id', 'students.section_id')
+            ->where('fees_receipt_details.school_id', $school_id)
+            ->where('fees_receipt_details.batch', $batch)->where('fees_receipt_details.cancel_status', 1) 
+            ->select('fees_receipt_details.*', 'creator.name as creator_name', 'classes.class_name', 
+                'sections.section_name', 'scholar.name',  'scholar.admission_no', 'payment_modes.name as payment_name',
+                'receipt_heads.name as receipt_head_name', 'accounts.account_name', 
+                'fee_cancel_reasons.cancel_reason as fee_cancel_reason', 'cancellor.name as cancellor_name'
+            );  
+
+            if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['search']['value']) && !empty($value['name'])) {
+                        if ($value['name'] == 'fees_receipt_details.status') {
+                            $feesummary_qry->where($value['name'], 'like', $value['search']['value'] . '%'); 
+                        } else {
+                            $feesummary_qry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                        }
+                    }
+                }
+            } 
+
+            if (count($search) > 0) {
+                if (isset($search['value']) && !empty($search['value'])) {
+                    $feesummary_qry->whereRaw('( accounts.account_name like "%'.$search['value'] . '%" OR payment_modes.name like "%'.$search['value'] . '%" OR scholar.name like "%'.$search['value'] . '%" OR scholar.mobile like "%'.$search['value'] . '%" OR scholar.admission_no like "%'.$search['value'] . '%" )'); 
+                }
+            }  
+
+            if(!empty(trim($mindate))) {
+                $mindate = date('Y-m-d', strtotime($mindate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '>=', $mindate); 
+    
+            }
+            if(!empty(trim($maxdate))) {
+                $maxdate = date('Y-m-d', strtotime('+1 day '. $maxdate));
+                $feesummary_qry->where('fees_receipt_details.created_at', '<=', $maxdate); 
+            }
+
+
+            if($student_id>0) {
+                $feesummary_qry->where('fees_receipt_details.student_id', $student_id); 
+            }
+
+            if($class_id>0) {
+                $feesummary_qry->where('students.class_id', $class_id); 
+            }
+
+            if($section_id>0) {
+                $feesummary_qry->where('students.section_id', $section_id); 
+            } 
+ 
+            if ($order >= 0) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'fees_receipt_details.id';
+            }
+            if (empty($dir)) {
+                $dir = 'DESC';
+            }
+
+            $feesummary = $feesummary_qry->orderBy($orderby, $dir)->get();
+         
+            $fee_collection_excel = [];
+
+            if (! empty($feesummary)) {
+                $i = 1;
+                foreach ($feesummary as $rev) {
+                    $fee_collection_excel[] = [
+                         "Batch" => $rev->batch,
+                         "Class" => $rev->class_name,
+                         "Section" => $rev->section_name,
+                         "Scholar" => $rev->scholar_name,
+                         "Admission Number" => $rev->admission_no,
+                         "Receipt#" => $rev->receipt_no,
+                         "Receipt Date" => $rev->receipt_date,
+                         "Amount" => $rev->amount,
+                         "Receipt Name" => $rev->receipt_head_name,
+                         "Account" => $rev->account_name,
+                         "Payment Mode" => $rev->payment_name, 
+                         "Created By" => $rev->creator_name, 
+                    ];
+
+                    $i++;
+                }
+            }
+
+   
+             header("Content-Type: text/plain");
+             $flag = false;
+             foreach ($fee_collection_excel as $row) {
+                 if (! $flag) {
+                     // display field/column names as first row
+                     echo implode("\t", array_keys($row)) . "\r\n";
+                     $flag = true;
+                 }
+                 echo implode("\t", array_values($row)) . "\r\n";
+             }
+             exit();
+
+        } else {
+            return redirect('/admin/login');
+        }
+    }
+
+
+
+    public function viewFeeOverallReport(Request $request)   {
+        if(Auth::check()){
+            $class_id = $section_id = ''; 
+            $school_id = (new AdminRoleController())->getSchoolId();
+
+            $classes = Classes::where('status', 'ACTIVE')->where('school_id', $school_id)->orderby('position', 'Asc')->get();
+            $students  = $acadamic_year = ''; 
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+            if(!empty($settings)) {
+                $acadamic_year = trim($settings->acadamic_year);
+            }   
+
+            return view('admin.fees_overall_report')->with(['classes'=>$classes,'class_id'=>$class_id,'section_id'=>$section_id ]);
+        }else{
+            return redirect('/login');
+        }
+    }
+
+    public function loadFeeOverallReport(Request $request) {
+        if (Auth::check()) {
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $input = $request->all();
+            $start = 0; // $input['start'];
+            $length = -1; // $input['length'];
+
+            $input = $request->all();
+            $columns = $request->get('columns');
+            $dir = $request->input('order.0.dir');
+            $order = $request->input('order.0.column');
+            $status = $request->get('status','');
+
+            $class_id = $request->get('class_id',0);
+            $section_id = $request->get('section_dropdown',0); 
+
+            $acadamic_year = ''; 
+            $settings = DB::table('admin_settings')->where('school_id', $school_id)->orderby('id', 'asc')->first();
+            if(!empty($settings)) {
+                $acadamic_year = trim($settings->acadamic_year);
+            }   
+
+            OAFeesSections::$acadamic_year = $acadamic_year; 
+            $sectionsqry = OAFeesSections::leftjoin('classes', 'classes.id', 'sections.class_id')
+                ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                ->where('sections.status','=','ACTIVE')
+                ->select('sections.class_id', 'sections.id', 'classes.class_name', 'sections.section_name');
+            $filteredqry = OAFeesSections::leftjoin('classes', 'classes.id', 'sections.class_id')
+                ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')
+                ->where('sections.status','=','ACTIVE')
+                ->select('sections.class_id', 'sections.id', 'classes.class_name', 'sections.section_name');
+
+            /*if (count($columns) > 0) {
+                foreach ($columns as $key => $value) {
+                    if (!empty($value['name']) && !empty($value['search']['value'])) { 
+                        $sectionsqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%');
+                        $filteredqry->where($value['name'], 'like', '%' . $value['search']['value'] . '%'); 
+                    }
+                }
+            }*/
+
+            $school_id = (new AdminRoleController())->getSchoolId();
+            $sectionsqry->where('classes.school_id', $school_id);
+            $filteredqry->where('classes.school_id', $school_id); 
+
+            if($class_id>0){
+                $sectionsqry->where('class_id',$class_id);
+                $filteredqry->where('class_id',$class_id);
+            }
+            if($section_id>0){
+                $sectionsqry->where('sections.id',$section_id);
+                $filteredqry->where('sections.id',$section_id);
+            }
+
+            if (!empty($order)) {
+                $orderby = $columns[$order]['name'];
+            } else {
+                $orderby = 'classes.position';
+            }
+            if (empty($dir)) {
+                $dir = 'ASC';
+            } 
+
+            $sections = $sectionsqry->orderby($orderby, $dir)->get();//->skip($start)->take($length)
+            $filters = $filteredqry->select('id')->count();
+
+            $data = [];
+            if (!empty($sections)) {
+                foreach ($sections as $post) {
+                    $data[] = $post;
+                }
+            }
+
+            $totalDataqry = DB::table('sections')->leftjoin('classes', 'classes.id', 'sections.class_id')
+                ->where('sections.id', '>', 0)->where('classes.status','=','ACTIVE')->where('classes.school_id',$school_id)
+                ->where('sections.status','=','ACTIVE')
+                ->select('sections.id');
+            $totalData = $totalDataqry->select('id')->count();
+
+            $totalFiltered = $totalData;
+            if (!empty($filters)) {
+                $totalFiltered = $filters;
+            } 
+            $json_data = array(
+                "draw" => intval($request->input('draw')),
+                "recordsTotal" => intval($totalData),
+                "recordsFiltered" => intval($totalFiltered), 
+                "data" => $data
+            );
+
+            echo json_encode($json_data);
+
         } else {
             return redirect('/admin/login');
         }
